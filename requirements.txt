@@ -1,0 +1,3 @@
+- psutil
+- requests
+- qdrant_client
