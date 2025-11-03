@@ -15,4 +15,10 @@
 Notes:
 - .venv is the venv for linux env
 - Use windows env as it seems that linux is slower (only tested with WSL though)
-- also start ollama server on same system, i.e., either wsl or windows. Otherwise, there seem to be some routing issues or something.
+- also start ollama server on same system, i.e., either wsl or windows. Otherwise, there seems to be some routing issues or something.
+
+
+To run main.py and langChain.py pull the model "mxbai-embed-large" with > ollama pull mxbai-embed-large
+
+This model is used to transform strings into vector embeddings. 
+langchain.py just a quick test of their pdf reader. Can only retrieve text but all structure is lost. Rather use own preprocessing or better pdfreader that allows further processing. 

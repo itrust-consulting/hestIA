@@ -1,3 +1,6 @@
 - psutil
 - requests
 - qdrant_client
+- langchain_community
+- pypdf
+- PyMuPDF
