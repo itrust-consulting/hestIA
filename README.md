@@ -22,3 +22,28 @@ To run main.py and langChain.py pull the model "mxbai-embed-large" with > ollama
 
 This model is used to transform strings into vector embeddings. 
 langchain.py just a quick test of their pdf reader. Can only retrieve text but all structure is lost. Rather use own preprocessing or better pdfreader that allows further processing. 
+
+Quick start:
+
+> ollama serve
+> docker run -p 6333:6333 -p 6334:6334 -v "$(pwd)/qdrant_storage:/qdrant/storage:z" qdrant/qdrant
+
+Check if qdrant Db is initialized: http://localhost:6333/dashboard#/collections
+should see PoC-Datastore + PoC-Datastore-1
+
+Otherwise initialize vector DB:
+> python .\rag.py
+PowerShell
+> Invoke-RestMethod -Uri http://localhost:8099/init `
+>>     -Method POST `
+>>     -Headers @{ "Content-Type" = "application/json" } `
+>>     -Body '{"dirpath": "./docs", "collection": "PoC-Datastore"}'
+bash
+> curl -X POST http://localhost:8099/init -H "Content-Type: application/json"  -d '{"prompt":"Explain secure boot"}'
+
+Start web app with
+> python .\view.py
+
+http://127.0.0.1:7860/
+
+Model and Collection are hardcoded selections for now.
