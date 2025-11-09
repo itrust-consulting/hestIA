@@ -54,3 +54,10 @@ foo@bar:~$ python .\view.py
 Acces via http://127.0.0.1:7860/
 
 Model and Collection are hardcoded selections for now.
+
+
+
+Weird qdrant behavior. Storage not properly mounted on windows machines -> Rebooting qdrant instance will no longer be able to access created collections. 
+When creating snapshots of collections to be uploaded, or restored from afterwards, snapshots are of size ~600MB, irrespective of actual collection size.
+Assuming the storage is bloated with deleted and uploaded collections during testing. But don't know how to clean up. 
+These bloated snapshots are also not able to be uploaded, errors are thrown...

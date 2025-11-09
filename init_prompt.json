@@ -1,9 +1,0 @@
-{
-  "model": "llama3.1:8b",
-  "messages": [
-    {
-      "role": "user",
-      "content": "why is the sky blue?"
-    }
-  ]
-}

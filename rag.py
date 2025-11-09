@@ -178,6 +178,21 @@ async def init_endpoint(request: Request):
     result = initialize_collection(dirpath, collection) 
     return {"status": "completed", "details": result}
 
+@app.post("/snapshot")
+async def create_snapshot(request: Request):
+    os.makedirs("snapshots", exist_ok=True)
+    
+    body = await request.json()
+    collection = body.get("collection")
+    info = client.create_snapshot(collection_name=collection)
+    
+    snapshot_url = f"{ QDRANT_URL}/collections/test_collection/snapshots/{info.name}"
+    local_path = os.path.join("snapshots", info.name)
+    response = requests.get(snapshot_url)
+    with open(local_path, "wb") as f:
+        response.raise_for_status()
+        f.write(response.content)
+
 @app.post("/rag")
 async def rag_endpoint(request: Request):
 
@@ -199,9 +214,9 @@ async def rag_endpoint(request: Request):
     t1 = time.perf_counter()
 
     t = t1 - t0
-    write_to_file(f"./tests/{current}.md", augmented_prompt)
-    write_to_file(f"./tests/{current}.md", "\n" + f"{response}", mode = "a")
-    write_to_file(f"./tests/{current}.md", "\n Total:\t" + f"{t}", mode = "a")
+    write_to_file(f"./tests/queries/{current}.md", augmented_prompt)
+    write_to_file(f"./tests/queries/{current}.md", "\n" + f"{response}", mode = "a")
+    write_to_file(f"./tests/queries/{current}.md", "\n Total:\t" + f"{t}", mode = "a")
 
     #print(response)
     return {"response": response}

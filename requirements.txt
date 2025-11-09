@@ -4,5 +4,6 @@
 - langchain_community
 - pypdf
 - PyMuPDF
+- pymupdf4llm
 - python-frontmatter
 - gradio
