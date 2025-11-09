@@ -11,6 +11,8 @@ from lxml import etree
 import zipfile
 from pathlib import Path
 
+import argparse
+
 
 DUMP_DIR = "./dump"
 SUPPPORTED_EXTENSIONS = [".docx", ".pdf"]
@@ -33,21 +35,20 @@ class BaseParser(ABC):
             return ""
         return re.sub(r"\s+", " ", text).strip()
     
-    def dump(self, path=None, builtIn_only=True):
+    def dump(self, output_path=None, builtIn_only=True):
         """Dump document as markdown with yaml frontmatter."""
         body = self.body or self.to_markdown()
         meta = self.meta or self.get_metadata(builtIn_only=builtIn_only)
 
         post = frontmatter.Post(content=body, **meta)
-
-        if not path:
+        if not output_path:
             # Extract just the filename without directories or extension
             filename = Path(self.filepath).stem
             dump_dir = Path(DUMP_DIR)
             dump_dir.mkdir(parents=True, exist_ok=True)  # ensure directory exists
-            path = dump_dir / f"{filename}.md"
+            output_path = dump_dir / f"{filename}.md"
 
-        with open(path, "wb") as file:
+        with open(output_path, "wb") as file:
             frontmatter.dump(post, file)
 
     @abstractmethod
@@ -336,17 +337,43 @@ class MarkdownConverter:
         
         return md_files
     
-    def dump(self, path=None, builtIn_only=True):
+    def dump(self, output_path=None, builtIn_only=True):
         """
         Dump documents as markdown with yaml frontmatter.
+
+        Have to add check if docs_to_convert > 1, to properly handle output_path
         """
         for doc in self.docs_to_convert:
             parser = self.get_parser(doc)
-            parser.dump(path=path, builtIn_only=builtIn_only)
+            parser.dump(output_path=output_path, builtIn_only=builtIn_only)
         return
 
 
-file = "./docs"
+if __name__ == "__main__":
 
-converter = MarkdownConverter(file)
-converter.dump(builtIn_only=False)
+    parser = argparse.ArgumentParser(
+        description="Convert DOCX and PDF documents to Markdown."
+    )
+    parser.add_argument(
+        "path",
+        type=str,
+        help="Path to a file or a directory containing documents."
+    )
+    parser.add_argument(
+        "--builtIn-only",
+        action="store_true",
+        help="Only include built-in metdata (ignores custom metadata)."
+    )
+    parser.add_argument(
+        "-o", "--output",
+        type=str,
+        help="Directory or filepath to save the Markdown files (default: ./dump/<filename>.md)"
+    )
+
+    args = parser.parse_args()
+
+    file_path = Path(args.path)
+    converter = MarkdownConverter(file_path)
+
+    # Call dump with optional builtIn_only argument
+    converter.dump(output_path=args.output, builtIn_only=args.builtIn_only)
