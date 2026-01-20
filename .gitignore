@@ -1,3 +1,5 @@
 docs/
 dump/
 tests/
+qdrant_storage/
+__pycache__/
