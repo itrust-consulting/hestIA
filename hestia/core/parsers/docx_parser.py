@@ -5,10 +5,11 @@ from docx.text.paragraph import Paragraph
 from lxml import etree
 import zipfile
 import os
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 import warnings
 
-from core.parsers.baseparser import BaseParser
+from hestia.core.parsers.baseparser import BaseParser, MetadataFilter
 
 try:
     import pypandoc
@@ -290,27 +291,16 @@ class DOCXParser(BaseParser):
                     val_elem = next(iter(prop))
                     metadata[self.normalize_key(name)] = self.clean_string(val_elem.text)
         return metadata
+    
+    def get_metadata(self, mask_name=None):
+        stem = Path(self.filepath).stem
+        builtIn = self.get_builtin_metadata(self.filepath) 
+        metadata = {**builtIn, "source": stem}
 
-    def get_metadata_from_cover_page(self, file: str) -> dict:
-        doc = Document(file)
-        # assuming itr template
-        if len(doc.tables) < 1:
-            return {}
-        table_data = doc.tables[1]._tbl
-        data = self.extract_table_text(table_data)
-        if data:
-            metadata = {k: v for k, v in data} 
-        else:
-            metadata = {}
-        return metadata
-
-    def get_metadata(self, builtIn_only=True):
-        builtIn = self.get_builtin_metadata(self.filepath)
-        if builtIn_only:
-            self.meta = builtIn
-            return builtIn
-        custom = self.get_metadata_from_cover_page(self.filepath)
-        metadata = {**builtIn, **custom}
+        if mask_name:
+            # "global" call to the MetadataFilter instance. change in futuer
+            metadata = MetadataFilter().filter(metadata, mask_name)
+        
         self.meta = metadata
         return metadata
     
@@ -329,9 +319,69 @@ class DOCXParser(BaseParser):
         self.body = md_text
 
         return md_text
+    
+class ITRDOCXParser(DOCXParser):
+    """
+    extend DOCXParser to handle itrust specifics, e.g., builtin-Metadata
+    """
+    def __init__(self, file=None):
+        super().__init__(file)
+
+    def get_builtin_metadata(self, file: str) -> dict:
+        """get document builtin metadata (core + custom)"""
+        metadata = {}
+        with zipfile.ZipFile(file) as zf:
+            """Extract core props first"""
+            xml_data = zf.read("docProps/core.xml")
+            root = etree.fromstring(xml_data)
+            for elem in root:
+                tag = etree.QName(elem).localname  # strip namespace
+                metadata[self.normalize_key(tag)] = self.clean_string(elem.text)
+
+            """Extract custom props"""
+            if "docProps/custom.xml" in zf.namelist():
+                xml_data = zf.read("docProps/custom.xml")
+                root = etree.fromstring(xml_data)
+                for prop in root.findall("ep:property", self.NAMESPACES):
+                    name = prop.get("name")
+                    val_elem = next(iter(prop))
+                    metadata[self.normalize_key(name)] = self.clean_string(val_elem.text)
+        return metadata
+
+    def get_metadata_from_cover_page(self, file: str) -> dict:
+        doc = Document(file)
+        # assuming itr template
+        if len(doc.tables) < 1:
+            return {}
+        table_data = doc.tables[1]._tbl
+        data = self.extract_table_text(table_data)
+        if data:
+            metadata = {k: v for k, v in data} 
+        else:
+            metadata = {}
+        return metadata
+
+    def get_metadata(self, builtIn_only=True, mask_name=None):
+        
+        # Get base metadata
+        stem = Path(self.filepath).stem
+        builtIn = self.get_builtin_metadata(self.filepath)
+        metadata = {**builtIn, "source": stem}
+
+        # Get custom metadata if needed
+        if not builtIn_only:
+            custom = self.get_metadata_from_cover_page(self.filepath)
+            # Merge custom metadata, giving custom values precedence
+            metadata = {**metadata, **custom}
+
+        # Apply mask once at the end
+        if mask_name:
+            metadata = MetadataFilter().filter(metadata, mask_name)
+
+        self.meta = metadata
+        return metadata
 
 if __name__ == "__main__":
-
-    p = DOCXParser()
-    p.parse("./tests/test_inputs/Test-Document.docx")
-    p.dump()
+    p = ITRDOCXParser()
+    p.parse("../tests/test_inputs/Test-Document.docx")
+    p.dump(builtIn_only=True, mask_name="rag_default")

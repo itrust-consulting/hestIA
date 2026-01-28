@@ -2,8 +2,9 @@ import re
 import os
 import pymupdf
 import pymupdf4llm
+from pathlib import Path
 
-from core.parsers.baseparser import BaseParser
+from hestia.core.parsers.baseparser import BaseParser, MetadataFilter
 
 os.environ["TESSDATA_PREFIX"] = "C:/Users/hfries/AppData/Local/Programs/Tesseract-OCR/tessdata"
 
@@ -42,18 +43,26 @@ class PDFParser(BaseParser):
                 table_data[self.normalize_key(_row[0])] = _row[1]
         return table_data
 
-    def get_metadata(self, builtIn_only=True):
-        # retrieve builtin document metadata, e.g., format, title, author, ...
-        builtIn = self.get_builtin_metadata()        
-        if builtIn_only:
-            self.meta = builtIn
-            return builtIn
-        
-        custom = self.get_metadata_from_cover_page()
-        metadata = {**builtIn, **custom}
-        # set meta
+    def get_metadata(self, builtIn_only=True, mask_name=None):
+
+        stem = Path(self.filepath).stem
+        builtIn = self.get_builtin_metadata()
+        metadata = {**builtIn, "source": stem}
+
+        # Get custom metadata if needed
+        if not builtIn_only:
+            custom = self.get_metadata_from_cover_page()
+            metadata = {**metadata, **custom}
+
+        # Apply mask once at the end
+        if mask_name:
+            metadata = MetadataFilter().filter(metadata, mask_name)
+
         self.meta = metadata
         return metadata
+    
+    # Get base metadata
+        
 
     def to_markdown(self, header=False, footer=False, ignore_graphics=True, ignore_images=True, **kwargs):
         # Generate Markdown from PDF

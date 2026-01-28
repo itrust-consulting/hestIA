@@ -1,0 +1,14 @@
+.venv/
+.vscode/
+.wenv/
+docs/
+dump/
+scripts/
+test_docs/
+tests/
+_regex.md
+repo_access_token.md
+hestia/__pycache__/
+hestia/core/
+hestia/backend.py
+.gitignore

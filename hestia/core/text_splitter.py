@@ -17,8 +17,8 @@ _HEADING_RE = re.compile(r"^(#{1,5})\s+(.*)$")
 
 DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:0.6b"
 DEFAULT_OUTPUT_DIR = "./dump/textsplitter/"
-OLLAMA_URL = "http://localhost:11434"
-QDRANT_URL = "http://localhost:6333"
+OLLAMA_URL = "http://192.168.0.34:11434"
+QDRANT_URL = "http://192.168.0.34:6333"
 
 client = QdrantClient(url=QDRANT_URL)
 
@@ -33,13 +33,14 @@ class Chunk():
         self.question = None
         self.relations = None
         self.tags = None
-        self.embedding = None
+        # embedding not innately relevant to Chunk, only when put into vectorDB -> remove later on
+        self.embeddings = None
 
     def __str__(self):
         return self.content
     
     def __repr__(self):
-        return f"text = {self.content}\nmetadata = {self.metadata}\nparent = {self.parent}\nsummary = {self.summary}\nquestion = {self.question}"
+        return f"text = {self.content}\nmetadata = {self.metadata}\nparent = {self.parent}\n  summary = {self.summary}\nquestion = {self.question}"
     
     def set_parent(self, parent_chunk):
         self.parent = parent_chunk
@@ -56,7 +57,7 @@ class Chunk():
             'parent_chunk': self.parent,
             'relations': self.relations
         }
-    
+
     @classmethod
     def from_dict(cls, data):
         return cls()
@@ -91,7 +92,7 @@ class BaseSplitter(ABC):
         return self._chunks
         
     @abstractmethod
-    def split(self, text, metadata = None):
+    def split(self, text):
         """
         Abstract method that must be implemented by subclasses.
         
@@ -241,11 +242,10 @@ class SectionSplitter(BaseSplitter):
         super().__init__()
         self._max_depth = max_depth 
 
-    def split(self, text, metadata = None):
+    def split(self, text):
         """
         TODO:
         - parent chunks
-        - load into Chunk
         
         :param self: Description
         :param max_level: Description
@@ -344,12 +344,15 @@ class SemanticSplitter(BaseSplitter):
 
         
     def _get_embedding(self, text, embedding_model=DEFAULT_EMBEDDING_MODEL, timeout = 30):
-        
+        """
+        TODO: handle response.json()["error"]
+        """
         response = requests.post(
             f"{OLLAMA_URL}/api/embed",
             json={"model": embedding_model, "input": text},
             timeout=timeout
         )
+        
         if len(response.json()["embeddings"]) > 0:
             return response.json()["embeddings"][0]
         else:
@@ -439,6 +442,29 @@ class SemanticSplitter(BaseSplitter):
         return chunks
 
 
+class ModalSplitter(BaseSplitter):
+    """
+    Docstring for ModalSplitter
+    
+    Requires implementation of proper Document object to differ between
+    modalities (paragraph, tables, images)
+
+    :var filepath: Description
+    :vartype filepath: LiteralString
+    :var file: Description
+    :vartype file: Any
+    :var text: Description
+    :vartype text: Any
+    :var metadata: Description
+    :vartype metadata: Any
+    :var splitter: Description
+    :vartype splitter: SemanticSplitter
+    :var chunks: Description
+    :vartype chunks: list[Chunk] | list
+    """
+    def __init__(self):
+        super().__init__()
+
 def load(filepath):
     path = Path(filepath)
 
@@ -462,10 +488,7 @@ def store_document_chunks(chunks, collection, embedding_model=DEFAULT_EMBEDDING_
     for chunk in chunks:
         # Generate a unique ID for each chunk
         chunk_id = str(uuid.uuid4())
-        adjusted_metadata = {
-            **chunk.metadata,
-            "content": chunk.content
-        }
+        adjusted_metadata = chunk.to_dict()
 
         embeddings = chunk.embed(embedding_model=embedding_model)
 
@@ -501,7 +524,7 @@ def initialize_collection(dirpath: str, collection: str, model=DEFAULT_EMBEDDING
                 #meta = {**document.metadata, "source": doc_name}
                 content = document.content
 
-                splitter = FixedSizeSplitter()
+                splitter = SectionSplitter()
                 chunks = splitter.split(content)
                 
                 store_document_chunks(chunks, collection, model)
@@ -524,8 +547,6 @@ if __name__ == "__main__":
     splitter = SemanticSplitter(hysteresis=2)
     chunks = splitter.split(text)
     splitter.dump()"""
-    input_path = "./dump"
-    initialize_collection(input_path, "FixedSizeSplitter")
-
-
-    
+    #input_path = "./dump"
+    #initialize_collection(input_path, "ISMS (subset)")
+    print("hi")

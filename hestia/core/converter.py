@@ -1,14 +1,14 @@
 import argparse
 from pathlib import Path
 
-from core.parsers.docx_parser import DOCXParser
-from core.parsers.pdf_parser import PDFParser
+from hestia.core.parsers.docx_parser import ITRDOCXParser
+from hestia.core.parsers.pdf_parser import PDFParser
 
 SUPPPORTED_EXTENSIONS = [".docx", ".pdf"]
 
 class MarkdownConverter:
     EXTENSION_MAP = {
-        ".docx": DOCXParser,
+        ".docx": ITRDOCXParser,
         ".pdf": PDFParser
     }
 
@@ -70,7 +70,7 @@ class MarkdownConverter:
         
         return md_files
     
-    def dump(self, output_path=None, builtIn_only=True):
+    def dump(self, output_path=None, builtIn_only=True, mask_name=None):
         """
         Dump documents as markdown with yaml frontmatter.
 
@@ -78,7 +78,7 @@ class MarkdownConverter:
         """
         for doc in self.docs_to_convert:
             parser = self.get_parser(doc)
-            parser.dump(output_path=output_path, builtIn_only=builtIn_only)
+            parser.dump(output_path=output_path, builtIn_only=builtIn_only, mask_name=mask_name)
         return
     
 if __name__ == "__main__":
@@ -108,4 +108,4 @@ if __name__ == "__main__":
     converter = MarkdownConverter(file_path)
 
     # Call dump with optional builtIn_only argument
-    converter.dump(output_path=args.output, builtIn_only=True)#args.builtIn_only)
+    converter.dump(output_path=args.output, builtIn_only=True, mask_name="rag_default")#args.builtIn_only)
