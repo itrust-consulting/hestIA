@@ -25,9 +25,10 @@ client = QdrantClient(url=QDRANT_URL)
 
 class Chunk():
 
-    def __init__(self, content, metadata):
+    def __init__(self, content, metadata, source):
         self.content = content
         self.metadata = metadata
+        self.source = source
         self.parent = None
         self.summary = None
         self.question = None
@@ -52,6 +53,7 @@ class Chunk():
         return {
             'content': self.content,
             'metadata': self.metadata,
+            'source': self.source,
             'summary': self.summary,
             'question': self.question,
             'parent_chunk': self.parent,
@@ -242,7 +244,7 @@ class SectionSplitter(BaseSplitter):
         super().__init__()
         self._max_depth = max_depth 
 
-    def split(self, text):
+    def split(self, text, source):
         """
         TODO:
         - parent chunks
@@ -290,7 +292,7 @@ class SectionSplitter(BaseSplitter):
                 "position": section["position"],
             }
 
-            chunk = Chunk(content = chunk_text, metadata = chunk_meta)
+            chunk = Chunk(content = chunk_text, metadata = chunk_meta, source=source)
             chunks.append(chunk)
 
         self._chunks = chunks

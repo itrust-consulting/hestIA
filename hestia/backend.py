@@ -1,9 +1,10 @@
 from abc import ABC
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, NamedVector
 from typing import Optional, Dict, Any
 import uuid
 import requests
+import os
 
 import frontmatter
 from pathlib import Path
@@ -22,7 +23,7 @@ DEFAULT_TAG_LIST = [
 
 DEFAULT_CONFIG = {
     "vectors":{
-        "text": {
+        "Default": {
             "size": 1024,
             "distance": "Cosine"
         }
@@ -31,7 +32,7 @@ DEFAULT_CONFIG = {
 
 DEFAULT_RAG_CONFIG= {
     "vectors": {
-        "content": {
+        "Default": {
             "size": 1024,
             "distance": "Cosine"
         }, 
@@ -102,8 +103,13 @@ class QdrantDBBackend(StorageBackend):
     def delete_collection(self, collection_name: str) -> None:
         self.client.delete_collection(collection_name)
 
-    def query(self, query, collection_name, **kwargs):
-        pass
+    def query(self, embedding: list[float], collection_name: str, **kwargs):
+        query_result = self.client.query_points(collection_name, 
+                                          query=embedding,
+                                          using="content", 
+                                          limit=1)
+
+        return query_result
 
     def close(self):
         self.client.close()
@@ -208,7 +214,22 @@ class RAGManager:
         pass
 
 
+def embed(data, model=DEFAULT_EMBEDDING_MODEL):
+        """
+        Generate embedding for data with model.
 
+        :param self: Description
+        :param data: Description
+        """
+        response = requests.post(
+            f"{OLLAMA_URL}/api/embed",
+            json={"model": model, "input": data},
+        )
+        if len(response.json()["embeddings"]) > 0:
+            return response.json()["embeddings"][0]
+        else:
+            return None
+        
 def load(filepath):
     path = Path(filepath)
 
@@ -230,53 +251,45 @@ def load(filepath):
 if __name__ == "__main__":
     collection = "itrust ISMS"
     backend = QdrantDBBackend()
+    
     backend.initialize(collection, config=DEFAULT_RAG_CONFIG)
-    """
-    point = {
-        "vectors": {
-            "content": [0]*1536,
-            "question": [0]*384,
-            "summary": [0]*1024
-        },
-        "payload": {
-            "content" : "THIS IS A TEST",
-            "metadata" : None,
-            "question": "Some represantative question",
-            "summary": "Some summary"
-        }
-    }
 
-    point_0 = {
-        "vectors": {
-            "text": [0]*1024
-        },
-        "payload": {
-            "content" : "THIS IS A TEST",
-            "metadata" : None,
-            "question": "Some represantative question",
-            "summary": "Some summary"
-        }
-    }
+    dirpath = "./dump"
 
-    backend.upsert(collection)
-    """
+    documents = [doc for doc in os.listdir(dirpath) if doc.endswith(".md")]
+    print(f"Detected {len(documents)} files.")
+    for doc_name in documents:
+        filepath = os.path.join(dirpath, doc_name)
+        print(f"Embedding file: {doc_name}")
+        with open(filepath, "r", encoding="utf-8") as file:
+            document = load(filepath)
+            #meta = {**document.metadata, "source": doc_name}
+            content = document.content
 
-    doc_path = "./dump/1_POL_ITR-ISMS_v2.0.md"
-    doc = load(doc_path)
-    chunks = splitter.SectionSplitter().split(doc.content)
+            chunks = splitter.SectionSplitter().split(document.content, source=document.metadata["source"])
+            
+            for chunk in chunks:
+                vector = chunk.embed()
+                payload = chunk.to_dict()
 
-    for chunk in chunks:
-        vector = chunk.embed()
-        payload = chunk.to_dict()
+                if not vector:
+                    continue
 
-        if not vector:
-            continue
+                point = [{
+                    "vectors": {
+                        "Default": vector
+                    },
+                    "payload": payload
+                }]
 
-        point = [{
-            "vectors": {
-                "content": vector
-            },
-            "payload": payload
-        }]
+                backend.upsert(collection, point)
+    
+    info = backend.client.get_collection(collection_name=collection)
+    print(f"All documents embedded. {info.points_count} points created.")
 
-        backend.upsert(collection, point)
+    """query = "How to evaluate competence?"
+    query_embed = embed(query)
+    results = backend.query(embedding=query_embed, collection_name=collection)
+    print(results)"""
+
+    

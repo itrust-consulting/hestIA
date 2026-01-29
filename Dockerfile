@@ -10,8 +10,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY hestia/ ./
 
-
-
-
 EXPOSE 7860
 CMD ["python", "hestia.py"]
