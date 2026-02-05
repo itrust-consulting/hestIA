@@ -1,14 +1,15 @@
 FROM python:3.13-slim
-WORKDIR /hestia
+WORKDIR /root
 
 RUN useradd -m user
-RUN chown -R user:user /hestia
+RUN chown -R user:user /root
 USER user
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY hestia/ ./
+COPY assets/ ./assets/
+COPY hestia/ ./hestia/
 
 EXPOSE 7860
-CMD ["python", "hestia.py"]
+CMD ["python", "-m", "hestia.hestia"]

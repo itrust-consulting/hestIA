@@ -1,6 +1,7 @@
 .venv/
 .vscode/
 .wenv/
+app/
 docs/
 dump/
 scripts/

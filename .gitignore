@@ -4,3 +4,4 @@ tests/
 test_docs/
 qdrant_storage/
 __pycache__/
+hestia.log
