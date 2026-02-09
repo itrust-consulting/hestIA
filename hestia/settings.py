@@ -6,10 +6,15 @@ import pathlib
 PROJECT_ROOT_PATH = pathlib.Path(os.path.abspath(os.path.join(__file__, ".."))).parent.absolute()
 print(PROJECT_ROOT_PATH)
 # --- Logging --- 
-APP_DATA = PROJECT_ROOT_PATH.joinpath("./app/data/")
-LOG_FILE = PROJECT_ROOT_PATH.joinpath("./log.log")
-REQ_FILE = PROJECT_ROOT_PATH.joinpath("./requests.json")
 CSS_FILE = PROJECT_ROOT_PATH.joinpath("./assets/styles.css")
+APP_DATA = PROJECT_ROOT_PATH.joinpath("./app/data/")
+LOG_FILE = APP_DATA.joinpath("./log.log")
+REQ_FILE = APP_DATA.joinpath("./requests.json")
+
+# --- DB Config ---
+CDB_PATH = APP_DATA.joinpath("./uhist.db")
+PBKDF2_ITERATIONS = 210_000  # OWASP-recommended range; reasonable default
+MAX_HISTORY_PAIRS = 10       # Limit messages loaded into UI
 
 
 verbosity = 0  # global verbosity setting for controlling string formatting
@@ -53,6 +58,7 @@ DEFAULT_MODELS = ["ministral-3:14b", "deepseek-r1:32b"]
 DEFAULT_GEN_MODEL = "ministral-3:14b"
 DEFAULT_EMB_MODEL = "qwen3-embedding:0.6b"
 DEFAULT_RRK_MODEL = "dengcao/Qwen3-Reranker-4B:Q8_0"
+DEFAULT_KEEP_ALIVE = -1
 
 DEFAULT_LLM_SETTINGS = {
         "gen": {"model": DEFAULT_GEN_MODEL, },

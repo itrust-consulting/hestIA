@@ -200,7 +200,6 @@ class QueryPlan:
     def __repr__(self):
         return self.ascii()
 
-
 @dataclass
 class QueryContext:
     org_query: str                            # original query
@@ -1037,6 +1036,7 @@ if __name__ == "__main__":
             "sparse_vectors": {},
         }
     }
+
 
     router = Router(endpoints)
     query_opts = QueryOptions().from_schema(db_settings["query"])
