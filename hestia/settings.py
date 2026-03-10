@@ -1,12 +1,15 @@
 import os
 import pathlib
+from typing import Optional, List
+from dataclasses import dataclass, field
 
+from hestia.schemas import types
 
 # --- Settings ---
 PROJECT_ROOT_PATH = pathlib.Path(os.path.abspath(os.path.join(__file__, ".."))).parent.absolute()
-print(PROJECT_ROOT_PATH)
+
 # --- Logging --- 
-CSS_FILE = PROJECT_ROOT_PATH.joinpath("./assets/styles.css")
+CSS_FILE = PROJECT_ROOT_PATH.joinpath("./frontend/gui/static/styles.css")
 APP_DATA = PROJECT_ROOT_PATH.joinpath("./app/data/")
 LOG_FILE = APP_DATA.joinpath("./log.log")
 REQ_FILE = APP_DATA.joinpath("./requests.json")
@@ -25,115 +28,71 @@ MAX_VERBOSITY = 4
 LOG_LEVEL = MAX_VERBOSITY
 
 # --- HTTP ---
-REQUEST_TIMEOUT = (10.0, 180.0)
+REQUEST_TIMEOUT = (10.0, 800.0)
+
 
 # --- DB Settings ---
 DEFAULT_DB_URL = "http://192.168.0.34:6333"  # change to http://qdrant:6333 in docker deployment
 DB_URL = os.getenv("QDRANT_BASE_URL", DEFAULT_DB_URL)
 
-DEFAULT_DB_SETTINGS = {
-    "vectors": {
-        "name": "Default",
-        "size": 1024,
-        "distance": "Cosine"
-        },
-        "sparse_vectors": {},
-    }
-DEFAULT_QUERY_OPTIONS = {
-            "using": "Default",
-            "limit": 5,
-            "offset": 0,
-            "score_threshold": 0.2,
-            "with_payload": True,
-            "with_vectors": False,
-            "filter": None
-            }
 
 # --- LLM Settings ---
 DEFAULT_LLM_URL = "http://192.168.0.34:11434" # change to http://ollama:11434 in docker deployment
 LLM_URL = os.getenv("OLLAMA_BASE_URL", DEFAULT_LLM_URL)
 
-DEFAULT_CONTEXT_SIZE = 32768
-DEFAULT_MODELS = ["ministral-3:14b", "deepseek-r1:32b"]
+DEFAULT_CONTEXT_SIZE = 128000
 DEFAULT_GEN_MODEL = "ministral-3:14b"
 DEFAULT_EMB_MODEL = "qwen3-embedding:0.6b"
 DEFAULT_RRK_MODEL = "dengcao/Qwen3-Reranker-4B:Q8_0"
 DEFAULT_KEEP_ALIVE = -1
-
-DEFAULT_LLM_SETTINGS = {
-        "gen": {"model": DEFAULT_GEN_MODEL, },
-        "emb": {"model": DEFAULT_EMB_MODEL, "vector_size": 1024},
-        "rrk": {"model": DEFAULT_RRK_MODEL, "temperature": 0, "num_predict": 3, "raw": True},
-        }
-## --- RAG Settings ---
-
-### --- Parser + Splitter
-DUMP_DIR = "./dump"
-SUPPPORTED_EXTENSIONS = [".docx", ".pdf"]
-DEFAULT_TEXT_SPLITTER = "SectionSplitter"
-
-DEFAULT_TAG_LIST = [
-    "ISMS", "DocMgmt", "CoC", "Tech", "Org", "Phys"
-]
-
-DEFAULT_CONFIG = {
-    "vectors":{
-        "Default": {
-            "size": 1024,
-            "distance": "Cosine"
-        }
-    }
-}
-
-DEFAULT_RAG_CONFIG= {
-    "vectors": {
-        "Default": {
-            "size": 1024,
-            "distance": "Cosine"
-        }, 
-        "summary" : {
-            "size": 1024,
-            "distance": "Cosine"
-        }, 
-        "question" : {
-            "size": 1024,
-            "distance": "Cosine"
-        } 
-    },
-    "sparse_vectors" : {
-        "tags": {}
-    }
-}
-
-### --- Query ---
+WHITELIST_MODELS = ["ministral-3:14b", "deepseek-r1:32b"]
 
 
-DEFAULT_EXECUTION_CONTEXT = {
-    "llm": {
-        "model": DEFAULT_GEN_MODEL,
-        "temperature": 0.0,
-        "num_predict": 1,
-        "raw": False,
-    },
-    "emb": {
-        "model": DEFAULT_EMB_MODEL,
-        "vector_size": 1024,
-    },
-    "rrk": {
-        "model": DEFAULT_RRK_MODEL,
-        "temperature": 0.0,
-        "num_predict": 3,
-        "raw": True,
-    },
-    "query": {
-        "using": "Default",
-        "ranking": "rrf",
-        "limit": 5,
-        "offset": 0,
-        "with_payload": True,
-        "with_vectors": False,
-        "prefetch_limit": 0,
-        "score_threshold": None,
-        "filter": None,
-    },
-}
+DENSE_DIM = 1024
+DEFAULT_OUTPUT_DIR = "./dump/textsplitter/"
+
+SUPPORTED_EXTENSIONS = [".docx", ".pdf"]
+CLASSIFICATION = ["public", "public (pu)", 
+                  "internal", "internal (in)",
+                  "confidential", "confidential (co)",
+                  "restricted", "restricted (re)",
+                  "secret", "secret (se)"]
+
+
+@dataclass
+class Settings:
+    LLM_BACKEND: Optional[types.LLMBackend] = field(default="ollama")
+    DB_BACKEND: Optional[types.DBBackend] = field(default="qdrant")
+
+    SERVICES_TO_START: List[types.ServiceName] = field(default_factory=lambda: ["embed", 
+                                                                          "generate", 
+                                                                          "chat",
+                                                                          "search",
+                                                                          "rag"])
+
+    REQUEST_TIMEOUT = (10.0, 800.0)    
+    # --- DB Settings ---
+    DEFAULT_DB_URL = "http://192.168.0.34:6333"  # change to http://qdrant:6333 in docker deployment
+    DB_URL = os.getenv("QDRANT_BASE_URL", DEFAULT_DB_URL)
+
+    # --- LLM Settings ---
+    DEFAULT_LLM_URL = "http://192.168.0.34:11434" # change to http://ollama:11434 in docker deployment
+    LLM_URL = os.getenv("OLLAMA_BASE_URL", DEFAULT_LLM_URL)
+
+    DEFAULT_CONTEXT_SIZE = 32768
+    DEFAULT_GEN_MODEL = "ministral-3:14b"
+    DEFAULT_EMB_MODEL = "qwen3-embedding:0.6b"
+    DEFAULT_RRK_MODEL = "dengcao/Qwen3-Reranker-4B:Q8_0"
+
+    WHITELIST_MODELS = ["ministral-3:14b", "deepseek-r1:32b"]
+    APP_DATA = PROJECT_ROOT_PATH.joinpath("./app/data/")
+    CSS_FILE = PROJECT_ROOT_PATH.joinpath("./hestia/frontend/gui/static/styles.css")
+    LOG_FILE = APP_DATA.joinpath("./log.log")
+    REQ_FILE = APP_DATA.joinpath("./requests.json")
+
+    CORPUS_INDEX = APP_DATA.joinpath("./corpus_index.json")
+
+    API_URL = "http://0.0.0.0:7860"
+
+    DENSE_DIM = 1024
+
