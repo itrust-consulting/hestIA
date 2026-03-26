@@ -1,19 +1,20 @@
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+
 import uvicorn
 
-from hestia.settings import Settings
+import hestia.settings as s
 from hestia.container import build_container, AppStartupConfig
 from hestia.routes.registry import include_routers
-from hestia.frontend.gui.app import create_gui
+
+from hestia.handler import RequestHandler
 
 
 def create_api() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
 
-        s = Settings()  
         cfg = AppStartupConfig(
             llm_backend=s.LLM_BACKEND,
             db_backend=s.DB_BACKEND,
@@ -22,6 +23,7 @@ def create_api() -> FastAPI:
 
         container = build_container(s, cfg)
         app.state.container = container
+        app.state.handler = RequestHandler(container)
         
         enabled_services = set(container.services.keys())
         include_routers(app, enabled_services)
@@ -33,5 +35,4 @@ def create_api() -> FastAPI:
 if __name__=="__main__":
 
     api = create_api()
-    gui = create_gui(api)
-    uvicorn.run(gui, host="0.0.0.0", port=7860, log_level="debug")
+    uvicorn.run(api, host="0.0.0.0", port=s.PORT, log_level="debug")

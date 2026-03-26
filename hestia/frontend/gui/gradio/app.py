@@ -16,13 +16,36 @@ REQ_FILE = Settings.REQ_FILE
 REQUEST_TIMEOUT = Settings.REQUEST_TIMEOUT
 APP_URL = Settings.API_URL
 
+VERSION = Settings.VERSION
+
 Message = Dict[str, str] # {"role": "user"|"assistant"|"system", "content": "..."}
 
 _lock = Lock()
 
 http_client = HttpClient(base_url="http://127.0.0.1:7860")
 
-
+def create_version_textbox(version=VERSION):
+    html = f"""
+    <style>
+        .bottom-version-container {{
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px;
+            background: #f0f0f0;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            z-index: 100;
+            border-top: 1px solid #ddd;
+        }}
+    </style>
+    <div class="bottom-version-container">
+        {version}
+    </div>
+    """
+    return html
 
 def store_submission(form: dict):
     os.makedirs(APP_DATA, exist_ok=True)
@@ -205,6 +228,8 @@ def create_gui(api):
                 info = gr.Textbox(value="Your chat history is temporary. \
                                 Conversations will be erased when you close the browser." ,label="Warning", )
 
+                
+                version = gr.HTML(create_version_textbox())
 
             chatbot = gr.Chatbot(buttons=["copy"], 
                                 height="calc(100vh - 200px)",
@@ -220,6 +245,7 @@ def create_gui(api):
                     fill_height=True,
                     save_history=True
                     )
+            
 
         enable_rag.change(
             fn=lambda x: gr.Group(visible=x),

@@ -1,0 +1,59 @@
+entrypoint: Encode1
+exitpoint:  [Generate1]
+
+include:
+  - ../base/encode_dense.yaml
+  - ../base/encode_sparse.yaml
+  - ../base/retrieve.yaml
+  - ../base/augment.yaml
+  - ../base/generate.yaml
+
+nodes:
+  - use: encode_dense.yaml
+    with:
+      id: Encode1
+      inputs:
+        data: ${prompt}
+        model: ${model}
+        model_kwargs: ${model_kwargs}
+      outputs:
+        vector: dense_vector
+
+  - use: encode_sparse.yaml
+    with:
+      id: Encode2
+      inputs:
+        data: ${prompt}
+        collection: ${collection}
+      outputs:
+        vector: sparse_vector
+
+  - use: retrieve.yaml
+    with: 
+      id: Retrieve1
+      inputs:
+        dense: ?dense_vector
+        sparse: ?sparse_vector
+        collection: ${collection}
+        options: ${query_kwargs}
+      outputs:
+        hits: points
+      
+  - use: augment.yaml
+    with:
+      id: Augment1
+      inputs: 
+        prompt: ${prompt}
+        hits:   ?points
+      outputs:
+        prompt: aug_prompt
+
+  - use: generate.yaml
+    with:
+      id: Generate1
+      inputs:
+        prompt: ?aug_prompt
+        model: ${model}
+        options: ${model_kwargs}
+      outputs:
+        response: response  

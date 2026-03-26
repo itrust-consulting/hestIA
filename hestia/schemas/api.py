@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Union, List, Dict, Any, Literal, TypeAlias
+from typing import Optional, Union, List, Dict, Any, Literal, TypeAlias, Tuple
 
 from hestia.schemas.base import APIModel, Request, Response
 
@@ -7,7 +7,9 @@ from hestia.schemas.base import APIModel, Request, Response
 class GenerateRequest(Request):
     prompt: str = Field(..., description="Prompt.")
     model: Optional[str] = Field(None, description="Generate model override.")
-    options: Optional[Dict[str, Any]] = Field(None, description="Provider-specific options pass-through.")
+    model_kwargs: Optional[Dict[str, Any]] = Field(None, description="Provider-specific options pass-through.")
+    collection: Optional[str] = Field(None, description="Spcify collection for augmented retrieval.")
+    query_kwargs: Optional[Dict[str, Any]] = Field(None, description="Augmented retrieval provider-specific query options pass-through")
     stream: bool = Field(False, description="If True, stream tokens as plain text.")
 
 
@@ -18,47 +20,27 @@ class GenerateData(APIModel):
 GenerateResponse = Response[GenerateData]
 
 
-Role = Literal["system", "user", "assistant"]
-
-
-class ChatMessage(BaseModel):
-    role: Role
-    content: str
-
-
 class ChatRequest(Request):
-    messages: List[ChatMessage] = Field(..., description="Chat history. Last user message drives the response.")
+    messages: List[Dict[str, Any]] = Field(..., description="Chat history. Last user message drives the response.")
     model: Optional[str] = Field(None, description="Chat model override.")
-    options: Optional[Dict[str, Any]] = Field(None, description="Provider-specific options pass-through.")
+    model_kwargs: Optional[Dict[str, Any]] = Field(None, description="Provider-specific options pass-through.")
+    collection: Optional[str] = Field(None, description="Colllection name.")
+    query_kwargs: Optional[Dict[str, Any]] = Field(None, description="Provider-specific options pass-through.")
     stream: bool = Field(False, description="If True, stream tokens as plain text.")
 
 
-class EmbedRequest(Request):
-    inputs: Union[str, List[str]] = Field(..., description="Text(s) to embed.")
-    model: Optional[str] = Field(None, description="Embedding model override.")
-    options: Optional[Dict[str, Any]] = Field(None, description="Provider-specific options pass-through.")
+class EncodeRequest(BaseModel):
+    type: Literal["dense", "sparse"]            
+    input: str                                  
+    model: Optional[str] = None                  
+    options: Optional[Dict[str, Any]] = None     
+    collection: Optional[str] = None    
 
-
-class EmbedData(APIModel):
-    embeddings: List[List[float]]
-
-
-EmbedResponse = Response[EmbedData]
-
-
-class RerankRequest(Request):
-    inputs: Union[str, List[str]] = Field(..., description="Text(s) to rerank.")
-    model: Optional[str] = Field(None, description="Rerank model override.")
-    top_k: int | None = Field(None, description="Return only top_k.") 
-    options: Optional[Dict[str, Any]] = Field(None, description="Provider-specific options pass-through.")
-
-
-class RerankData(APIModel):
-    scores: List[float]
-    order: List[int]
-    top_k: List[int]
-
-RerankResponse = Response[RerankData]
+class EncodeResponse(BaseModel):
+    type: Literal["dense", "sparse"]
+    vector: Any                               
+    model: Optional[str] = None                  
+    meta: Optional[Dict[str, Any]] = None    
 
 
 # This should move to types/models
@@ -100,11 +82,29 @@ class SearchData(APIModel):
 SearchResponse = Response[Any]
 
 
-class RAGenerateRequest(Request):
-    collection: str
-    message: str
-    options: Dict[str, Any] = None
+class ExecutionRequest(BaseModel):
+    exec_type: str
+    history: Optional[List[Dict[str, Any]]] = None
+    # prompt and last_user_message effectively the same, only for readabilty
+    last_user_message: Optional[str] = None
+    prompt: Optional[str] = None
+    model: Optional[str] = None
+    model_kwargs: Optional[Dict[str, Any]] = None
+    collection: Optional[str] = None
+    query_kwargs: Optional[Dict[str, Any]] = None
     stream: bool = False
 
+class Node(BaseModel):
+    id: str
+    type: str
+    inputs: Dict[str, Any]
+    outputs: Dict[str, Any]
+    options: Optional[Dict[str, Any]] = None
+    model: Optional[str] = None
 
-RAGenerateResponse = Response[GenerateData]
+class ExecutionGraph(BaseModel):
+    nodes: List[Node]
+    edges: List[Tuple[str, str]] = Field(default_factory=list)
+    entrypoint: str
+    exitpoints: List[str] = Field(default_factory=list)
+    context_refs: Dict[str, str] = Field(default_factory=dict)  # e.g. kv://... refs

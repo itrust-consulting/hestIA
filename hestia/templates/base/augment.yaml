@@ -1,0 +1,7 @@
+id: ${id}
+type: Augment
+inputs: 
+  prompt: ${message}
+  hits: ${hits}
+outputs:
+  prompt: ${prompt}

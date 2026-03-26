@@ -27,8 +27,7 @@ class Request(APIModel):
     """
     request_id: Optional[str] = Field(
         default=None,
-        description="Client-provided correlation ID (optional).",
-        examples=["req_12345"],
+        description="Client-provided correlation ID (optional)."
     )
     meta: Dict[str, Any] = Field(
         default_factory=dict,

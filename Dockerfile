@@ -8,8 +8,7 @@ USER user
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY assets/ ./assets/
 COPY hestia/ ./hestia/
 
-EXPOSE 7860
-CMD ["python", "-m", "hestia.hestia"]
+EXPOSE 5555
+CMD ["python", "-m", "hestia.main"]

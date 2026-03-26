@@ -1,0 +1,60 @@
+entrypoint: Encode1
+exitpoint:  [Chat1]
+
+include:
+  - ../base/encode_dense.yaml
+  - ../base/encode_sparse.yaml
+  - ../base/retrieve.yaml
+  - ../base/augment.yaml
+  - ../base/chat.yaml
+
+nodes:
+  - use: encode_dense.yaml
+    with:
+      id: Encode1
+      inputs:
+        data: ${last_user_message}
+        model: ${model}
+        model_kwargs: ${model_kwargs}
+      outputs:
+        vector: dense_vector
+
+  - use: encode_sparse.yaml
+    with:
+      id: Encode2
+      inputs:
+        data: ${last_user_message}
+        collection: ${collection}
+      outputs:
+        vector: sparse_vector
+
+  - use: retrieve.yaml
+    with: 
+      id: Retrieve1
+      inputs:
+        dense: ?dense_vector
+        sparse: ?sparse_vector
+        collection: ${collection}
+        options: ${query_kwargs}
+      outputs:
+        hits: points
+      
+  - use: augment.yaml
+    with:
+      id: Augment1
+      inputs: 
+        prompt: ${prompt}
+        hits:   ?points
+      outputs:
+        prompt: aug_message
+
+  - use: chat.yaml
+    with:
+      id: Chat1
+      inputs:
+        history: ${history}
+        last_user_message: ?aug_message
+        model: ${model}
+        options: ${model_kwargs}
+      outputs:
+        response: response  

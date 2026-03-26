@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager
 import requests
 import json
-import hestia.settings as settings
+import hestia.settings as s
 
 @dataclass(frozen=True)
 class HttpClient:
@@ -13,7 +13,7 @@ class HttpClient:
     - proper construction of the requests.
     """
     base_url: str
-    timeout: Tuple[float, float] = settings.REQUEST_TIMEOUT
+    timeout: Tuple[float, float] = s.REQUEST_TIMEOUT
     api_key: Optional[str] = None
     session: requests.Session = field(default_factory= requests.Session, repr=False, compare=False)
 
@@ -53,8 +53,7 @@ class HttpClient:
                               timeout=self.timeout)
             r.raise_for_status()
         except requests.HTTPError as e:
-            resp = e.response
-
+            r = e.response
         return r
     
 
@@ -70,9 +69,15 @@ class HttpClient:
             yield json.loads(line)
 
     
-    def get(self):
-        pass
-
+    def get(self, endpoint):
+        url = self.base_url + endpoint
+        try:
+            r = self.session.get(url)
+            r.raise_for_status()
+        except requests.HTTPError as e:
+            r = e.response    
+        return r
+    
     def put(self):
         pass
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
-from fastapi.responses import Response, StreamingResponse
-from hestia.schemas.api import SearchRequest, SearchResponse, DenseVector, SparseVector, HybridQuery, RAGenerateRequest
+
+from hestia.schemas.api import SearchRequest, SearchResponse, DenseVector, SparseVector, HybridQuery
 from hestia.container import Container
 from hestia.utils.deps import get_container
 
@@ -31,15 +31,3 @@ def search(req: SearchRequest, c: Container = Depends(get_container)):
             query=query,
             options=req.options)
     return SearchResponse(data=result)
-
-
-@router.post("/rag")
-def rag(req: RAGenerateRequest, c: Container = Depends(get_container)):
-    rag = c.services["rag"]
-    
-    if req.stream:
-        it = rag.generate(collection=req.collection, message=req.message, options=req.options, stream=True)
-        return StreamingResponse(it, media_type="text/plain; charset=utf-8")
-    
-    response = rag.generate(collection=req.collection, message=req.message, options=req.options)
-    return Response(response, media_type="text/plain; charset=utf-8")

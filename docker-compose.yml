@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./
+      dockerfile: Dockerfile  # Path to your Python Dockerfile
+    ports:
+      - "5555:5555"
+    networks:
+      - app_network
+
+  frontend:
+    build:
+      context: ./hestia/frontend/gui/svelte-gui  # Path to svelte-app
+      dockerfile: Dockerfile  # Dockerfile inside svelte-app
+    ports:
+      - "7860:7860"
+    depends_on:
+      - backend
+    networks:
+      - app_network
+    environment:
+      - PUBLIC_MICROSERVICE_URL=http://backend:5555  
+      - PORT=7860
+
+networks:
+  app_network:
+    driver: bridge

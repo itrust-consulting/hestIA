@@ -1,9 +1,9 @@
-from typing import Optional, Dict, Any, Union, Literal, List
+from typing import Dict, Any
 from qdrant_client import QdrantClient, models
 
 from hestia.protocols.db import DBProvider
 from hestia.utils import HttpClient
-from hestia.schemas.api import DenseVector, SparseVector, Query, HybridQuery, QueryPoints
+from hestia.schemas.api import DenseVector, SparseVector, Query, HybridQuery
 
 
 
@@ -59,7 +59,7 @@ class QdrantDB(DBProvider):
                     query=models.FusionQuery(
                         fusion=models.Fusion.RRF
                     ),
-                    limit=50,
+                    limit=limit,
                     with_payload=True
                     )
         
@@ -87,3 +87,13 @@ class QdrantDB(DBProvider):
             )
         
         raise TypeError(f"Unsupported query request: {type(query)}")
+    
+    @property
+    def collections(self):
+        # TODO: define CollectionResponse to capture collection name and accessibility
+        available_collections = []
+        coll_descriptions  = self.client.get_collections().collections
+        for idx, coll in enumerate(coll_descriptions):
+            available_collections.append({"id": idx, "name": coll.name})
+        return {"collections": available_collections}
+

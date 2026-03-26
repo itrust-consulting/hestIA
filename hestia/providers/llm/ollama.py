@@ -88,5 +88,11 @@ class OllamaProvider(LLMProvider):
 
     @property
     def models(self):
-        j = self.http.post("/api/tags")
-        return list[j.get("models", [])]
+        # TODO create ModelsResponse (or similar) to capture model name and use
+        j = self.http.get("/api/tags")
+        available_models = []
+        model_list = j.json().get("models")
+        if model_list:
+            for idx, model in enumerate(model_list):
+                available_models.append({"id": idx, "model" : model.get("model")})
+        return {"models" : available_models}

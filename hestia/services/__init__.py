@@ -1,6 +1,5 @@
-from .embedding import Embedder
+from .encoder import DenseEncoder, SparseEncoder
 from .generation import Generator
 from .search import Retriever
-from .rag import RAGenerator
 
-__all__ = ["Embedder", "Generator", "Retriever", "RAGenerator"]
+__all__ = ["DenseEncoder", "SparseEncoder", "Generator", "Retriever"]

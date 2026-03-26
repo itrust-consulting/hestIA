@@ -1,23 +1,27 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse, Response
-from hestia.schemas.api import GenerateRequest, GenerateResponse, GenerateData
-from hestia.container import Container
-from hestia.utils.deps import get_container
+
+from hestia.schemas.api import GenerateRequest, ExecutionRequest
+from hestia.handler import RequestHandler
+from hestia.utils.deps import get_handler
 
 router = APIRouter()
 
 @router.post("/generate")
-def generate(req: GenerateRequest, c: Container = Depends(get_container)):
-    generator = c.services["generate"]  # safe: router only registered if service exists
+def generate(req: GenerateRequest, h: RequestHandler = Depends(get_handler)):
+    
+    request = ExecutionRequest(
+        exec_type =     "rag_generate" if req.collection else "generate",
+        prompt =        req.prompt,
+        model =         req.model,
+        model_kwargs =  req.model_kwargs,
+        collection =    req.collection,
+        query_kwargs =  req.query_kwargs,
+        stream =        req.stream if req.stream else False,
+    )
     
     if req.stream:
-        it = generator.generate(req.prompt, model=req.model, options=req.options, stream=True)
-        return StreamingResponse(it, media_type="text/plain; charset=utf-8")
-    response = generator.generate(req.prompt, model=req.model, options=req.options)
-    """
-    used_model = req.model or generator.default_model
-    GenerateResponse.success(
-        GenerateData(response=response),
-        meta={"model": used_model},
-    )"""
-    return Response(response, media_type="text/plain; charset=utf-8")
+        it = h.resolve(request, stream=True)
+        return StreamingResponse(it, media_type="application/json")
+    result = h.resolve(request)
+    return Response(result, media_type="applicaiton/json")

@@ -7,7 +7,7 @@ from typing import Optional, Sequence, Dict
 from fastapi import FastAPI, APIRouter
 
 from hestia.routes.health import router as health_router
-from hestia.routes.embed import router as embed_router
+from hestia.routes.encode import router as encode_router
 from hestia.routes.generate import router as generate_router
 from hestia.routes.chat import router as chat_router
 from hestia.routes.search import router as search_router
@@ -38,12 +38,14 @@ class RouterSpec:
 
 ROUTER_REGISTRY: Dict[str, RouterSpec] = {
     # --- always-on routers ---
-    "health": RouterSpec(router=health_router, prefix="", tags=("health", "ready"), always_on=True),
+    "health": RouterSpec(router=health_router, prefix="", tags=("health", 
+                                                                "ready",
+                                                                "models",
+                                                                "collections"), always_on=True),
 
     # --- service routers (conditional) ---
-    "embed": RouterSpec(router=embed_router, prefix="/api", tags=("embed"), service="embed",),
+    "encode": RouterSpec(router=encode_router, prefix="/api", tags=("encode"), service="encDense",),
     "generate": RouterSpec(router=generate_router, prefix="/api",tags=("generate"), service="generate"),
     "chat": RouterSpec(router=chat_router, prefix="/api", tags=("chat"), service="generate"),
     "search": RouterSpec(router=search_router, prefix="/api", tags=("search"), service="search"),
-    "rag": RouterSpec(router=search_router, prefix="/api", tags=("rag"), service="rag")
 }

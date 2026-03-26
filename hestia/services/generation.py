@@ -2,11 +2,11 @@
 from typing import Optional, Dict, List, Any, Literal, Iterator, overload
 
 from hestia.protocols.llm import LLMProvider
-from hestia.settings import DEFAULT_GEN_MODEL
+import hestia.settings as s
 
-
+Message = Dict[str, str]
 class Generator:
-    def __init__(self, provider: LLMProvider, model = DEFAULT_GEN_MODEL):
+    def __init__(self, provider: LLMProvider, model = s.DEFAULT_GEN_MODEL):
         self.provider = provider
         self.default_model = model
 
@@ -38,7 +38,7 @@ class Generator:
              ) -> Iterator[str]: ...
     
     def chat(self, 
-             messages: List[str], 
+             messages: List[Message], 
              *,
              model: str | None = None,
              options: Optional[Dict[str, Any]] = None,
