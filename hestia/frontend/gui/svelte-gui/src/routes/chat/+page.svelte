@@ -4,6 +4,7 @@
 
   import { messages } from '$lib/stores/chat';
   import { sendMessage, copyMessage, deleteMessage, retryMessage, sending, stop } from '$lib/chat/actions';
+  import { loadConversations } from '$lib/stores/conversations';
   import { renderChatContent } from '$lib/render/renderChatContent';
 
   import SideBar from '$lib/components/SideBar.svelte';
@@ -33,6 +34,7 @@
     return () => window.removeEventListener("click", handler);
   });
   onMount(() => window.addEventListener("keydown", onKey));
+  onMount(() => {loadConversations();});
   
 
   // auto-scroll to bottom when messages change

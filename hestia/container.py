@@ -3,8 +3,8 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Set, Callable, Any, Literal, Protocol, AsyncIterator
 
 from hestia.providers import OllamaProvider, QdrantDB
-from hestia.services import Generator, DenseEncoder, SparseEncoder, Retriever
-
+from hestia.services import Generator, DenseEncoder, SparseEncoder, Retriever, UserService
+from hestia.utils.user_db import UserRepository
 
 ProviderType = Literal["llm", "db"]
 ServiceName = Literal["generate", "chat", "encDense", "encSparse", "search"]
@@ -88,8 +88,9 @@ class AppStartupConfig:
                                                                           "encSparse"
                                                                           "generate", 
                                                                           "chat", 
-                                                                          "search"]),
-    agents_to_start = []
+                                                                          "search"])
+    agents_to_start: List[str] = field(default_factory=list)
+    enable_auth: bool = False
 
 
 @dataclass
@@ -115,6 +116,12 @@ def build_container(settings, cfg: AppStartupConfig) -> Container:
 
     if cfg.db_backend:
         c.providers["db"] = _build_provider("db", cfg.db_backend, settings)
+
+
+    if cfg.enable_auth:
+        repo = UserRepository()
+        repo.initialize()
+        c.services["auth"] = UserService(repo)
 
     singleton_cache: Dict[str, Any] = {}
 

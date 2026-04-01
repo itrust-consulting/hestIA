@@ -1,9 +1,11 @@
-// src/lib/auth/auth.ts
+export async function login(username: string, password: string) {
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  });
 
-export async function login(email: string, password: string) {
-  try {
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: 'Network error' };
-  }
+  return await res.json();
 }

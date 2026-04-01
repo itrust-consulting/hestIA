@@ -3,11 +3,14 @@ import type { Role, ChatMessage, ChatAPIMessages } from '$lib/types';
 
 
 export const messages = writable<ChatMessage[]>([]);
+export const conversationId = writable<string | null>(null);
 
 export function pushMessage(role: ChatMessage['role'], content: string) {
+  const msg_id = crypto.randomUUID().replace(/-/g, "");
+  console.log("this is the assigned msg_id: " + msg_id) 
   messages.update((m) => [
     ...m,
-    { id: crypto.randomUUID(), role, content, createdAt: Date.now() }
+    { id: msg_id, role, content, createdAt: Date.now() }
   ]);
 }
 

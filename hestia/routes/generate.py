@@ -5,19 +5,24 @@ from hestia.schemas.api import GenerateRequest, ExecutionRequest
 from hestia.handler import RequestHandler
 from hestia.utils.deps import get_handler
 
+from hestia.utils.security import User, get_current_user
+
 router = APIRouter()
 
 @router.post("/generate")
-def generate(req: GenerateRequest, h: RequestHandler = Depends(get_handler)):
+def generate(req: GenerateRequest, 
+             h: RequestHandler = Depends(get_handler),
+             user: User = Depends(get_current_user)):
     
     request = ExecutionRequest(
-        exec_type =     "rag_generate" if req.collection else "generate",
-        prompt =        req.prompt,
-        model =         req.model,
-        model_kwargs =  req.model_kwargs,
-        collection =    req.collection,
-        query_kwargs =  req.query_kwargs,
-        stream =        req.stream if req.stream else False,
+        permissions     =   user.permissions,
+        exec_type       =   "rag_generate" if req.collection else "generate",
+        prompt          =   req.prompt,
+        model           =   req.model,
+        model_kwargs    =   req.model_kwargs,
+        collection      =   req.collection,
+        query_kwargs    =   req.query_kwargs,
+        stream          =   req.stream if req.stream else False,
     )
     
     if req.stream:

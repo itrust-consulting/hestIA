@@ -1,7 +1,9 @@
+import json
 from fastapi.exceptions import HTTPException
+
 from hestia.templater import TemplateRepository, TemplatePlanBuilder
 from hestia.schemas.api import ExecutionRequest, HybridQuery
-
+from hestia.utils.policies import PolicyDecision, PolicyResult, PolicyGuard
 
 RAG_PROMPT = """
     You are an assistant with access to an organizations ISMS knowledge base of Markdown documents.
@@ -204,6 +206,87 @@ class Runner:
                 return b
         return None
 
+
+class PersistChat:
+    """
+    Wrapper around Runner that persists conversation messages
+    using the UserService ("auth" service in your container).
+    """
+
+    def __init__(self, runner: Runner, req: ExecutionRequest):
+        self.runner = runner
+        self.req = req
+        self.auth = runner.container.services.get("auth")
+
+    def run(self, plan, stream=False):
+        # Execute normal runner
+        result = self.runner.run(plan, stream=stream)
+
+        if stream:
+            return self._wrap_stream(result, self.req)
+
+        # Non-stream: persist immediately
+        conversation_id = self._persist(self.req, result)
+        return result
+
+    def _wrap_stream(self, iterable, req):
+        final_text = ""
+
+        def generator():
+            nonlocal final_text
+            for chunk in iterable:
+                text = self._extract_text(chunk)
+                final_text += text
+                yield chunk
+
+            conversation_id, user_msg_id, assistant_msg_id = self._persist(req, final_text)
+
+            yield json.dumps({
+                "conversation_id": conversation_id.hex(),
+                "user_message_id": user_msg_id.hex() if user_msg_id else None,
+                "assistant_message_id": assistant_msg_id.hex()
+            }).encode("utf-8")
+
+
+        return generator()
+
+    def _extract_text(self, chunk):
+        if isinstance(chunk, dict):
+            return chunk.get("content", "") or chunk.get("delta", "")
+        return str(chunk)
+
+    def _persist(self, req: ExecutionRequest, assistant_reply):
+
+        user_id = req.user.id.bytes
+
+        if req.conversation_id:
+            c_id = bytes.fromhex(req.conversation_id)
+        else:
+            # Create new conversation
+            title = req.conversation_title or req.last_user_message[:40]
+            c_id = self.auth.create_user_conversation(user_id, title)
+
+        # Persist the user message
+        if req.last_user_message:
+            user_msg_id = self.auth.append_conversation_message(
+                c_id=c_id,
+                role="user",
+                content=req.last_user_message,
+                metadata={},
+                options=req.model_kwargs or {}
+            )
+
+        # Persist assistant reply
+        assistant_msg_id = self.auth.append_conversation_message(
+            c_id=c_id,
+            role="assistant",
+            content=assistant_reply,
+            metadata={},
+            options=req.model_kwargs or {}
+        )
+        return c_id, user_msg_id, assistant_msg_id
+
+
 class RequestHandler:
     """
     Central orchestrator: compile -> authorize -> optimize -> execute a Plan.
@@ -215,16 +298,31 @@ class RequestHandler:
         "chat" :            "./workflows/chat.yaml",
         "rag_chat":         "./workflows/rag_chat.yaml",
     }
-    def __init__(self, container,  policy=None, telemetry=None):
+    def __init__(self, container,  policy: PolicyGuard = None, telemetry=None):
         self.container = container
         self.policy = policy
         self.telemetry = telemetry
         self.builder = TemplatePlanBuilder(TemplateRepository())
         self.runner = Runner(container)
 
-    def resolve(self, req: ExecutionRequest, stream=False):
+    def resolve(self, req: ExecutionRequest, stream: bool):
 
+        policy_result: PolicyResult = self.policy.check(req)
+
+        if policy_result.decision == PolicyDecision.DENY:
+            raise PermissionError(policy_result.msg)
+
+        if policy_result.decision == PolicyDecision.FILTER:
+            # inject filter constraints into the ExecutionRequest
+            req.query_kwargs = req.query_kwargs or {}
+            req.query_kwargs["filters"] = policy_result.filters
+    
+
+        runner = self.runner
         template = self.TEMPLATE_MAP[req.exec_type]
         graph = self.builder.build(req, template)
-        return self.runner.run(graph, stream=req.stream)
+        if req.save_chat:
+            runner = PersistChat(runner, req)
+
+        return runner.run(graph, stream=req.stream)
         

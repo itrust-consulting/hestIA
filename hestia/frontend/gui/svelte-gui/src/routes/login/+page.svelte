@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { login } from '$lib/auth/auth';
+
   import { goto } from '$app/navigation';
+  import { login } from '$lib/auth/auth';
+  import { scheduleTokenExpiryWatcher } from '$lib/auth/session'
 
   let email = '';
   let password = '';
@@ -20,9 +21,25 @@
     const res = await login(email, password);
     loading = false;
 
+
     if (res.ok) {
-      goto('/chat');
-    } else {
+        const token = document.cookie
+            .split("; ")
+            .find(x => x.startsWith("token="))
+            ?.split("=")[1];
+
+        if (token) {
+            scheduleTokenExpiryWatcher(token);
+        }
+        
+        if (res.must_change_pw) {
+          goto('/account/overview?section=security');
+        }
+        else {
+          goto('/chat');
+        }
+    } 
+    else {
       error = res.error ?? 'Login failed.';
     }
   }
@@ -30,7 +47,7 @@
 
 <div class="login-container">
   <div class="login-card">
-    <h1 class="login-title">Welcome to HestIA</h1>
+    <h1 class="login-title">Welcome to hestIA</h1>
 
     {#if error}
       <div class="login-error">{error}</div>
@@ -38,12 +55,11 @@
 
     <form on:submit|preventDefault={handleSubmit} class="login-form">
       <input
-        type="email"
-        placeholder="Email"
+        type="text"
+        placeholder="Username or email"
         bind:value={email}
         class="login-input"
-        autocomplete="email"
-        required
+        autocomplete="username"
       />
 
       <input

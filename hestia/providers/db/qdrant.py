@@ -23,6 +23,15 @@ class QdrantDB(DBProvider):
             return models.Fusion.DBSF
         raise ValueError(f"Unknown ranking: {ranking}")
     
+    def _build_filter(self, filter: dict):
+        if not filter:
+            return None
+        must_condition = models.FieldCondition(key="access.classification", 
+                                               range=models.Range(lte=filter.get("max_classification"))
+                                               )
+        return models.Filter(must=must_condition)
+        
+
     def search(self, 
             collection: str, 
             query: Query,
@@ -39,6 +48,7 @@ class QdrantDB(DBProvider):
             with_payload = options.get("with_payload", True)
             with_vectors = options.get("with_vectors", False)
             score_threshold = options.get("score_threshold")
+            filter = self._build_filter(options.get("filters"))
 
         if isinstance(query, HybridQuery):
             return self.client.query_points(
@@ -49,11 +59,13 @@ class QdrantDB(DBProvider):
                                                       values=query.sparse.values),
                             using="sparse",
                             limit=200,
+                            filter = filter
                         ),
                     models.Prefetch(
                         query=query.dense.vector,
                         using="dense",
-                        limit=100
+                        limit=100,
+                        filter = filter
                     )
                     ],
                     query=models.FusionQuery(
@@ -72,7 +84,8 @@ class QdrantDB(DBProvider):
                 limit=limit,
                 with_payload=with_payload,
                 with_vectors=with_vectors,
-                score_threshold=score_threshold
+                score_threshold=score_threshold,
+                filter = filter
             )
         
         if isinstance(query, DenseVector):
@@ -83,7 +96,8 @@ class QdrantDB(DBProvider):
                 limit=limit,
                 with_payload=with_payload,
                 with_vectors=with_vectors,
-                score_threshold=score_threshold
+                score_threshold=score_threshold,
+                filter = filter
             )
         
         raise TypeError(f"Unsupported query request: {type(query)}")

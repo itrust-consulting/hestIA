@@ -1,22 +1,45 @@
 // src/routes/api/chat/+server.ts
 import type { RequestHandler } from './$types';
-import { PUBLIC_MICROSERVICE_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 
-const CHAT_API = PUBLIC_MICROSERVICE_URL + '/api/chat'
+const API_URL  = env.PUBLIC_MICROSERVICE_URL || 'http://localhost:5555';
+const CHAT_API_URL = API_URL + '/api/chat';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
     // Parse incoming body
     const body = await request.json();
-    const { messages, model, model_kwargs, collection, query_kwargs, stream } = body;
+    const token = cookies.get('token')
 
-    // Forward to your microservice (which must support streaming)
-    const upstream = await fetch(CHAT_API, {
+    const {
+      messages,
+      model,
+      model_kwargs,
+      collection,
+      query_kwargs,
+      stream,
+      save_chat,
+      conversation_id,
+      conversation_title
+    } = body;
+
+    const upstream = await fetch(CHAT_API_URL, {
       method: 'POST',
       headers: {
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ messages, model, model_kwargs, collection, query_kwargs, stream })
+      body: JSON.stringify({
+        messages, 
+        model, 
+        model_kwargs, 
+        collection, 
+        query_kwargs, 
+        stream,
+        save_chat,
+        conversation_id,
+        conversation_title
+ })
     });
 
     if (!upstream.ok || !upstream.body) {
@@ -29,7 +52,6 @@ export const POST: RequestHandler = async ({ request }) => {
     const readableStream = new ReadableStream({
       async start(controller) {
         const reader = upstream.body!.getReader();
-        const decoder = new TextDecoder();
 
         try {
           while (true) {
@@ -60,4 +82,3 @@ export const POST: RequestHandler = async ({ request }) => {
     return new Response(`API error: ${err.message}`, { status: 500 });
   }
 };
-``

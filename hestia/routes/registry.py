@@ -7,6 +7,11 @@ from typing import Optional, Sequence, Dict
 from fastapi import FastAPI, APIRouter
 
 from hestia.routes.health import router as health_router
+from hestia.routes.login import router as login_router
+from hestia.routes.account import router as account_router
+from hestia.routes.admin import router as admin_router
+from hestia.routes.conversation import router as convo_router
+
 from hestia.routes.encode import router as encode_router
 from hestia.routes.generate import router as generate_router
 from hestia.routes.chat import router as chat_router
@@ -42,6 +47,10 @@ ROUTER_REGISTRY: Dict[str, RouterSpec] = {
                                                                 "ready",
                                                                 "models",
                                                                 "collections"), always_on=True),
+    "login": RouterSpec(router=login_router, prefix="", tags=("login"), always_on=True),
+    "account": RouterSpec(router=account_router, prefix="", tags=(), always_on=True),
+    "convo": RouterSpec(router=convo_router, prefix="", tags=(), always_on=True),
+    "admin": RouterSpec(router=admin_router, prefix="/admin", tags=("admin"), always_on=True),
 
     # --- service routers (conditional) ---
     "encode": RouterSpec(router=encode_router, prefix="/api", tags=("encode"), service="encDense",),

@@ -9,6 +9,7 @@ from hestia.container import build_container, AppStartupConfig
 from hestia.routes.registry import include_routers
 
 from hestia.handler import RequestHandler
+from hestia.utils.policies import ExecutionPolicy
 
 
 def create_api() -> FastAPI:
@@ -19,11 +20,12 @@ def create_api() -> FastAPI:
             llm_backend=s.LLM_BACKEND,
             db_backend=s.DB_BACKEND,
             services_to_start=s.SERVICES_TO_START,
+            enable_auth=True
         )
 
         container = build_container(s, cfg)
         app.state.container = container
-        app.state.handler = RequestHandler(container)
+        app.state.handler = RequestHandler(container, policy=ExecutionPolicy())
         
         enabled_services = set(container.services.keys())
         include_routers(app, enabled_services)

@@ -13,7 +13,7 @@
     import {
         conversations,
         activeConversationId,
-        saveCurrentConversationAndStartNew,
+        startNewChat,
         openConversation,
         renameConversation,
         deleteConversation as removeConversation
@@ -33,19 +33,9 @@
         openModal = null;
     }
 
-    let isISMSOpen = false;
-
-    function openISMS() {
-        isISMSOpen = true;
-    }
-
-    function closeISMS() {
-        isISMSOpen = false;
-    }
-
     function newChat() {
         // Save current (if any) and start a fresh chat
-        saveCurrentConversationAndStartNew();
+        startNewChat();
         // You can also collapse on small screens if you want
     }
 

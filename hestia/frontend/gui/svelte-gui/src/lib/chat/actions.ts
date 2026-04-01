@@ -5,34 +5,44 @@ import {
   updateMessage,
   findIndex,
   buildAPIMessages,
-  pushMessage,
 } from '$lib/stores/chat';
-  import { activeCorpusName } from '$lib/stores/isms';
+
+import { activeConversationId, loadConversations } from '$lib/stores/conversations';
+import { activeCorpusName } from '$lib/stores/isms';
 
 export const sending = writable<boolean>(false);
 
 let controller: AbortController | null = null;
+
 export function stop() {
-    controller?.abort();
-  }
+  controller?.abort();
+}
+
+function tempId() {
+  return "__local__" + crypto.randomUUID();
+}
 
 export async function sendMessage(text: string) {
   if (!text.trim() || get(sending)) return;
 
   sending.set(true);
 
-  // push user's message
-  pushMessage('user', text);
-
-  const assistantId = crypto.randomUUID();
-  messages.update((m) => [
+  const userTempId = tempId();
+  messages.update(m => [
     ...m,
-    { id: assistantId, role: 'assistant', content: '', createdAt: Date.now() }
+    { id: userTempId, role: 'user', content: text, createdAt: Date.now() }
   ]);
-  await streamFromHistoryInto(assistantId);
+
+  const assistantTempId = tempId();
+  messages.update(m => [
+    ...m,
+    { id: assistantTempId, role: 'assistant', content: '', createdAt: Date.now() + 2 }
+  ]);
+
+  await streamFromHistoryInto(assistantTempId, userTempId);
 }
 
-export async function streamFromHistoryInto(targetId: string) {
+export async function streamFromHistoryInto(assistantTempId: string, userTempId: string) {
   sending.set(true);
 
   controller?.abort();
@@ -46,17 +56,18 @@ export async function streamFromHistoryInto(targetId: string) {
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-          messages: payloadMessages,
-          model: 'ministral-3:14b',
-          model_kwargs: {},
-          collection: get(activeCorpusName),
-          query_kwargs: {'limit' : 20},
-          stream: true
-        })
+        messages: payloadMessages,
+        model: 'ministral-3:14b',
+        model_kwargs: {},
+        collection: get(activeCorpusName),
+        query_kwargs: { limit: 20 },
+        stream: true,
+        conversation_id: get(activeConversationId),
+        save_chat: true
+      })
     });
 
-
-    if (!res.ok) throw new Error(`HTTP ${res.json()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     if (res.body) {
       const reader = res.body.getReader();
@@ -69,7 +80,37 @@ export async function streamFromHistoryInto(targetId: string) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        pending += decoder.decode(value, { stream: true });
+        const chunkText = decoder.decode(value, { stream: true });
+
+        let handledAsMetadata = false;
+        try {
+          const maybeJson = JSON.parse(chunkText);
+          if (maybeJson && typeof maybeJson === 'object') {
+            
+            if (maybeJson.conversation_id) {
+              activeConversationId.set(maybeJson.conversation_id);
+              await loadConversations();
+            }
+
+            if (maybeJson.user_message_id) {
+              updateMessage(userTempId, { id: maybeJson.user_message_id });
+            }
+
+            if (maybeJson.assistant_message_id) {
+              updateMessage(assistantTempId, { id: maybeJson.assistant_message_id });
+            }
+            handledAsMetadata = true;
+          }
+          
+        } catch {
+          // normal text chunk
+        }
+
+        if (handledAsMetadata) {
+          continue;
+        }
+
+        pending += chunkText;
 
         if (!raf) {
           raf = requestAnimationFrame(() => {
@@ -77,9 +118,9 @@ export async function streamFromHistoryInto(targetId: string) {
             pending = '';
             raf = 0;
 
-            messages.update((m) =>
-              m.map((msg) =>
-                msg.id === targetId
+            messages.update(m =>
+              m.map(msg =>
+                msg.id === assistantTempId
                   ? { ...msg, content: msg.content + chunk }
                   : msg
               )
@@ -89,9 +130,9 @@ export async function streamFromHistoryInto(targetId: string) {
       }
 
       if (pending) {
-        messages.update((m) =>
-          m.map((msg) =>
-            msg.id === targetId
+        messages.update(m =>
+          m.map(msg =>
+            msg.id === assistantTempId
               ? { ...msg, content: msg.content + pending }
               : msg
           )
@@ -100,7 +141,7 @@ export async function streamFromHistoryInto(targetId: string) {
     }
   } catch (e: any) {
     if (e.name !== 'AbortError') {
-      updateMessage(targetId, { content: `⚠️ ${e}` });
+      updateMessage(assistantTempId, { content: `⚠️ ${e}` });
     }
   } finally {
     sending.set(false);
@@ -116,51 +157,59 @@ export async function copyMessage(content: string) {
     }
 }
 
+export async function deleteMessage(id: string) {
+  const cid = get(activeConversationId);
 
-export function deleteMessage(id: string) {
-    removeMessage(id);
+  if (cid) {
+    await fetch(`/api/conversations/${cid}/messages/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  removeMessage(id);
 }
 
 
-export async function retryMessage(id: string) {
-    if (get(sending)) return;
+export async function retryMessage(assistantId: string) {
+  if (get(sending)) return;
 
-    const all = get(messages);
-    const idx = findIndex(id);
-    if (idx < 0) return;
+  const all = get(messages);
+  const cid = get(activeConversationId);
 
-    const msg = all[idx];
+  const idx = findIndex(assistantId);
+  if (idx < 0) return;
+  const assistantMsg = all[idx];
+  if (assistantMsg.role !== 'assistant') return;
 
-    // Determine the slice of history to send:
-    // If retrying assistant → take history up to the previous user message (inclusive)
-    // If retrying user → take history up to that user (inclusive) and remove following assistant if any.
-    let sliceEnd = idx;
-    if (msg.role === 'assistant') {
-        // walk back to preceding user
-        for (let i = idx - 1; i >= 0; i--) {
-        if (all[i].role === 'user') {
-            sliceEnd = i + 1; // include that user
-            break;
-        }
-        }
-    } else {
-        // retrying a user: include that user itself
-        sliceEnd = idx + 1;
-        // option: if next is an assistant (the old answer), delete it so we “regenerate”
-        if (all[idx + 1]?.role === 'assistant') {
-        removeMessage(all[idx + 1].id);
-        }
+
+  let userIdx = -1;
+  for (let i = idx - 1; i >= 0; i--) {
+    if (all[i].role === 'user') {
+      userIdx = i;
+      break;
     }
+  }
+  if (userIdx < 0) return;
 
-    const kept = all.slice(0, sliceEnd);
-    messages.set(kept);
+  const userMsg = all[userIdx];
 
-    // Create a fresh assistant placeholder at the end and stream into it
-    const placeholderId = crypto.randomUUID();
-    messages.update((m) => [
-        ...m,
-        { id: placeholderId, role: 'assistant', content: '', createdAt: Date.now() }
-    ]);
 
-    await streamFromHistoryInto(placeholderId);
+  if (cid) {
+    deleteMessage(userMsg.id)
+    deleteMessage(assistantId)
+  }
+
+  const newUserTempId = tempId();
+  messages.update(m => [
+    ...m,
+    { id: newUserTempId, role: "user", content: userMsg.content, createdAt: Date.now() }
+  ]);
+
+
+  const newAssistantTempId = tempId();
+  messages.update(m => [
+    ...m,
+    { id: newAssistantTempId, role: "assistant", content: "", createdAt: Date.now() + 2 }
+  ])
+  await streamFromHistoryInto(newAssistantTempId, newUserTempId);
 }

@@ -2,8 +2,10 @@ import os
 import pathlib
 
 
-VERSION = "alpha_v0.1"
+VERSION = "alpha_v0.2"
 PORT = os.getenv("PORT", 5555)
+
+SECRET_KEY = os.getenv("API_KEY")
 
 PROJECT_ROOT_PATH = pathlib.Path(os.path.abspath(os.path.join(__file__, ".."))).parent.absolute()
 
@@ -45,7 +47,7 @@ DEFAULT_CONTEXT_SIZE = 32768
 DEFAULT_KEEP_ALIVE = -1
 
 WHITELIST_MODELS = ["ministral-3:14b", "deepseek-r1:32b"]
-APP_DATA        = PROJECT_ROOT_PATH.joinpath("./app/data/")
+APP_DATA        = PROJECT_ROOT_PATH.joinpath(os.getenv("HESTIA_DATA_DIR") or "./app/data/")
 CSS_FILE        = PROJECT_ROOT_PATH.joinpath("./hestia/frontend/gui/gradio/static/styles.css")
 LOG_FILE        = APP_DATA.joinpath("./log.log")
 REQ_FILE        = APP_DATA.joinpath("./requests.json")

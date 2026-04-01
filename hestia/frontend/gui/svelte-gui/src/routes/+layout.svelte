@@ -5,6 +5,20 @@
   import UserIcon from '$lib/components/icons/userIcon.svelte';
   import LogoutIcon from '$lib/components/icons/logoutIcon.svelte';
   import HelpIcon from '$lib/components/icons/helpIcon.svelte';
+  import { onMount } from 'svelte';
+  import { scheduleTokenExpiryWatcher } from '$lib/auth/session';
+
+
+  onMount(() => {
+      const token = document.cookie
+          .split("; ")
+          .find(x => x.startsWith("token="))
+          ?.split("=")[1];
+
+      if (token) {
+          scheduleTokenExpiryWatcher(token);
+      }
+  });
 
 
   const { children } = $props();
@@ -27,6 +41,16 @@
   function closeDropdown() {
     isDropdownOpen = false;
   }
+
+  function logout() {
+    fetch('/api/logout', { method: 'POST' }).
+    then(() => window.location.href = '/login');
+  }
+
+  function handleLogout() {
+    closeDropdown();
+    logout();
+  }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -37,7 +61,7 @@
 >
   <header class="app-header">
     <div>
-      <h1>hestIA</h1>
+      <h1><a href="/chat">hestIA</a></h1>
     </div>
 
     <div class="app-header-buttons">
@@ -57,7 +81,7 @@
               class="dropdown-btn"
               onclick={closeDropdown}
             >
-              <AccountSetIcon /> <a href=".">Account</a>
+              <AccountSetIcon /> <a href="/account/overview">Account</a>
             </button>
             <button
               class="dropdown-btn"
@@ -67,9 +91,9 @@
             </button>
             <button
               class="dropdown-btn"
-              onclick={closeDropdown}
+              onclick={handleLogout}
             >
-              <LogoutIcon /><a href="../login">Logout</a>
+              <LogoutIcon />Logout
             </button>
           </div>
         {/if}

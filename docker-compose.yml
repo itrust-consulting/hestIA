@@ -7,6 +7,8 @@ services:
       - "5555:5555"
     networks:
       - app_network
+    environment:
+      - API_KEY=${API_KEY}
 
   frontend:
     build:
@@ -21,6 +23,7 @@ services:
     environment:
       - PUBLIC_MICROSERVICE_URL=http://backend:5555  
       - PORT=7860
+
 
 networks:
   app_network:

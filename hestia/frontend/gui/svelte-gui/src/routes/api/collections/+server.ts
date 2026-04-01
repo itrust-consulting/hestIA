@@ -1,8 +1,10 @@
 import type { RequestHandler } from './$types';
-import { PUBLIC_MICROSERVICE_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 
-const GET_COLLECTION_API = PUBLIC_MICROSERVICE_URL + '/collections'
-export const GET: RequestHandler = async () => {
+const API_URL = env.PUBLIC_MICROSERVICE_URL || 'http://localhost:5555'
+const GET_COLLECTION_API = API_URL + '/collections'
+
+export const GET: RequestHandler = async ( ) => {
   try {
     const res = await fetch(GET_COLLECTION_API);
 
