@@ -25,6 +25,27 @@
     font-weight: 600;
 }
 
+.app-header-left {
+    display: flex;
+    align-items: center;
+    gap: 235px; /* space between hestIA and breadcrumbs */
+}
+
+.app-header-left h1 {
+    margin: 0;
+    padding: 0;
+}
+
+.breadcrumbs {
+  font-size: var(--text-xl);
+  color: var(--color-neutral-600);
+  white-space: nowrap;   /* prevent wrapping to next line */
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+
 .app-header-buttons {
     display: inline-flex;
     gap: .5rem;                   

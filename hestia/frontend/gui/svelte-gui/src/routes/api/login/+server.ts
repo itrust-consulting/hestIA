@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/public';
+import { jwtDecode } from 'jwt-decode';
 
 const API_URL = env.PUBLIC_MICROSERVICE_URL || 'http://localhost:5555'
 const LOGIN_API = API_URL + '/login'
@@ -30,8 +31,12 @@ export async function POST({ request, cookies }) {
     maxAge: 60 * 60 // 1 hour
   });
 
+  const decoded: any = jwtDecode(data.access_token);
+  const exp = decoded.exp;
+
   return json({ 
     ok: true, 
-    must_change_pw: data.must_change_pw ?? false
+    must_change_pw: data.must_change_pw ?? false,
+    exp: exp
   });
 }

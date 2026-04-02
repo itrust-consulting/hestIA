@@ -1,29 +1,35 @@
-// src/lib/auth/session.ts
-import { goto } from '$app/navigation';
-
 let sessionTimer: ReturnType<typeof setTimeout> | null = null;
+let inactivityTimer: ReturnType<typeof setTimeout> | null = null
 
-function decodeJwt(token: string): any {
-    // Decode base64 payload only
-    const payload = token.split('.')[1];
-    try {
-        return JSON.parse(atob(payload));
-    } catch {
-        return null;
-    }
+const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes
+
+export function startInactivityWatcher() {
+    resetInactivityTimer();
+
+    // Listen to any user activity
+    window.addEventListener('mousemove', resetInactivityTimer);
+    window.addEventListener('keydown', resetInactivityTimer);
+    window.addEventListener('click', resetInactivityTimer);
+    window.addEventListener('scroll', resetInactivityTimer);
 }
 
-export function scheduleTokenExpiryWatcher(token: string) {
-    if (!token) return;
+function resetInactivityTimer() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
 
+    inactivityTimer = setTimeout(() => {
+        handleSessionExpired();
+    }, INACTIVITY_LIMIT);
+}
+
+
+export function scheduleTokenExpiration(exp: number) {
+    if (!exp) return;
+    
     // Clear existing timers
     if (sessionTimer) clearTimeout(sessionTimer);
 
-    const decoded = decodeJwt(token);
-    if (!decoded || !decoded.exp) return; // no exp claim → do nothing
-
     // exp is in seconds → convert to ms
-    const expiryMs = decoded.exp * 1000;
+    const expiryMs = exp * 1000;
     const nowMs = Date.now();
 
     const delay = expiryMs - nowMs;
@@ -37,12 +43,8 @@ export function scheduleTokenExpiryWatcher(token: string) {
     sessionTimer = setTimeout(handleSessionExpired, delay);
 }
 
-function handleSessionExpired() {
-    // Clear token cookie (client‑side)
-    document.cookie = "token=; Path=/; Max-Age=0";
+async function handleSessionExpired() {
 
-    // Optional UI feedback
-    alert("Your session has expired. Please log in again.");
-
-    goto('/login');
+    await fetch('/api/logout', { method: 'POST' }).
+    then(() => window.location.href = '/login?expired=1');
 }

@@ -158,15 +158,16 @@ export async function copyMessage(content: string) {
 }
 
 export async function deleteMessage(id: string) {
+  removeMessage(id);
+  
   const cid = get(activeConversationId);
-
   if (cid) {
     await fetch(`/api/conversations/${cid}/messages/${id}`, {
       method: 'DELETE'
     });
   }
 
-  removeMessage(id);
+
 }
 
 

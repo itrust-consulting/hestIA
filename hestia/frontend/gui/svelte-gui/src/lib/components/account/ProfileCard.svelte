@@ -7,7 +7,7 @@
   };
 </script>
 
-<h1 class="section-title">Profile Overview</h1>
+<h1 class="section-title">Profile</h1>
 
 <div class="profile-card">
   <!-- HEADER -->

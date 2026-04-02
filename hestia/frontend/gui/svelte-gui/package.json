@@ -1,6 +1,6 @@
 {
 	"name": "svelte-app",
-	"version": "0.0.1",
+	"version": "0.2.1",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
@@ -54,6 +54,7 @@
 	"dependencies": {
 		"@humanspeak/svelte-virtual-list": "^0.4.3",
 		"highlight.js": "^11.11.1",
+		"jwt-decode": "^4.0.0",
 		"katex": "^0.16.38",
 		"marked": "^17.0.4",
 		"marked-katex-extension": "^5.1.7"

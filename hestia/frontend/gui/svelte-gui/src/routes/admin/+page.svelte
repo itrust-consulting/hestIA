@@ -1,10 +1,11 @@
 <script lang="ts">
-
+  import AdminSidebar from "$lib/components/AdminSidebar.svelte";
   let error: string | null = null;
 
 </script>
 
 <div class="page-container">
+  <AdminSidebar/>
   <div class="admin-content">
 
     {#if error}
@@ -36,27 +37,27 @@
             </div>
         </div>
         <div class="admin-card">
-            <div class="admin-card-header">Knowledge Base</div>
+            <div class="admin-card-header">Database Management</div>
             <div class="admin-list">
                 <div class="admin-item">
-                    <span>Document Management</span>
+                    <span>User Database</span>
+                    <span class="chevron">›</span>
+                </div>
+                <div class="admin-item">
+                    <span>Knowledge Base</span>
                     <span class="chevron">›</span>
                 </div>
             </div>
         </div>
         <div class="admin-card">
-            <div class="admin-card-header">Agent Settings</div>
+            <div class="admin-card-header">LLM Settings</div>
             <div class="admin-list">
                 <div class="admin-item">
-                    <span>ISMS</span>
+                    <span>Configuration</span>
                     <span class="chevron">›</span>
                 </div>
                 <div class="admin-item">
-                    <span>Audit Assistant</span>
-                    <span class="chevron">›</span>
-                </div>
-                <div class="admin-item">
-                    <span>Asset Manager</span>
+                    <span>Agent Settings</span>
                     <span class="chevron">›</span>
                 </div>
             </div>
@@ -67,17 +68,7 @@
 
         <div class="admin-list">
             <div class="admin-item" on:click={() => open('/admin/system')}>
-            <span>System Settings</span>
-            <span class="chevron">›</span>
-            </div>
-
-            <div class="admin-item" on:click={() => open('/admin/database')}>
-            <span>Database Management</span>
-            <span class="chevron">›</span>
-            </div>
-
-            <div class="admin-item" on:click={() => open('/admin/llm')}>
-            <span>LLM Configuration</span>
+            <span>Settings</span>
             <span class="chevron">›</span>
             </div>
         </div>

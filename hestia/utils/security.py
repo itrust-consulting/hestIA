@@ -10,6 +10,7 @@ from hestia.container import Container
 from hestia.utils.deps import get_container
 from hestia.schemas.api import Permissions, User
 
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 720
 

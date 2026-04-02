@@ -1,44 +1,42 @@
 <script lang="ts">
-  import UserIcon from '$lib/components/icons/userIcon.svelte';
-  import LockIcon from './icons/lockIcon.svelte';
-  import SettingsIcon from '$lib/components/icons/settingsIcon.svelte';
-  import HelpIcon from '$lib/components/icons/helpIcon.svelte';
-  import LogoutIcon from '$lib/components/icons/logoutIcon.svelte';
-
-
   import { PUBLIC_APP_VERSION } from '$env/static/public';
 
   const currentVersion = PUBLIC_APP_VERSION;
-  
-  export let currentSection: string = "profile";
-  export let onSelect: (section: string) => void;
 
-  const sections = [
-    { id: "profile", label: "Profile", icon: UserIcon },
-    { id: "security", label: "Security", icon: LockIcon},
-    { id: "support", label: "Support", icon: HelpIcon },
-    { id: "logout", label: "Logout", icon: LogoutIcon, danger: true },
-  ];
 </script>
 
 <aside class="sidebar">
 
   <!-- Navigation -->
   <div class="sidebar-list">
-
-    {#each sections as s}
-      <div
-        class="sidebar-item"
-        class:active={currentSection === s.id}
-        class:danger={s.danger}
-        on:click={() => onSelect(s.id)}
-      >
-        <div class="icon-wrapper">
-          <s.icon />
+    <h2>Users & Authentication</h2>
+    <div class="sidebar-item">
+        User Management
+    </div>
+        <div class="sidebar-item">
+        Role Management
+    </div>
+        <div class="sidebar-item">
+        Password Management
+    </div>
+    <h2>Database Management</h2>
+        <div class="sidebar-item">
+            User Database
         </div>
-        <span class="sidebar-label">{s.label}</span>
-      </div>
-    {/each}
+        <div class="sidebar-item">
+            Knowledge Base
+        </div>
+    <h2>LLM Settings</h2>        
+        <div class="sidebar-item">
+            Configuration
+        </div>
+        <div class="sidebar-item">
+            Agent Settings
+        </div>
+    <h2>System</h2>
+        <div class="sidebar-item">
+            Settings
+        </div>
   </div>
 
   <!-- Footer -->
@@ -65,7 +63,13 @@
         transition: width 200ms ease, transform 200ms ease, opacity 150ms ease, padding 200ms ease;
     }
 
-
+    .sidebar h2 {
+        font-size: var(--text-md);
+        font-weight: 600;
+        padding-bottom: .25rem;;
+        border-bottom: 1px solid var(--color-neutral-400);
+    }
+    
     .sidebar-toggle {
         display: inline-flex;
         align-items: center;
@@ -110,7 +114,7 @@
         gap: .75rem;
         line-height: 1.5rem;
         height: 1.75rem;
-        padding: -5rem .75rem;
+        padding: .75rem;
         border-radius: var(--radius-md);
         transition: background-color 120ms ease, color 120ms ease;
         cursor: pointer;

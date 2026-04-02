@@ -12,15 +12,12 @@
   let loading = $state(true);
   let error: string | null = $state(null);
 
-  // ✅ read query param reactively
   const querySection = $derived(page.url.searchParams.get('section'));
 
-  // ✅ update section when query param changes
   $effect(() => {
     if (querySection) section = querySection;
   });
 
-  // ✅ switch sections through sidebar AND update URL
   function select(newSection: string) {
     section = newSection;
 

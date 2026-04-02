@@ -2,7 +2,7 @@ import os
 import pathlib
 
 
-VERSION = "alpha_v0.2"
+VERSION = "alpha_v0.2.1"
 PORT = os.getenv("PORT", 5555)
 
 SECRET_KEY = os.getenv("API_KEY")
@@ -33,11 +33,11 @@ SERVICES_TO_START = ["encDense", "encSparse","generate", "chat","search",]
 
 REQUEST_TIMEOUT = (10.0, 800.0)    
 # --- DB Settings ---
-DEFAULT_DB_URL = "http://192.168.0.34:6333"  # change to http://qdrant:6333 in docker deployment
+DEFAULT_DB_URL = "http://192.168.0.34:6333"  
 DB_URL = os.getenv("QDRANT_BASE_URL", DEFAULT_DB_URL)
 
 # --- LLM Settings ---
-DEFAULT_LLM_URL = "http://192.168.0.34:11434" # change to http://ollama:11434 in docker deployment
+DEFAULT_LLM_URL = "http://192.168.0.34:11434" 
 LLM_URL = os.getenv("OLLAMA_BASE_URL", DEFAULT_LLM_URL)
 
 DEFAULT_GEN_MODEL = "ministral-3:14b"

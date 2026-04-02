@@ -1,43 +1,47 @@
 <script lang="ts">
 
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { login } from '$lib/auth/auth';
-  import { scheduleTokenExpiryWatcher } from '$lib/auth/session'
+  import { scheduleTokenExpiration } from '$lib/auth/session'
 
-  let email = '';
-  let password = '';
-  let error: string | null = null;
-  let loading = false;
+
+  let username = $state('');
+  let password = $state('');
+  let error = $state<string | null>(null);
+  let loading = $state(false);
+  
+  const expiredParam = $derived(page.url.searchParams.get('expired'));
+
+  $effect(() => {
+    if (expiredParam === '1') {
+      error = "Session expired. Please log in again.";
+    }
+  });
+
 
   async function handleSubmit() {
     error = null;
 
-    if (!email || !password) {
-      error = 'Email and password are required.';
+    if (!username || !password) {
+      error = 'Username and password are required.';
       return;
     }
 
     loading = true;
-    const res = await login(email, password);
+    const res = await login(username, password);
     loading = false;
 
 
     if (res.ok) {
-        const token = document.cookie
-            .split("; ")
-            .find(x => x.startsWith("token="))
-            ?.split("=")[1];
-
-        if (token) {
-            scheduleTokenExpiryWatcher(token);
-        }
-        
-        if (res.must_change_pw) {
-          goto('/account/overview?section=security');
-        }
-        else {
-          goto('/chat');
-        }
+      scheduleTokenExpiration(res.exp);
+      
+      if (res.must_change_pw) {
+        goto('/account/overview?section=security');
+      }
+      else {
+        goto('/chat');
+      }
     } 
     else {
       error = res.error ?? 'Login failed.';
@@ -56,8 +60,8 @@
     <form on:submit|preventDefault={handleSubmit} class="login-form">
       <input
         type="text"
-        placeholder="Username or email"
-        bind:value={email}
+        placeholder="Username"
+        bind:value={username}
         class="login-input"
         autocomplete="username"
       />
@@ -79,9 +83,6 @@
         {loading ? 'Logging in…' : 'Log In'}
       </button>
     </form>
-    
-    <p class="password-forgot">Forgot password?</p>
-    <a href="./login">Sign up</a>
   </div>
 </div>
 
