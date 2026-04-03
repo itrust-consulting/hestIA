@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { PUBLIC_APP_VERSION } from '$env/static/public';
+  import { env } from '$env/dynamic/public';
 
-  const currentVersion = PUBLIC_APP_VERSION;
+  const currentVersion = env.PUBLIC_APP_VERSION;
 
 </script>
 

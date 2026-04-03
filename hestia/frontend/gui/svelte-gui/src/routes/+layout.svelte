@@ -11,15 +11,19 @@
   import { page } from '$app/state';
 
   const path = $derived(page.url.pathname);
+  const hideBreadcumbs = $derived(
+        path === "/login" || path.startsWith("/chat")
+      );
 
+  const hideHeaderButtons = $derived(
+    path === "/login"
+  );
   // derive breadcrumb segments
   const segments = $derived(
     (() => {
+      // hide breadcrumbs on /login and /chat
+      if (hideBreadcumbs) return [];
       const parts = path.split('/').filter(Boolean);
-
-      // hide breadcrumbs on home/chat
-      if (parts.length === 0 || parts[0] === 'chat') return [];
-
       // optional: a nicer label map
       const labelMap: Record<string, string> = {
         admin: "Admin Dashboard",
@@ -91,7 +95,7 @@
         </div>
       {/if}
     </div>
-
+    {#if !hideHeaderButtons}
     <div class="app-header-buttons">
       <button class="icon-btn">
         <SettingsIcon />
@@ -127,6 +131,7 @@
         {/if}
       </div>
     </div>
+    {/if}
   </header>
   {@render children()}
 </div>

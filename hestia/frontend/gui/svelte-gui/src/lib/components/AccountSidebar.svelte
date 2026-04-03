@@ -6,9 +6,9 @@
   import LogoutIcon from '$lib/components/icons/logoutIcon.svelte';
 
 
-  import { PUBLIC_APP_VERSION } from '$env/static/public';
+  import { env } from '$env/dynamic/public';
 
-  const currentVersion = PUBLIC_APP_VERSION;
+  const currentVersion = env.PUBLIC_APP_VERSION;
   
   export let currentSection: string = "profile";
   export let onSelect: (section: string) => void;

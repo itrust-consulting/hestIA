@@ -9,7 +9,7 @@
     import Chaticon from './icons/chaticon.svelte';
     import BinIcon from './icons/binIcon.svelte';
 
-    import { PUBLIC_APP_VERSION } from '$env/static/public';
+    import { env } from '$env/dynamic/public';
 
     import {
         conversations,
@@ -20,7 +20,7 @@
         deleteConversation as removeConversation
     } from '$lib/stores/conversations';
 
-    const currentVersion = PUBLIC_APP_VERSION;
+    const currentVersion = env.PUBLIC_APP_VERSION;
 
     const sidebarOpen = writable<boolean>(true);
     

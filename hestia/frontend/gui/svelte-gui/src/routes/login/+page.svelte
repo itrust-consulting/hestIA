@@ -1,5 +1,5 @@
 <script lang="ts">
-
+  import { redirect } from '@sveltejs/kit';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { login } from '$lib/auth/auth';
