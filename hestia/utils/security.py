@@ -10,7 +10,7 @@ from hestia.container import Container
 from hestia.utils.deps import get_container
 from hestia.schemas.api import Permissions, User
 
-
+SECRET_KEY = "a_very_secret_key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
@@ -30,7 +30,7 @@ def get_current_user(token: str = Depends(oauth2_scheme),
     """
     Decode JWT, validate, fetch the user record.
     """
-    user_services = c.services.get("auth")
+    user_services = c.services.get("users")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id_hex = payload.get("sub")
@@ -45,7 +45,7 @@ def get_current_user(token: str = Depends(oauth2_scheme),
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     # Fetch user from DB (minimal)
-    user = user_services.load_user(user_id)
+    user = user_services.load_user_profile(user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 

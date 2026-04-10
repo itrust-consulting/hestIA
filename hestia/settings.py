@@ -29,7 +29,7 @@ CLASSIFICATION = ["public", "public (pu)",
 LLM_BACKEND     = "ollama"
 DB_BACKEND      = "qdrant"
 
-SERVICES_TO_START = ["encDense", "encSparse","generate", "chat","search",]
+SERVICES_TO_START = ["encDense", "encSparse","generate", "chat", "search",]
 
 REQUEST_TIMEOUT = (10.0, 800.0)    
 # --- DB Settings ---
@@ -51,7 +51,21 @@ APP_DATA        = PROJECT_ROOT_PATH.joinpath(os.getenv("HESTIA_DATA_DIR") or "./
 CSS_FILE        = PROJECT_ROOT_PATH.joinpath("./hestia/frontend/gui/gradio/static/styles.css")
 LOG_FILE        = APP_DATA.joinpath("./log.log")
 REQ_FILE        = APP_DATA.joinpath("./requests.json")
-CDB_PATH        = APP_DATA.joinpath("./uhist.db")
+UDB_PATH        = APP_DATA.joinpath("./users.db")
 CORPUS_DIR      = APP_DATA.joinpath("./corpus_dir/")
 
+# Enable authentication
+ENABLE_AUTH = os.getenv("HESTIA_DATA_DIR") or False
 
+# LDAP Settings
+ENABLE_LDAP = os.getenv("HESTIA_DATA_DIR") or False
+LDAP_SERVER_HOST = "ldaps://ldap.itrust.lu" #os.getenv("HESTIA_DATA_DIR") or "ldaps://ldap.example.com"
+LDAP_SERVER_PORT = 636 #os.getenv("HESTIA_DATA_DIR") or 636
+LDAP_USE_TLS = os.getenv("HESTIA_DATA_DIR") or True
+LDAP_VALIDATE_CERT = True #os.getenv("HESTIA_DATA_DIR") or True
+LDAP_APP_DN = "CN=semaphore-binder,OU=services,OU=Users,OU=Niederanven,DC=domitr,DC=itrust,DC=lu" #os.getenv("HESTIA_DATA_DIR") or ""
+LDAP_APP_PASSWORD = "F1H19cHrwIBzOX5yFUhuGgm4Aql0deou"# os.getenv("HESTIA_DATA_DIR") or ""
+LDAP_SEARCH_BASE = "DC=domitr,DC=itrust,DC=lu" #os.getenv("HESTIA_DATA_DIR") or ""
+LDAP_ATTRIBUTE_FOR_USERNAME = "sAMAccountName"#os.getenv("HESTIA_DATA_DIR") or "uid"
+LDAP_ATTRIBUTE_FOR_MAIL = "mail" #os.getenv("HESTIA_DATA_DIR") or "mail"
+LDAP_MODE = "auto"#os.getenv("HESTIA_DATA_DIR") or "auto"

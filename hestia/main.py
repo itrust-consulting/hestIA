@@ -20,7 +20,8 @@ def create_api() -> FastAPI:
             llm_backend=s.LLM_BACKEND,
             db_backend=s.DB_BACKEND,
             services_to_start=s.SERVICES_TO_START,
-            enable_auth=True
+            enable_auth=True, #s.ENABLE_AUTH,
+            enable_ldap=True #s.ENABLE_LDAP,
         )
 
         container = build_container(s, cfg)

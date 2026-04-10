@@ -86,24 +86,10 @@ class SearchData(APIModel):
 SearchResponse = Response[Any]
 
 class Permissions(BaseModel):
-    use_rag: bool = False
-    max_classification: int = 0
-    allowed_collections: List[str] = []
-
-    manage_users: bool = False
-    assign_roles: bool = False
-    view_users: bool = False
-
-    configure_llm: bool = False
-    view_llm_status: bool = False
-
-    manage_system: bool = False
-    manage_database: bool = False
-    view_system_status: bool = False
-
-    manage_documents: bool = False
-    manage_collections: bool = False
-    reindex_corpus: bool = False
+    allowed_collections: list[dict] = []
+    user_management: bool = False
+    system_management: bool = False
+    data_management: bool = False
 
     # catch-all for future dynamic permissions
     extra: Dict[str, Any] = {}
@@ -113,18 +99,23 @@ from enum import Enum
 class Role(str, Enum):
     ADMIN = "admin"
     MODERATOR = "moderator"
-    AUDITOR = "auditor"
-    ISMS = "isms_member"
     USER = "user"
     GUEST = "guest"
 
 class User(BaseModel):
     id: uuid.UUID
     username: str
-    roles: list[str]
-    permissions: Permissions
+    email: str
+    first_name: str
+    last_name: str
+    roles: list[dict]
+    orgs: list[dict]
+    permissions: dict
     must_change_pw: bool
+    auth_source: str
     created_at: int
+    updated_at: int
+    expires_at: int | None
 
 
 class ExecutionRequest(BaseModel):
@@ -157,3 +148,31 @@ class ExecutionGraph(BaseModel):
     entrypoint: str
     exitpoints: List[str] = Field(default_factory=list)
     context_refs: Dict[str, str] = Field(default_factory=dict)  # e.g. kv://... refs
+
+
+class AuthResult(BaseModel):
+    success: bool
+    message: str
+    user_id: bytes | None = None
+    username: str | None = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    groups: list[str] = None
+    auth_source: str | None = None # "ldap" or "local"
+    must_change_pw: int | bool = None
+
+    @staticmethod
+    def ack(user_id: str, message="Login successful."):
+        return AuthResult(
+            success=True,
+            message=message,
+            user_id=user_id
+        )
+
+    @staticmethod
+    def nack(message="Invalid username or password."):
+        return AuthResult(
+            success=False,
+            message=message
+        )

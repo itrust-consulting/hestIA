@@ -217,6 +217,7 @@ class PersistChat:
         self.runner = runner
         self.req = req
         self.auth = runner.container.services.get("auth")
+        self.users = runner.container.services.get("users")
 
     def run(self, plan, stream=False):
         # Execute normal runner
@@ -264,11 +265,11 @@ class PersistChat:
         else:
             # Create new conversation
             title = req.conversation_title or req.last_user_message[:40]
-            c_id = self.auth.create_user_conversation(user_id, title)
+            c_id = self.users.create_user_conversation(user_id, title)
 
         # Persist the user message
         if req.last_user_message:
-            user_msg_id = self.auth.append_conversation_message(
+            user_msg_id = self.users.append_conversation_message(
                 c_id=c_id,
                 role="user",
                 content=req.last_user_message,
@@ -277,7 +278,7 @@ class PersistChat:
             )
 
         # Persist assistant reply
-        assistant_msg_id = self.auth.append_conversation_message(
+        assistant_msg_id = self.users.append_conversation_message(
             c_id=c_id,
             role="assistant",
             content=assistant_reply,

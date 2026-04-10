@@ -2,9 +2,28 @@
   export let user: {
     id: string;
     username: string;
-    roles: string[];
-    permissions: Record<string, any>;
+    email: string;
+    first_name: string;
+    last_name: string;
+    created_at: number;
+    updated_at: number;
+    expires_at: number;
+    orgs: Record<string, any>;
+    roles: Record<string, any>;
   };
+
+  const orgs: string[] = user.orgs.map((o: { name: any; }) => o.name);
+  const roles: string[] = user.roles.map((r: { name: any; }) => r.name);
+
+  const formatDate = (ts: number) => {
+    if (!ts) return '';
+    return new Date(ts).toLocaleString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
 </script>
 
 <h1 class="section-title">Profile</h1>
@@ -18,32 +37,40 @@
 
     <div class="profile-basic">
       <h2 class="profile-name">{user.username}</h2>
-      <p class="profile-role">{user.roles.join(', ')}</p>
+      <p class="profile-email">{user.email}</p>
     </div>
   </div>
 
   <!-- GRID INFO -->
   <div class="profile-details-grid">
     <div class="detail">
-      <label>User ID</label>
-      <p>{user.id}</p>
+      <label>Name</label>
+      <p>{user.first_name} {user.last_name}</p>
     </div>
 
     <div class="detail">
-      <label>Username</label>
-      <p>{user.username}</p>
+      <label>Organization</label>
+      <p>{orgs}</p>
     </div>
 
     <div class="detail">
       <label>Roles</label>
-      <p>{user.roles.join(', ')}</p>
+      <p>{roles}</p>
     </div>
 
     <div class="detail full">
-      <label>Permissions</label>
-      <pre class="permissions-box">{JSON.stringify(user.permissions, null, 2)}</pre>
+      <label>Created</label>
+      <p>{formatDate(user.created_at)}</p>
     </div>
+    
+    {#if user.expires_at}
+      <div class="detail full">
+        <label>Expires</label>
+        <p>{formatDate(user.expires_at)}</p>
+      </div>
+    {/if}
   </div>
+
 
 </div>
 
@@ -88,7 +115,7 @@
     font-weight: 600;
   }
 
-  .profile-role {
+  .profile-email {
     color: var(--color-neutral-600);
     font-size: var(--text-sm);
   }
@@ -114,43 +141,4 @@
     grid-column: 1 / -1;
   }
 
-  .permissions-box {
-    background: var(--color-neutral-100);
-    padding: 0.75rem;
-    border-radius: var(--radius-lg);
-    font-size: var(--text-xs);
-    max-height: 160px;
-    overflow-y: auto;
-    border: 1px solid var(--color-neutral-300);
-  }
-
-  .profile-actions {
-    display: flex;
-    gap: 1rem;
-  }
-
-  .btn {
-    padding: .65rem 1.25rem;
-    border-radius: var(--radius-lg);
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    transition: background 120ms ease;
-  }
-
-  .btn.dark {
-    background: var(--color-blue-600);
-    color: white;
-  }
-  .btn.dark:hover {
-    background: var(--color-blue-700);
-  }
-
-  .btn.light {
-    background: var(--color-neutral-200);
-    color: var(--color-neutral-900);
-  }
-  .btn.light:hover {
-    background: var(--color-neutral-300);
-  }
 </style>

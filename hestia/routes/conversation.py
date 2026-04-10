@@ -14,7 +14,7 @@ def list_user_conversations(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user)
 ):
-    svc = h.container.services.get("auth")
+    svc = h.container.services.get("users")
     return svc.get_user_conversations(user.id.bytes)
 
 @router.patch("/conversations/{cid}")
@@ -29,7 +29,7 @@ def patch_conversation(
     if not new_title:
         raise HTTPException(400, "No title specified.")
     
-    svc = h.container.services.get("auth")
+    svc = h.container.services.get("users")
     svc.rename_user_conversation(user.id.bytes, bytes.fromhex(cid), title=req.get("title"))
     return {"status": "ok", "title": new_title}
 
@@ -39,7 +39,7 @@ def list_conversation_messages(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user)
 ):
-    svc = h.container.services.get("auth")
+    svc = h.container.services.get("users")
     return svc.get_conversation_messages(bytes.fromhex(cid))
 
 @router.delete("/conversations/{cid}")
@@ -49,7 +49,7 @@ def delete_conversation(
     user: User = Depends(get_current_user)
     ):
 
-    svc = h.container.services.get("auth")
+    svc = h.container.services.get("users")
     svc.delete_user_conversation(user.id.bytes, bytes.fromhex(cid))
 
 @router.delete("/conversations/{cid}/messages/{mid}")
@@ -60,7 +60,7 @@ def delete_message(
     user: User = Depends(get_current_user)
     ):
 
-    svc = h.container.services.get("auth")
+    svc = h.container.services.get("users")
     svc.delete_conversation_message(user.id.bytes, 
                                     bytes.fromhex(cid),
                                     bytes.fromhex(mid))

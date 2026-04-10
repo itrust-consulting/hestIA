@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Set, Callable, Any, Literal, Protocol, AsyncIterator
 
 from hestia.providers import OllamaProvider, QdrantDB
-from hestia.services import Generator, DenseEncoder, SparseEncoder, Retriever, UserService
-from hestia.utils.user_db import UserRepository
+from hestia.services import Generator, DenseEncoder, SparseEncoder, \
+    Retriever, LDAPService, UserService, AuthenticationService
+from hestia.utils.user_db import UserRepository, create_sqlite_connection
 
 ProviderType = Literal["llm", "db"]
 ServiceName = Literal["generate", "chat", "encDense", "encSparse", "search"]
@@ -91,6 +92,7 @@ class AppStartupConfig:
                                                                           "search"])
     agents_to_start: List[str] = field(default_factory=list)
     enable_auth: bool = False
+    enable_ldap: bool = False
 
 
 @dataclass
@@ -117,11 +119,27 @@ def build_container(settings, cfg: AppStartupConfig) -> Container:
     if cfg.db_backend:
         c.providers["db"] = _build_provider("db", cfg.db_backend, settings)
 
-
     if cfg.enable_auth:
-        repo = UserRepository()
+        get_conn, close, lock = create_sqlite_connection(settings.UDB_PATH)
+        repo = UserRepository(get_conn, lock)
+        usvc = UserService(repo)
         repo.initialize()
-        c.services["auth"] = UserService(repo)
+        ldap = None
+        if cfg.enable_ldap:
+            ldap = LDAPService(
+                host=settings.LDAP_SERVER_HOST,
+                port=settings.LDAP_SERVER_PORT,
+                search_base=settings.LDAP_SEARCH_BASE,
+                bind_dn=settings.LDAP_APP_DN,
+                bind_password=settings.LDAP_APP_PASSWORD,
+                user_attribute=settings.LDAP_ATTRIBUTE_FOR_USERNAME,
+                mail_attribute=settings.LDAP_ATTRIBUTE_FOR_MAIL,
+                validate_cert=settings.LDAP_VALIDATE_CERT,
+                mode=settings.LDAP_MODE
+            )
+        c.services["auth"] = AuthenticationService(usvc, ldap)
+        c.services["users"] = usvc
+        close()
 
     singleton_cache: Dict[str, Any] = {}
 
