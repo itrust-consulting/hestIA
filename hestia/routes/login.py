@@ -18,7 +18,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(),
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=result.message,
         )
-    access_token = create_access_token(result.user_id)
+    access_token = create_access_token(
+        result.user_id,
+        key=auth.config.token_secret_key,
+        algorithm=auth.config.token_encoding_alg,
+        expiration_time=auth.config.token_lifetime_minutes)
+    
     return {
         "access_token": access_token,
         "token_type": "bearer",

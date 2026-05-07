@@ -2,10 +2,12 @@
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Set, Callable, Any, Literal, Protocol, AsyncIterator
 
-from hestia.providers import OllamaProvider, QdrantDB
+from hestia.providers import OllamaProvider, QdrantDB, vLLMProvider
 from hestia.services import Generator, DenseEncoder, SparseEncoder, \
     Retriever, LDAPService, UserService, AuthenticationService
 from hestia.utils.user_db import UserRepository, create_sqlite_connection
+from hestia.config.ldap import load_ldap_config
+from hestia.config.auth import load_auth_config
 
 ProviderType = Literal["llm", "db"]
 ServiceName = Literal["generate", "chat", "encDense", "encSparse", "search"]
@@ -23,6 +25,9 @@ class AgentProtocol(Protocol):
 
 def _build_ollama(settings):
     return OllamaProvider(http=settings.LLM_URL)
+
+def _build_vllm(settings):
+    return vLLMProvider(chat=settings.LLM_URL, embed=settings.EMB_URL, rerank=settings.RRK_URL)
 
 def _build_qdrant(settings):
     return QdrantDB(http=settings.DB_URL)
@@ -64,6 +69,7 @@ class AgentSpec:
 
 PROVIDER_REGISTRY: Dict[str, ProviderSpec] = {
     "ollama":   ProviderSpec(factory=_build_ollama, type="llm"),
+    "vllm":     ProviderSpec(factory=_build_vllm, type="llm"),
     "qdrant":   ProviderSpec(factory=_build_qdrant, type="db"),
 }
 
@@ -124,20 +130,28 @@ def build_container(settings, cfg: AppStartupConfig) -> Container:
         repo = UserRepository(get_conn, lock)
         usvc = UserService(repo)
         repo.initialize()
+
+        auth_config = load_auth_config()
+
         ldap = None
-        if cfg.enable_ldap:
+        if auth_config.enable_ldap:
+            ldap_config = load_ldap_config()
+
             ldap = LDAPService(
-                host=settings.LDAP_SERVER_HOST,
-                port=settings.LDAP_SERVER_PORT,
-                search_base=settings.LDAP_SEARCH_BASE,
-                bind_dn=settings.LDAP_APP_DN,
-                bind_password=settings.LDAP_APP_PASSWORD,
-                user_attribute=settings.LDAP_ATTRIBUTE_FOR_USERNAME,
-                mail_attribute=settings.LDAP_ATTRIBUTE_FOR_MAIL,
-                validate_cert=settings.LDAP_VALIDATE_CERT,
-                mode=settings.LDAP_MODE
+                host=ldap_config.host,
+                port=ldap_config.port,
+                search_base=ldap_config.search_base,
+                bind_dn=ldap_config.bind_dn,
+                bind_password=ldap_config.bind_password,
+                user_attribute=ldap_config.user_attribute,
+                mail_attribute=ldap_config.mail_attribute,
+                use_ssl=ldap_config.use_ssl,
+                validate_cert=ldap_config.validate_cert,
+                allowed_groups=ldap_config.allowed_groups,
+                mode=ldap_config.mode
             )
-        c.services["auth"] = AuthenticationService(usvc, ldap)
+
+        c.services["auth"] = AuthenticationService(usvc, ldap, config=auth_config)
         c.services["users"] = usvc
         close()
 

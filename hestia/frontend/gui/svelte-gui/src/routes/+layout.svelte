@@ -2,6 +2,7 @@
   import './layout.css';
   import SettingsIcon from '$lib/components/icons/settingsIcon.svelte';
   import AccountSetIcon from '$lib/components/icons/accountSetIcon.svelte';
+  import AdminIcon from '$lib/components/icons/adminIcon.svelte';
   import UserIcon from '$lib/components/icons/userIcon.svelte';
   import LogoutIcon from '$lib/components/icons/logoutIcon.svelte';
   import HelpIcon from '$lib/components/icons/helpIcon.svelte';
@@ -9,6 +10,8 @@
   import { onMount } from 'svelte';
   import { startInactivityWatcher } from '$lib/auth/session';
   import { page } from '$app/state';
+
+  const user = $derived(page.data.user)
 
   const path = $derived(page.url.pathname);
   const hideBreadcumbs = $derived(
@@ -18,29 +21,37 @@
   const hideHeaderButtons = $derived(
     path === "/login"
   );
-  // derive breadcrumb segments
-  const segments = $derived(
-    (() => {
-      // hide breadcrumbs on /login and /chat
-      if (hideBreadcumbs) return [];
-      const parts = path.split('/').filter(Boolean);
-      // optional: a nicer label map
-      const labelMap: Record<string, string> = {
-        admin: "Admin Dashboard",
-        users: "User Management",
-        account: "Account",
-        overview: "Overview",
-        security: "Security",
-        settings: "Settings"
+  
+  type Breadcrumb = {
+    label: string;
+    href: string;
+  };
+
+  const breadcrumbs = $derived.by<Breadcrumb[]>(() => {
+    if (hideBreadcumbs) return [];
+
+    const parts = path.split('/').filter(Boolean);
+
+    const labelMap: Record<string, string> = {
+      admin: "Admin Dashboard",
+      users: "User Management",
+      account: "Account",
+      overview: "Overview",
+      security: "Security",
+      settings: "Settings"
+    };
+
+    let currentPath = "";
+
+    return parts.map((part) => {
+      currentPath += `/${part}`;
+
+      return {
+        label: labelMap[part] ?? part.charAt(0).toUpperCase() + part.slice(1),
+        href: currentPath
       };
-
-      const cap = (s: string) =>
-        labelMap[s] ?? s.charAt(0).toUpperCase() + s.slice(1);
-
-      return parts.map(cap);
-    })()
-  );
-
+    });
+  });
 
   onMount(() => {
       startInactivityWatcher();
@@ -87,12 +98,21 @@
   <header class="app-header">
     <div class="app-header-left">
       <h1><a href="/chat">hestIA</a></h1>
-      {#if segments.length > 0}
-        <div class="breadcrumbs">
-          {#each segments as seg, i}
-            {seg}{#if i < segments.length - 1} <span class="crumb-sep">»</span> {/if}
+      {#if breadcrumbs.length > 0}
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          {#each breadcrumbs as crumb, i}
+            {#if i < breadcrumbs.length - 1}
+              <a href={crumb.href} class="breadcrumb-link">
+                {crumb.label}
+              </a>
+              <span class="crumb-sep">»</span>
+            {:else}
+              <span class="breadcrumb-current">
+                {crumb.label}
+              </span>
+            {/if}
           {/each}
-        </div>
+        </nav>
       {/if}
     </div>
     {#if !hideHeaderButtons}
@@ -115,6 +135,15 @@
             >
               <AccountSetIcon /> <a href="/account/overview">Account</a>
             </button>
+            {#if user?.permissions?.system_management}
+              <button
+                class="dropdown-btn"
+                onclick={closeDropdown}
+              >
+                <AdminIcon />
+                <a href="/admin">Admin Panel</a>
+              </button>
+            {/if}
             <button
               class="dropdown-btn"
               onclick={closeDropdown}

@@ -5,7 +5,7 @@ const version = 'v0.2.1'
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
 	},
 	env: {
 		VERSION: version,

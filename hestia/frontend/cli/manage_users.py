@@ -295,6 +295,79 @@ def handle_set_user_permission(args, svc: UserService):
 
     print(f"Set permission override: {args.permission}={args.value}")
 
+def normalize_permission_value(value_type: str, value, schema: dict):
+    
+    # Empty or missing → use default semantics
+    if value in ("", None):
+        if value_type == "boolean":
+            return schema.get("default", False)
+        if value_type == "list":
+            return schema.get("default")
+        if value_type == "map":
+            return {}
+
+    
+    if value_type == "boolean":
+        if isinstance(value, bool):
+            return value
+        raise ValueError("Boolean permission requires true/false")
+    
+    if value_type == "map":
+        if not isinstance(value, dict):
+            raise ValueError("Map permission requires an object")
+
+        normalized = {}
+        fields = schema["value"]["fields"]
+
+        for k, v in value.items():
+            access = v.get("access", fields["access"].get("default", False))
+            max_cls = v.get("max_classification")
+
+            if not access:
+                max_cls = None
+
+            allowed_cls = fields["max_classification"].get("allowed_values")
+            if max_cls is not None and max_cls not in allowed_cls:
+                raise ValueError(f"Invalid classification: {max_cls}")
+
+            normalized[k] = {
+                "access": bool(access),
+                "max_classification": max_cls
+            }
+
+        return normalized
+
+    raise ValueError(f"Unsupported value_type: {value_type}")
+
+
+def normalize_permission_options(value_type: str, options):
+    """
+    Normalizes and validates permission options.
+    Returns a JSON-serializable dict.
+    """
+
+    # Allow empty or missing options
+    if options in ("", None):
+        options = {}
+
+    if value_type == "boolean":
+        # Allow shorthand: "" or {}
+        normalized = {
+            "labels": options.get("labels", {
+                "true": "Enabled",
+                "false": "Disabled"
+            }),
+            "default": options.get("default", False)
+        }
+        return normalized
+
+    if value_type == "map":
+        if not {"keys", "value"}.issubset(options):
+            raise ValueError("map permission requires 'keys' and 'value'")
+        return options
+
+    raise ValueError(f"Unsupported value_type: {value_type}")
+
 def handle_init_db(args, svc: UserService):
     with open(args.from_json, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -312,9 +385,16 @@ def handle_init_db(args, svc: UserService):
     # Permissions
     # -----------------------------
     for p in data.get("permissions", []):
+        normalized_options = normalize_permission_options(
+            value_type=p["value_type"],
+            options=p.get("options")
+            )
+        
         svc.repo.insert_permission(
             name=p["name"],
-            description=p.get("description", "")
+            description=p.get("description", ""),
+            value_type=p["value_type"],
+            options=json.dumps(normalized_options)
         )
 
     # -----------------------------
@@ -328,11 +408,18 @@ def handle_init_db(args, svc: UserService):
         perm = svc.repo.get_permission_by_name(rp["permission"])
         if not perm:
             raise SystemExit(f"Permission not found: {rp['permission']}")
+        
+        options = json.loads(perm["options"]) # load option schema
 
+        normalized_value = normalize_permission_value(
+            value_type=perm["value_type"],
+            value=rp.get("value"), 
+            schema=options
+        )
         svc.repo.set_role_permission(
             role_id=role["id"],
             permission_id=perm["id"],
-            value=rp.get("value")
+            value=json.dumps(normalized_value)
         )
 
     # -----------------------------

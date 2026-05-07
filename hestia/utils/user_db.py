@@ -91,7 +91,9 @@ class UserRepository:
             CREATE TABLE IF NOT EXISTS permissions (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 name                TEXT NOT NULL UNIQUE,
-                description         TEXT
+                description         TEXT NOT NULL,
+                value_type          TEXT NOT NULL,              -- boolean | list | map
+                options             TEXT                        -- list or json, depending on type
             );
 
             CREATE TABLE IF NOT EXISTS role_hierarchy (
@@ -200,7 +202,8 @@ class UserRepository:
         conn = self._get_conn()
         return conn.execute(
             """
-            SELECT id, username, email, first_name, last_name, must_change_pw, created_at, updated_at, expires_at
+            SELECT id, username, email, first_name, last_name, must_change_pw, auth_source, 
+            created_at, updated_at, expires_at
             FROM users
             ORDER BY last_name ASC
             """
@@ -333,7 +336,7 @@ class UserRepository:
         expires_ts: int | None = None):
         conn.execute(
             """
-            INSERT INTO user_roles (user_id, role_id, starts_at, expires_at)
+            INSERT OR IGNORE INTO user_roles (user_id, role_id, starts_at, expires_at)
             VALUES (?, ?, ?, ?)
             """,
             (user_id, role_id, starts_ts, expires_ts)
@@ -656,22 +659,42 @@ class UserRepository:
 
     # permissions
     @with_txn
-    def insert_permission(self, conn: sqlite3.Connection, *, name: str, description: str):
+    def insert_permission(
+        self, 
+        conn: sqlite3.Connection, 
+        *, 
+        name: str, 
+        description: str,
+        value_type: str,
+        options: list | dict
+        ):
+
         conn.execute(
             """
-            INSERT OR IGNORE INTO permissions (name, description) VALUES (?, ?)
+            INSERT OR IGNORE INTO permissions (name, description, value_type, options) 
+            VALUES (?, ?, ?, ?)
             """,
-            (name, description)
+            (name, description, value_type, options)
         )
 
     @with_txn
-    def update_permission(self, conn: sqlite3.Connection, *, id: int, name: str, description: str):
+    def update_permission(
+        self, 
+        conn: sqlite3.Connection, 
+        *, 
+        id: int, 
+        name: str, 
+        description: str,
+        value_type: str,
+        options: list | dict
+        ):
+    
         conn.execute(
             """
-            UPDATE permissions SET name = ?, description = ? 
+            UPDATE permissions SET name = ?, description = ?, value_type = ?, options = ?
             WHERE id = ?
             """,
-            (name, description, id)
+            (name, description, value_type, options, id)
         )
         
     @with_txn
@@ -682,7 +705,7 @@ class UserRepository:
         conn = self._get_conn()
         return conn.execute(
             """
-            SELECT id, name, description FROM permissions 
+            SELECT id, name, description, value_type, options FROM permissions 
             WHERE id = ?
             """, 
             (id,)
@@ -692,7 +715,7 @@ class UserRepository:
         conn = self._get_conn()
         return conn.execute(
             """
-            SELECT id, name, description FROM permissions 
+            SELECT id, name, description, value_type, options FROM permissions 
             WHERE name = ?
             """, 
             (name,)
@@ -702,7 +725,7 @@ class UserRepository:
         conn = self._get_conn()
         return conn.execute(
             """
-            SELECT id, name, description FROM permissions
+            SELECT id, name, description, value_type, options FROM permissions
             ORDER BY id
             """
         ).fetchall()

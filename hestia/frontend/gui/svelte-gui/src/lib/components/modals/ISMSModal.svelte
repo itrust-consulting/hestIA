@@ -1,24 +1,45 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+
+    import { page } from '$app/state';
     import Modal from '$lib/components/Modal.svelte';
     import InfoIcon from '../icons/infoIcon.svelte';
     import { activeCorpusId, activeCorpusName, isIsmsActive } from '$lib/stores/isms';
 
     /** Props passed from parent */
-    const { open, onClose, isAdmin } = $props();
+    const { open, onClose} = $props();
 
+    const user = page.data.user;
 
     let mode = $state<'select' | 'create'>('select');
     let corpora = $state<{ id: string; name: string }[]>([]);
     let selectedCorpusId = $state('');
     let isCorporaLoaded = $state(false);
+    type Collection = { id: string; name: string };
 
     async function loadCorpora() {
-        isCorporaLoaded = false;
-        const res = await fetch('/api/collections');
-        const data = await res.json();
-        corpora = data.collections;
+      isCorporaLoaded = false;
+
+      const allowed = user?.permissions?.allowed_collections;
+
+      if (!allowed) {
+        corpora = [];
         isCorporaLoaded = true;
+        return;
+      }
+
+      // Admin: wildcard → list all collections
+      if (allowed['*']?.access === true) {
+        const res = await fetch('/api/collections');
+        const data: { collections: Collection[] } = await res.json();
+        corpora = data.collections;
+      } else {
+        // Regular users: only those with access === true
+        corpora = Object.entries(allowed)
+          .filter(([, v]) => v.access === true)
+          .map(([id]) => ({ id, name: id }));
+      }
+
+      isCorporaLoaded = true;
     }
 
     $effect(() => {
@@ -131,7 +152,7 @@
             {/if}
             </select>
         <!-- Only expose this for admins -->
-         {#if isAdmin}
+         {#if user?.permissions?.data_management}
             <button class="primary-btn" onclick={() => mode = "create"}>
                 + Create New Corpus
             </button>

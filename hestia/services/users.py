@@ -13,11 +13,11 @@ from hestia.utils.user_db import UserRepository
 TODO:
 - output type annotations.
 - proper input validations.
+- setters shall return ack/nack - msg
 """
 
 PBKDF2_ITERATIONS = 210_000
 SALT_BYTES = 16
-GLOBAL_ORG_ID = 0
 
 def new_uuid() -> uuid.UUID:
     return uuid.uuid4().bytes 
@@ -92,10 +92,23 @@ class PermissionResolver:
             ordered.extend(self._collect_role_tree(rid, visited))
         return ordered
 
-    def compute_user_permissions(self, user_id: bytes) -> dict:
-        effective = {}
+    def _merge_map_permission(self, base: dict, incoming: dict) -> dict:
+        """
+        Merge map permissions without overwriting existing keys.
+        Child role keys override parent keys.
+        """
+        result = dict(base)
 
-        # 1. Direct user roles
+        for key, value in incoming.items():
+            # value is expected to be an object like:
+            # { "access": bool, "max_classification": int | None }
+            result[key] = value
+
+        return result
+
+    def compute_user_permissions(self, user_id: bytes) -> dict:
+        effective: dict = {}
+
         role_rows = self.repo.get_user_roles(user_id)
         direct_role_ids = [
             r["id"]
@@ -103,20 +116,42 @@ class PermissionResolver:
             if self._time_valid(r["starts_at"], r["expires_at"])
         ]
 
-        # 2. Expand via inheritance
-        full_roles = self._resolve_roles(direct_role_ids)
+        resolved_roles = self._resolve_roles(direct_role_ids)
 
-        # 3. Merge role permissions (child first)
-        for rid in full_roles:
+        for rid in resolved_roles:
             for rp in self.repo.get_role_permissions(rid):
-                effective[rp["name"]] = self._parse_value(rp["value"])
+                perm_name = rp["name"]
+                perm_value = self._parse_value(rp["value"])
 
-        # 4. User overrides
+                perm_def = self.repo.get_permission_by_name(perm_name)
+                value_type = perm_def["value_type"]
+
+                if value_type == "map":
+                    existing = effective.get(perm_name, {})
+                    if not isinstance(existing, dict):
+                        existing = {}
+
+                    if isinstance(perm_value, dict):
+                        effective[perm_name] = self._merge_map_permission(
+                            existing,
+                            perm_value
+                        )
+                    else:
+                        effective[perm_name] = existing
+                else:
+                    effective[perm_name] = perm_value
+
         for up in self.repo.get_user_permissions(user_id):
-            if self._time_valid(up["starts_at"], up["expires_at"]):
-                effective[up["name"]] = self._parse_value(up["value"])
+            if not self._time_valid(up["starts_at"], up["expires_at"]):
+                continue
+
+            perm_name = up["name"]
+            perm_value = self._parse_value(up["value"])
+
+            effective[perm_name] = perm_value
 
         return effective
+
 
 class UserService:
 
@@ -140,6 +175,21 @@ class UserService:
             pwd_hash, 
             self._hash_password(password, salt)
         )
+    
+    def _serialize_permission_value(self, value) -> str:
+        """
+        Convert a permission value into a DB-safe string.
+        """
+        if isinstance(value, bool):
+            return "true" if value else "false"
+
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, separators=(",", ":"))
+
+        if value is None:
+            return "null"
+
+        return str(value)
 
     # --------------------------------------
     # Auth
@@ -194,9 +244,10 @@ class UserService:
                 "id": r["id"].hex(),
                 "username": r["username"],
                 "email": r["email"],
-                "must_change_pw": r["must_change_pw"],
                 "first_name": r["first_name"],
                 "last_name": r["last_name"],
+                "auth_source": r["auth_source"],
+                "must_change_pw": r["must_change_pw"],
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
                 "expires_at": r["expires_at"],
@@ -206,15 +257,18 @@ class UserService:
 
     def create_user(
             self, 
+            *,
             username: str, 
-            email: str,   # "ldap" or "local"
+            email: str, 
             password: str,
             first_name: str, 
             last_name: str,
-            role: str = "guest",
-            auth_source: str = "local", 
+            roles: list[str] | list[int] = ["guest"],
+            organization: str | int | None = None,
             must_change_pw: int = 1,        # default requires user to change pw upon first login.
-            expires_at: int | None = None):
+            auth_source: str = "local",
+            expires_at: int | None = None,
+            permissions: dict | None = None):
 
         if len(username) < 3:
             raise ValueError("Username too short")
@@ -233,7 +287,7 @@ class UserService:
             email=email,
             first_name=first_name,
             last_name=last_name,
-            auth_source=auth_source,
+            auth_source=auth_source,        # always 'local' user must be created
             password_hash=pwd_hash,
             salt=salt,
             must_change_pw=must_change_pw,
@@ -242,16 +296,55 @@ class UserService:
         )
 
         # Assign role
-        role_row = self.repo.get_role_by_name(role)
-        if not role_row:
-            raise ValueError(f"Role '{role}' does not exist")
+        for role in roles:
+            role_id = role
+            if isinstance(role, str):
+                role_row = self.repo.get_role_by_name(role)
+                if not role_row:
+                    raise ValueError(f"Role '{role}' does not exist")
+                role_id = role_row["id"]
 
-        self.repo.add_role_to_user(
+            self.repo.add_role_to_user(
+                user_id=user_id,
+                role_id=role_id,
+                starts_ts=ts,
+                expires_ts=expires_at,
+            )
+        # assign org
+        org_id = organization
+        if isinstance(organization, str):
+            org_row = self.repo.get_organization_by_name(organization)
+            if not org_row:
+                raise ValueError(f"Organization '{organization}' does not exist")
+            org_id = org_row["id"]
+        
+        self.repo.add_user_to_organization(
             user_id=user_id,
-            role_id=role_row["id"],
-            starts_ts=ts,
-            expires_ts=expires_at,
+            org_id=org_id
         )
+        
+        if permissions:
+            # Fetch permission definitions once
+            perm_defs = {
+                p["name"]: p["id"]
+                for p in self.repo.list_permissions()
+            }
+
+            for perm_name, perm_value in permissions.items():
+                if perm_name not in perm_defs:
+                    raise ValueError(f"Unknown permission '{perm_name}'")
+
+                permission_row = self.repo.get_permission_by_name(perm_name)
+                pid = permission_row["id"]
+                value_str = self._serialize_permission_value(perm_value)
+
+                self.set_user_permission(
+                    user_id=user_id,
+                    permission_id=pid,
+                    value=value_str,
+                    starts_ts=ts,
+                    expires_ts=expires_at,
+                )
 
         return user_id
 
@@ -288,10 +381,15 @@ class UserService:
         return [{
             "id": p["id"],
             "name": p["name"],
-            "description": p["description"]
+            "description": p["description"],
+            "value_type": p["value_type"],
+            "options": p["options"]
             }
             for p in perm_rows
         ]
+    
+    def create_permission(self, name: str, description: str, value_type: str):        
+        self.repo.insert_permission(name=name, description=description, value_type=value_type)
 
     def assign_role_to_user(
             self, 
@@ -306,6 +404,21 @@ class UserService:
             expires_ts=expires_at,
         )
 
+    def assign_multiple_roles_to_user(
+            self,
+            user_id: bytes,
+            role_ids: list[int],
+            starts_at: int | None = None,
+            expires_at: int | None = None,
+    ):
+        for rid in role_ids:
+            self.assign_role_to_user(
+                user_id=user_id,
+                role_id=rid,
+                starts_at=starts_at,
+                expires_at=expires_at
+            )
+
     def revoke_role_from_user(self, user_id: bytes, role_id: int):
         self.repo.remove_role_from_user(user_id=user_id, role_id=role_id)
 
@@ -315,7 +428,7 @@ class UserService:
             for r in self.repo.get_user_roles(user_id)
         ]
 
-    def list_role_permissions(self, role_id: bytes):
+    def list_role_permissions(self, role_id: int):
         return [
             {"id": p["id"], "name": p["name"], "value": p["value"]}
             for p in self.repo.get_role_permissions(role_id)
@@ -396,14 +509,12 @@ class UserService:
             for o in org_rows
         ]
   
-
     def load_user_profile(self, user_id: bytes):
         row = self.repo.get_user_by_id(user_id)
         if not row:
             return None
 
         perms = self.permissions.compute_user_permissions(user_id)
-
         return User(
             id=row["id"].hex(),
             username=row["username"],
@@ -422,13 +533,16 @@ class UserService:
     # --------------------------------------
     # Self-services
     # --------------------------------------
-    def change_password(self, user_id: bytes, current_pw: str, new_pw: str) -> bool:
+    def change_password(self, user_id: bytes, current_pw: str, new_pw: str):
         row = self.repo.get_user_by_id(user_id)
         if not row:
-            return False
-
+            return False, "Invalid user."
+        
+        if row["auth_source"] == "ldap":
+            return False, "Logged in with LDAP account. Password cannot be changed."
+        
         if not self._verify_password(current_pw, row["salt"], row["password_hash"]):
-            return False
+            return False, "Incorrect current password."
 
         if len(new_pw) < 6:
             raise ValueError("New password must be at least 6 characters.")
@@ -443,9 +557,7 @@ class UserService:
             updated_ts=now_epoch(),
         )
         self.repo.set_must_change_pw(change=0, id=user_id, updated_ts=now_epoch())
-        return True
-
-        # convo handling
+        return True, "Password successfully changed."
     
     def change_username(self, user_id: bytes, new_name: str):
         if len(new_name) < 3:
@@ -526,7 +638,7 @@ class UserService:
         return conv_id
 
     def rename_user_conversation(self, user_id: bytes, c_id: bytes,  title: str):
-        self.repo.update_conversation_title(user_id, c_id, title)
+        self.repo.update_conversation_title(user_id=user_id, c_id=c_id, title=title)
 
     def delete_user_conversation(self, user_id: bytes, c_id: bytes):
         self.repo.delete_conversation(user_id=user_id, c_id=c_id)
@@ -552,6 +664,7 @@ class LDAPService:
         bind_dn: str | None = None,
         bind_password: str | None = None,
         user_dn_template: str | None = None,
+        allowed_groups: set[str] | None = None,
         use_ssl: bool = True,
         validate_cert: bool = True,
         mode: str = "auto",     # "auto" | "ad" | "openldap"
@@ -562,6 +675,7 @@ class LDAPService:
         self.user_attribute = user_attribute    # e.g., "sAMAccountName" or "uid"
         self.mail_attribute = mail_attribute
         self.user_dn_template = user_dn_template
+        self.allowed_groups = allowed_groups
         self.bind_dn = bind_dn
         self.bind_password = bind_password
         self.mode = mode.lower()
@@ -673,6 +787,19 @@ class LDAPService:
             pass
         return None
 
+    def _normalize_ldap_groups(self, member_of: list[str]) -> set[str]:
+        groups = set()
+        for dn in member_of:
+            if dn.lower().startswith("cn="):
+                cn = dn.split(",", 1)[0][3:]
+                groups.add(cn.lower())
+        return groups
+    
+    def _filter_groups(self, groups: set[str]) -> set[str]:
+        if self.allowed_groups is None:
+            return groups
+        return groups & self.allowed_groups
+    
     def authenticate(self, identifier: str, password: str) -> AuthResult:
         """
         Authenticate user and return normalized attributes.
@@ -688,6 +815,9 @@ class LDAPService:
         if attrs is None:
             attrs = self._fetch_user_attributes(identifier) or {}
 
+        groups = self._normalize_ldap_groups(attrs.get("memberOf") or [])
+        groups = self._filter_groups(groups)
+
         # Normalize output
         return AuthResult(
             success=True,
@@ -696,5 +826,5 @@ class LDAPService:
             email=(attrs.get("mail") or [None])[0],
             first_name=(attrs.get("givenName") or [None])[0],
             last_name=(attrs.get("sn") or [None])[0],
-            groups=attrs.get("memberOf") or [],
+            groups = groups
         )

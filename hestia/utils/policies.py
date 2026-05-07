@@ -18,31 +18,53 @@ class PolicyGuard(Protocol):
     def check(self, req: ExecutionRequest) -> None:
         ...
 
+class CollectionAccessPolicy(PolicyGuard):
+
+    def check(self, req: ExecutionRequest) -> PolicyResult:
+        permissions: Permissions = req.user.permissions
+        
+        if req.exec_type not in {"rag_chat", "rag_generate"}:
+            return PolicyResult(decision=PolicyDecision.ALLOW)
+
+        collection = req.collection
+        if not collection:
+            return PolicyResult(decision=PolicyDecision.ALLOW)
+
+        acl = permissions.allowed_collections
+
+        perm = acl.get(collection) or acl.get("*")
+
+        if not perm:
+            return PolicyResult(
+                decision=PolicyDecision.DENY,
+                msg="Collection access denied."
+            )
+
+        if not perm.access:
+            return PolicyResult(
+                decision=PolicyDecision.DENY,
+                msg="Collection access denied."
+            )
+
+        return PolicyResult(
+            decision=PolicyDecision.FILTER,
+            filters={
+                "max_classification": perm.max_classification
+            },
+            msg=f"Max classification set to: {perm.max_classification}"
+        )
+    
 class ExecutionPolicy(PolicyGuard):
 
-    def check(self, req: ExecutionRequest) -> None:
-        permissions: Permissions = req.user.permissions
+    POLICIES = [
+        CollectionAccessPolicy(),
+    ]
 
-        if req.exec_type in ["rag_chat", "rag_generate"]:
-            # check if user is allowed to retrieve from knowledge base
-            if not permissions.use_rag:
-                return PolicyResult(decision=PolicyDecision.DENY,
-                                    msg="Retrieval permission denied.")
-            
-            # check if user is allowed to access requested collection
-            if req.collection is not None:
-                if permissions.allowed_collections != ["*"] and \
-                req.collection not in permissions.allowed_collections:
-                    return PolicyResult(decision=PolicyDecision.DENY,
-                                        msg="Collection access denied.")
-                
-                # check user's max classification and set filter
-                return PolicyResult(decision=PolicyDecision.FILTER,
-                                    filters={
-                                        "max_classification": permissions.max_classification,
-                                    },
-                                    msg=f"Max classification set to: {permissions.max_classification}")
+    def check(self, req: ExecutionRequest) -> PolicyResult:
+        for policy in self.POLICIES:
+            result = policy.check(req)
+            if result.decision != PolicyDecision.ALLOW:
+                return result
 
-        # allow generic "chat" and "generate" requests
         return PolicyResult(decision=PolicyDecision.ALLOW)
             

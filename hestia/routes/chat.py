@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, Response
 
 from hestia.schemas.api import ChatRequest, ExecutionRequest
@@ -9,7 +9,6 @@ from hestia.utils.security import User, get_current_user
 
 
 router = APIRouter()
-
 
 @router.post("/chat")
 def chat(req: ChatRequest, 
@@ -37,8 +36,11 @@ def chat(req: ChatRequest,
         stream              =   req.stream if req.stream else False,
     )
 
-    if req.stream:
-        it = h.resolve(request, stream=True)
-        return StreamingResponse(it, media_type="application/json")
-    result = h.resolve(request)
-    return Response(result, media_type="application/json")
+    try:
+        if req.stream:
+            it = h.resolve(request, stream=True)
+            return StreamingResponse(it, media_type="application/json")
+        result = h.resolve(request)
+        return Response(result, media_type="application/json")
+    except PermissionError:
+        raise HTTPException(403, "Forbidden")

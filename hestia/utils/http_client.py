@@ -67,6 +67,26 @@ class HttpClient:
             if not line:
                 continue
             yield json.loads(line)
+    
+    @staticmethod
+    def iter_sse_json(r: requests.Response) -> Iterator[Dict[str, Any]]:
+        """
+        Parse Server-Sent Events (SSE) where each `data:` line contains JSON.
+        Compatible with vLLM streaming responses.
+        """
+        for raw_line in r.iter_lines(decode_unicode=True):
+            if not raw_line:
+                continue
+
+            if not raw_line.startswith("data:"):
+                continue
+
+            data = raw_line[len("data:"):].strip()
+
+            if data == "[DONE]":
+                break
+
+            yield json.loads(data)
 
     
     def get(self, endpoint):

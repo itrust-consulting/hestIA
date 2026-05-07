@@ -85,14 +85,20 @@ class SearchData(APIModel):
 
 SearchResponse = Response[Any]
 
+
+class CollectionPermission(BaseModel):
+    access: bool = False
+    max_classification: int | None = None
+
+
 class Permissions(BaseModel):
-    allowed_collections: list[dict] = []
+    allowed_collections: dict[str, CollectionPermission] = Field(default_factory=dict)
     user_management: bool = False
     system_management: bool = False
     data_management: bool = False
 
     # catch-all for future dynamic permissions
-    extra: Dict[str, Any] = {}
+    extra: Dict[str, Any] = Field(default_factory=dict)
 
 
 from enum import Enum
@@ -110,7 +116,7 @@ class User(BaseModel):
     last_name: str
     roles: list[dict]
     orgs: list[dict]
-    permissions: dict
+    permissions: Permissions
     must_change_pw: bool
     auth_source: str
     created_at: int
@@ -176,3 +182,18 @@ class AuthResult(BaseModel):
             success=False,
             message=message
         )
+
+class CreateUserRequest(Request):
+    username: str = Field(..., description="Assigne username.")
+    email: str = Field(..., description="Assign email.")
+    first_name: str = Field(..., description="User's first name.")
+    last_name: str = Field(..., description="User's last name")
+    password: str = Field(..., description="Default password, expected to be changed upon first login.")
+    role: int = Field(0, description="Assign role. Defaults to 0 = 'guest'.")
+    organization: str = Field(None, description="Assign user to an organization.")
+    expires_at: int | None = Field(None, description="Set expiration date for user account.")
+    permissions: dict | None = Field(None, description="User-specific permissions.")
+
+class CreateOrgRequest(Request):
+    name: str = Field(..., description="Organization name.")
+    abbreviation: str = Field(..., description="Organization abbreviation.")

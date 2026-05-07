@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { login } from '$lib/auth/auth';
   import { scheduleTokenExpiration } from '$lib/auth/session'
@@ -34,7 +34,7 @@
 
     if (res.ok) {
       scheduleTokenExpiration(res.exp);
-      
+      await invalidateAll();
       if (res.must_change_pw) {
         goto('/account/overview?section=security');
       }

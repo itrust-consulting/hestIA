@@ -24,12 +24,13 @@
     });
   };
 
+  let editMode: boolean = false;
+
 </script>
 
 <h1 class="section-title">Profile</h1>
 
 <div class="profile-card">
-  <!-- HEADER -->
   <div class="profile-header">
     <div class="avatar">
       {user.username.charAt(0).toUpperCase()}
@@ -140,5 +141,4 @@
   .detail.full {
     grid-column: 1 / -1;
   }
-
 </style>

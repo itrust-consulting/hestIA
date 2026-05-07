@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from hestia.container import Container
 from hestia.utils.deps import get_container
+from hestia.utils.security import get_current_user
 
 router = APIRouter()
 

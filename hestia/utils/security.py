@@ -5,24 +5,25 @@ from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta, timezone
 import jwt
 
-from hestia.settings import SECRET_KEY
 from hestia.container import Container
 from hestia.utils.deps import get_container
-from hestia.schemas.api import Permissions, User
-
-SECRET_KEY = "a_very_secret_key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 720
+from hestia.schemas.api import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-def create_access_token(user_id_bytes: bytes):
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+def create_access_token(
+        user_id_bytes: bytes,
+        *,
+        key: str,
+        algorithm: str = "HS256",
+        expiration_time: int = 15):
+    
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expiration_time)
     payload = {
         "sub": user_id_bytes.hex(),   # store user_id in safe serializable form
         "exp": expire,
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, key, algorithm=algorithm)
 
 
 def get_current_user(token: str = Depends(oauth2_scheme),
@@ -31,8 +32,13 @@ def get_current_user(token: str = Depends(oauth2_scheme),
     Decode JWT, validate, fetch the user record.
     """
     user_services = c.services.get("users")
+    auth_config = c.services.get("auth").config
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token, 
+            key=auth_config.token_secret_key, 
+            algorithms=[auth_config.token_encoding_alg])
         user_id_hex = payload.get("sub")
         if not user_id_hex:
             raise HTTPException(
@@ -41,7 +47,7 @@ def get_current_user(token: str = Depends(oauth2_scheme),
         
         user_id = bytes.fromhex(user_id_hex)
 
-    except jwt.DecodeError:
+    except jwt.exceptions.ExpiredSignatureError or jwt.exceptions.DecodeError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     # Fetch user from DB (minimal)

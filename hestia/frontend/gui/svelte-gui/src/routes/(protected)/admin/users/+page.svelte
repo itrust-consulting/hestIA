@@ -1,15 +1,37 @@
 <script lang="ts">
-
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
+    import CreateUserModal from '$lib/components/modals/CreateUserModal.svelte';
 
+    import PlusCircleIcon from '$lib/components/icons/plusCircleIcon.svelte';
+    
     onMount(() => {
-    refreshUsers();
+      refreshUsers();
     });
+
 
     let users: any = [];
     let error: string | null = null;
 
     let loading = false;
+    let openModal: null | "create_user" = null;
+
+    const formatDate = (ts: number) => {
+      if (!ts) return 'Never';
+      return new Date(ts).toLocaleString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    };
+
+    function open(modal: "create_user") {
+        openModal = modal;
+    }
+
+    function close() {
+        openModal = null;
+    }
 
     async function refreshUsers() {
         loading = true;
@@ -26,6 +48,13 @@
 
         loading = false;
     }
+
+
+  function goToUser(userId: string | number) {
+    goto(`/admin/users/user/${userId}`);
+  }
+
+
 </script>
 
 <div class="page-container">
@@ -37,140 +66,182 @@
       <div class="error-box">{error}</div>
     {/if}
 
-    <div class="actions">
-      <button class="refresh-btn" disabled={loading} onclick={refreshUsers}>
-        {loading ? "Refreshing…" : "Refresh"}
-      </button>
-    </div>
-
     <div class="table-container">
       <table class="user-table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>No.</th>
             <th>Username</th>
-            <th>Role</th>
-            <th>Created</th>
-            <th class="actions-col">Actions</th>
+            <th>Email</th>
+            <th>Name</th>
+            <th>Expires</th>
           </tr>
         </thead>
 
         <tbody>
-          {#each users as u}
-            <tr>
-              <td>{u.id}</td>
+          {#each users as u, i}
+            <tr class="clickable-row" onclick={() => goToUser(u.id)}>
+              <td>{i + 1}</td>
               <td>{u.username}</td>
-              <td>{u.roles}</td>
-              <td>{new Date(u.created_at * 1000).toLocaleString()}</td>
-
-              <td class="actions">
-                <button class="small-btn">Edit</button>
-                <button class="small-btn danger">Delete</button>
-              </td>
+              <td>{u.email}</td>
+              <td>{u.first_name} {u.last_name}</td>
+              <td>{formatDate(u.expires_at)}</td>
             </tr>
           {/each}
         </tbody>
       </table>
-        <div class="actions">
-            <a href="/admin/users/create" class="create-user-btn">+ Create User</a>
-        </div>
+      <div class="actions">
+        <button class="action-btn" onclick={() => open("create_user")}>
+            <PlusCircleIcon/>Create User
+        </button>
+      </div>
     </div>
   </div>
 </div>
 
+<CreateUserModal open={openModal === "create_user"} onClose={close} isAdmin={true}/>
+
 <style>
-  .page-container {
-    display: flex;
-    height: 100vh;
-    background: var(--color-neutral-100);
-  }
+.page-container {
+  display: flex;
+  height: 100vh;
+  background: var(--color-neutral-100);
+}
 
-  .admin-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: calc(var(--spacing) * 4);
-    max-width: var(--container-6xl);
-    margin-inline: auto;
-  }
+.admin-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: calc(var(--spacing) * 4);
+  max-width: var(--container-6xl);
+  margin-inline: auto;
+}
 
-  .title {
-    font-size: var(--text-3xl);
-    font-weight: 700;
-    margin-bottom: .25rem;
-  }
+.title {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
 
-  .subtitle {
-    color: var(--color-neutral-600);
-    margin-bottom: 1.5rem;
-  }
+.subtitle {
+  color: var(--color-neutral-600);
+  margin-bottom: 1.5rem;
+}
 
-  .actions {
-    margin-bottom: 1rem;
-  }
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
 
-  .refresh-btn {
-    background: var(--color-blue-600);
-    color: white;
-    padding: .5rem 1rem;
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    font-weight: 600;
-  }
+.action-btn {
+  background: var(--color-blue-600);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  flex-direction: row;
+}
 
-  .refresh-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
-  .table-container {
-    background: white;
-    padding: calc(var(--spacing) * 4);
-    border-radius: var(--radius-2xl);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-  }
+.table-container {
+  background: white;
+  padding: calc(var(--spacing) * 4);
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  max-height: calc(100vh - 18rem);
+  overflow-y: auto;
+}
 
-  .user-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; 
+}
 
-  .user-table th,
-  .user-table td {
-    padding: .75rem 1rem;
-    border-bottom: 1px solid var(--color-neutral-200);
-  }
+/* Shared cell rules */
+.user-table th,
+.user-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-neutral-200);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
 
-  .actions {
-    display: flex;
-    gap: .5rem;
-  }
+.user-table thead th {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 2;
+  font-weight: 600;
+  box-shadow: 0 1px 0 var(--color-neutral-200);
+}
 
-  .small-btn {
-    background: var(--color-neutral-200);
-    padding: .35rem .75rem;
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    cursor: pointer;
-  }
+.user-table th:nth-child(1),
+.user-table td:nth-child(1) {
+  width: 4rem;
+  text-align: right;
+}
 
-  .small-btn:hover {
-    background: var(--color-neutral-300);
-  }
+.user-table th:nth-child(2),
+.user-table td:nth-child(2) {
+  width: 16%;
+}
 
-  .small-btn.danger {
-    background: var(--color-red-500);
-    color: white;
-  }
+.user-table th:nth-child(3),
+.user-table td:nth-child(3) {
+  width: 26%;
+}
 
-  .small-btn.danger:hover {
-    background: var(--color-red-600);
-  }
+.user-table th:nth-child(4),
+.user-table td:nth-child(4) {
+  width: 22%;
+}
 
-  .error-box {
-    background: var(--color-red-100);
-    color: var(--color-red-700);
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: var(--radius-xl);
-  }
+.user-table th:nth-child(5),
+.user-table td:nth-child(5) {
+  width: 14rem;
+}
+
+.user-table tbody tr:hover {
+  background: var(--color-neutral-100);
+}
+
+.small-btn {
+  background: var(--color-neutral-200);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.small-btn:hover {
+  background: var(--color-neutral-300);
+}
+
+.small-btn.danger {
+  background: var(--color-red-500);
+  color: white;
+}
+
+.small-btn.danger:hover {
+  background: var(--color-red-600);
+}
+
+.error-box {
+  background: var(--color-red-100);
+  color: var(--color-red-700);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--radius-xl);
+}
 </style>

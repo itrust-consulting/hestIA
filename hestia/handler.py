@@ -23,8 +23,7 @@ RAG_PROMPT = """
     - If the retrieved data is insufficient, say so explicitly.
     - At the end, always include:
 
-    Sources:
-        {sources_block}
+    {sources_block}
 
     <user-prompt>
         {user_prompt}
@@ -46,14 +45,14 @@ def _format_citations(hits: list[dict[str, str]]) -> dict[str, str]:
 
     retrieved_data = []
     source_map = []
-    sources_block = []
+    sources_block = ["Source:"]
 
     for idx, point in enumerate(hits):
         id = idx + 1
         chunk = point.payload
         retrieved_data.append(f"[Source {id}: {chunk['source']}]\n{chunk['content']}")
         source_map.append(f"- [{id}]: {chunk['source']}")
-        sources_block.append(f"- [{id}]: {chunk['source']}, \
+        sources_block.append(f"- **[{id}]**: {chunk['source']}, \
                                 {chunk['doc_info']['subject']}, \
                                 {chunk['info']['path']} ")
 

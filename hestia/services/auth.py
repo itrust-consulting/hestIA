@@ -1,6 +1,7 @@
 
 from hestia.schemas.api import AuthResult
 from hestia.services.users import UserService, LDAPService
+from hestia.config.auth import AuthConfig
 
 class AuthenticationService:
     """
@@ -14,14 +15,16 @@ class AuthenticationService:
         self,
         local: UserService,
         ldap: LDAPService | None = None,
+        *,
+        config: AuthConfig | None = None
     ):
         self.local = local
         self.ldap = ldap
+        self.config = config
 
     def authenticate(self, identifier: str, password: str) -> AuthResult:
         """
         Local auth → LDAP fallback → auto-provision shadow users.
-        Always returns a rich AuthResult.
         """
 
         local_result = self.local.authenticate(identifier, password)
@@ -34,10 +37,18 @@ class AuthenticationService:
             ldap_result = self.ldap.authenticate(identifier, password)
 
             if ldap_result.success:
+                
+                roles: list[str] = []
+                if self.config.ldap_group_mapping:
+                    role_names: set[str] = set()
+                    for group in ldap_result.groups:
+                        role_names.update(self.config.ldap_group_mapping.get(group, []))
+                    roles = list(role_names)
 
                 if local_result.user_id:
                     local_result.success = True
                     local_result.message = "Login Successful."
+                    # TODO assign roles even if user already exist to sync with AD
                     return local_result
                 
                 new_user_id = self.local.create_user(
@@ -47,7 +58,8 @@ class AuthenticationService:
                     password="__ldap__",     # never used
                     first_name=ldap_result.first_name or "",
                     last_name=ldap_result.last_name or "",
-                    role="user",
+                    roles=roles or ["user"],
+                    organization="itrust consulting",
                     must_change_pw=0,        # LDAP users never change passwords locally
                     expires_at=None,
                 )

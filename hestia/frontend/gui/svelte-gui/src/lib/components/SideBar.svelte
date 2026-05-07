@@ -165,7 +165,8 @@
                 </span>
             {/if}
 
-            <button class="delete-btn" onclick={(e) => deleteConversation(conv.id, e)} aria-label="Delete conversation">
+            <button class="delete-btn" 
+            onclick={(e) => deleteConversation(conv.id, e)} aria-label="Delete conversation">
                 <BinIcon />
             </button>
             </div>
@@ -364,6 +365,7 @@
     .delete-btn {
         opacity: 0;
         pointer-events: none; /* prevents accidental clicks when invisible */
+        cursor: pointer;
         transition: opacity 120ms ease;
     }
 

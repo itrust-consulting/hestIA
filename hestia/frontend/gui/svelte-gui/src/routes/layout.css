@@ -46,6 +46,10 @@
 }
 
 
+.breadcrumb-link:hover {
+    color: var(--color-black);
+}
+
 .app-header-buttons {
     display: inline-flex;
     gap: .5rem;                   
@@ -60,6 +64,7 @@
     border-radius: var(--radius-lg);
     transition: background-color 150ms ease;
     transform: scale(1.3);
+    cursor: pointer;
 }
 
 .icon-btn:hover svg{

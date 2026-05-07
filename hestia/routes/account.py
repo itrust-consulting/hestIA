@@ -36,7 +36,7 @@ def change_password(
     
     svc = h.container.services.get("users")
 
-    ok = svc.change_password(user.id.bytes, current_pw, new_pw)
+    ok, msg = svc.change_password(user.id.bytes, current_pw, new_pw)
     if not ok:
-        raise HTTPException(401, "Incorrect current password.")
+        raise HTTPException(401, msg)
     return {"status": "ok"}
