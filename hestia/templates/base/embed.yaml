@@ -1,8 +1,0 @@
-id: ${id}
-type: Generate
-inputs:
-  inputs: ${message}
-outputs:
-  final: ${final}
-model: ${model}
-options: ${model_kwargs}

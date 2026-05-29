@@ -8,12 +8,24 @@ services:
     networks:
       - app_network
     environment:
-      - API_KEY=${API_KEY}
+      - PORT=5555
+      - LLM_URL=${LLM_URL:-http://192.168.0.34:8000}
+      - EMB_URL=${EMB_URL:-http://192.168.0.34:8001}
+      - RRK_URL=${RRK_URL:-}
+      - DB_URL=${DB_URL:-http://192.168.0.34:6333}
+      - DEFAULT_GEN_MODEL=${DEFAULT_GEN_MODEL:-RedHatAI/Qwen3.6-35B-A3B-NVFP4}
+      - DEFAULT_EMB_MODEL=${DEFAULT_EMB_MODEL:-qwen3-embedding:0.6b}
+      - DEFAULT_RKK_MODEL=${DEFAULT_RKK_MODEL:-dengcao/Qwen3-Reranker-4B:Q8_0}
+      - ENABLE_AUTH=${ENABLE_AUTH:-true}
+      - AUTH_MODE=${AUTH_MODE:-local}
+      - AUTH_SECRET_KEY=${AUTH_SECRET_KEY:-some_very-Secret_kley}
+      - AUTH_TOKEN_LIFETIME=${AUTH_TOKEN_LIFETIME:-360}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
 
   frontend:
     build:
-      context: ./hestia/frontend/gui/svelte-gui  # Path to svelte-app
-      dockerfile: Dockerfile  # Dockerfile inside svelte-app
+      context: ./hestia-ui
+      dockerfile: Dockerfile
     ports:
       - "7860:7860"
     depends_on:

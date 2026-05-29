@@ -4,3 +4,4 @@ dump/
 tests/
 test_docs/
 __pycache__/
+.claude/

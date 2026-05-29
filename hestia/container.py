@@ -1,196 +1,128 @@
+from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Set, Callable, Any, Literal, Protocol, AsyncIterator
+from typing import Any, Dict
 
-from hestia.providers import OllamaProvider, QdrantDB, vLLMProvider
-from hestia.services import Generator, DenseEncoder, SparseEncoder, \
-    Retriever, LDAPService, UserService, AuthenticationService
-from hestia.utils.user_db import UserRepository, create_sqlite_connection
-from hestia.config.ldap import load_ldap_config
-from hestia.config.auth import load_auth_config
+from hestia.config.settings import Settings
+from hestia.domain.exceptions import ConfigurationError
 
-ProviderType = Literal["llm", "db"]
-ServiceName = Literal["generate", "chat", "encDense", "encSparse", "search"]
-
-class Settings(Protocol):
-    LLM_URL: str
-    DB_URL: str
-    DEFAULT_GEN_MODEL: str
-    DEFAULT_EMB_MODEL: str
-    SERVICES_TO_START: List[str]
-
-class AgentProtocol(Protocol):
-    name: str
-    async def act(self, inv) -> AsyncIterator[str]: ...
-
-def _build_ollama(settings):
-    return OllamaProvider(http=settings.LLM_URL)
-
-def _build_vllm(settings):
-    return vLLMProvider(chat=settings.LLM_URL, embed=settings.EMB_URL, rerank=settings.RRK_URL)
-
-def _build_qdrant(settings):
-    return QdrantDB(http=settings.DB_URL)
-
-def _build_dense_encoder(providers, settings, services = None):
-    return DenseEncoder(provider=providers["llm"], model=settings.DEFAULT_EMB_MODEL)
-
-def _build_sparse_encoder(providers, settings, services = None):
-    return SparseEncoder()
-
-def _build_generator(providers, settings, services = None):
-    return Generator(provider=providers["llm"], model=settings.DEFAULT_GEN_MODEL)
-
-def _build_retriever(providers, settings, services = None):
-    return Retriever(provider=providers["db"])
-
-
-@dataclass(frozen=True)
-class ProviderSpec:
-    factory: Callable[[Any], Any]
-    type: ProviderType
-
-
-@dataclass(frozen=True)
-class ServiceSpec:
-    factory: Callable[[Dict[str, Any], Any, Dict[str, Any]], Any]   # (providers, settings) -> service instance
-    deps: Set[str]                                  # required providers: {"llm"}, {"db"}
-    singleton_key: Optional[str | List[str]] = None             # services with same key share instance
-
-
-@dataclass(frozen=True)
-class AgentSpec:
-    factory: Callable[[Dict[str, Any], Dict[str, Any], Settings], AgentProtocol]
-    # factory(services, providers, settings) -> agent instance
-    deps_services: Set[str] = field(default_factory=set)  # e.g., {"generate","embed","search"}
-    deps_providers: Set[str] = field(default_factory=set)  # rare, but available
-    singleton_key: Optional[str] = None                   # share agent singleton if needed
-
-
-PROVIDER_REGISTRY: Dict[str, ProviderSpec] = {
-    "ollama":   ProviderSpec(factory=_build_ollama, type="llm"),
-    "vllm":     ProviderSpec(factory=_build_vllm, type="llm"),
-    "qdrant":   ProviderSpec(factory=_build_qdrant, type="db"),
-}
-
-SERVICE_REGISTRY: Dict[str, ServiceSpec] = {
-    "generate":     ServiceSpec(factory=_build_generator, deps={"llm"}, singleton_key="llm:generator"),
-    "chat":         ServiceSpec(factory=_build_generator, deps={"llm"}, singleton_key="llm:generator"),
-    "encDense":     ServiceSpec(factory=_build_dense_encoder,  deps={"llm"}, singleton_key="llm:embed"),
-    "encSparse":    ServiceSpec(factory=_build_sparse_encoder,  deps={}, singleton_key="encSparse"),
-    "search":       ServiceSpec(factory=_build_retriever, deps={"db"},  singleton_key="db:search"),
-}
-
-AGENT_REGISTRY: Dict[str, AgentSpec] = {
-    "audit":    AgentSpec(factory=None),
-    "asset":    AgentSpec(factory=None)
-}
-
-
-@dataclass(frozen=True)
-class AppStartupConfig:
-    llm_backend:    str
-    db_backend:     str
-    services_to_start: List[ServiceName] = field(default_factory=lambda: ["encDense", 
-                                                                          "encSparse"
-                                                                          "generate", 
-                                                                          "chat", 
-                                                                          "search"])
-    agents_to_start: List[str] = field(default_factory=list)
-    enable_auth: bool = False
-    enable_ldap: bool = False
+_log = logging.getLogger("hestia.system")
+from hestia.application.ingestion import IngestionPipeline
+from hestia.domain.auth.oidc import OIDCService
+from hestia.domain.auth.service import AuthenticationService
+from hestia.domain.auth.users import LDAPService, UserService
+from hestia.domain.rag.services import DenseEncoder, Generator, Retriever, SparseEncoder
+from hestia.infrastructure.db.qdrant import QdrantDB
+from hestia.infrastructure.db.user_repository import UserRepository, create_sqlite_connection
+from hestia.infrastructure.llm.ollama import OllamaProvider
+from hestia.infrastructure.llm.vllm import vLLMProvider
 
 
 @dataclass
 class Container:
     settings: Settings
-    providers: Dict[str, Any] = field(default_factory=dict)  # keys: "llm", "db", ...
-    services: Dict[str, Any] = field(default_factory=dict)   # keys: "embed", 
-    agents: Dict[str, Any] = field(default_factory=dict)
+    providers: Dict[str, Any] = field(default_factory=dict)
+    services: Dict[str, Any] = field(default_factory=dict)
 
-def _build_provider(type: str, backend_key: str, settings) -> Any:
-    spec = PROVIDER_REGISTRY.get(backend_key)
-    if not spec:
-        raise ValueError(f"Unknown backend '{backend_key}'")
-    if spec.type != type:
-        raise ValueError(f"Backend '{backend_key}' is type='{spec.type}', not type='{type}'")
-    return spec.factory(settings)
 
-def build_container(settings, cfg: AppStartupConfig) -> Container:
-    c = Container(settings)
-    
-    if cfg.llm_backend:
-        c.providers["llm"] = _build_provider("llm", cfg.llm_backend, settings)
+def build_container(settings: Settings) -> Container:
+    c = Container(settings=settings)
 
-    if cfg.db_backend:
-        c.providers["db"] = _build_provider("db", cfg.db_backend, settings)
+    # --- LLM provider ---
+    if settings.llm_backend == "vllm":
+        llm = vLLMProvider(
+            chat=settings.llm_url,
+            embed=settings.emb_url,
+            rerank=settings.rrk_url,
+            timeout=settings.request_timeout,
+        )
+    elif settings.llm_backend == "ollama":
+        llm = OllamaProvider(http=settings.llm_url, timeout=settings.request_timeout)
+    else:
+        raise ConfigurationError(f"Unknown LLM backend: '{settings.llm_backend}'")
+    c.providers["llm"] = llm
+    _log.info("provider_init", extra={"provider": "llm", "backend": settings.llm_backend, "url": settings.llm_url})
 
-    if cfg.enable_auth:
-        get_conn, close, lock = create_sqlite_connection(settings.UDB_PATH)
+    # --- DB provider ---
+    if settings.db_backend == "qdrant":
+        c.providers["db"] = QdrantDB(http=settings.db_url)
+    else:
+        raise ConfigurationError(f"Unknown DB backend: '{settings.db_backend}'")
+    _log.info("provider_init", extra={"provider": "db", "backend": settings.db_backend, "url": settings.db_url})
+
+    # --- Auth services ---
+    if settings.enable_auth:
+        get_conn, close, lock = create_sqlite_connection(str(settings.udb_path))
         repo = UserRepository(get_conn, lock)
-        usvc = UserService(repo)
         repo.initialize()
-
-        auth_config = load_auth_config()
-
-        ldap = None
-        if auth_config.enable_ldap:
-            ldap_config = load_ldap_config()
-
-            ldap = LDAPService(
-                host=ldap_config.host,
-                port=ldap_config.port,
-                search_base=ldap_config.search_base,
-                bind_dn=ldap_config.bind_dn,
-                bind_password=ldap_config.bind_password,
-                user_attribute=ldap_config.user_attribute,
-                mail_attribute=ldap_config.mail_attribute,
-                use_ssl=ldap_config.use_ssl,
-                validate_cert=ldap_config.validate_cert,
-                allowed_groups=ldap_config.allowed_groups,
-                mode=ldap_config.mode
-            )
-
-        c.services["auth"] = AuthenticationService(usvc, ldap, config=auth_config)
-        c.services["users"] = usvc
         close()
 
-    singleton_cache: Dict[str, Any] = {}
+        user_service = UserService(repo)
 
-    for svc in cfg.services_to_start:
-        spec = SERVICE_REGISTRY.get(svc)
-        if spec is None:
-            raise ValueError(f"Unknown service '{svc}'.")
-        
-        missing_dep = [d for d in spec.deps if d not in c.providers]
-        if missing_dep:
-            raise RuntimeError(f"Cannot start service '{svc}': missing providers {missing_dep}")
+        ldap: LDAPService | None = None
+        if settings.auth and settings.auth.auth_mode == "ldap" and settings.ldap:
+            ldap = LDAPService(
+                host=settings.ldap.host,
+                port=settings.ldap.port,
+                search_base=settings.ldap.search_base,
+                user_attribute=settings.ldap.user_attribute,
+                mail_attribute=settings.ldap.mail_attribute,
+                bind_dn=settings.ldap.bind_dn,
+                bind_password=settings.ldap.bind_password,
+                user_dn_template=settings.ldap.user_dn_template,
+                allowed_groups=settings.ldap.allowed_groups,
+                use_ssl=settings.ldap.use_ssl,
+                validate_cert=settings.ldap.validate_cert,
+                mode=settings.ldap.mode,
+            )
+            _log.info("service_init", extra={"service": "ldap", "host": settings.ldap.host})
 
-        key = spec.singleton_key or svc 
-        if key in singleton_cache:
-            c.services[svc] = singleton_cache[key]
-            continue
+        oidc: OIDCService | None = None
+        if settings.auth and settings.auth.auth_mode == "oidc" and settings.oidc:
+            oidc = OIDCService(settings.oidc)
+            _log.info("service_init", extra={"service": "oidc", "provider": settings.oidc.provider_url})
 
-        instance = spec.factory(c.providers, settings, c.services)
-        singleton_cache[key] = instance
-        c.services[svc] = instance
+        c.services["auth"] = AuthenticationService(user_service, ldap, oidc, config=settings.auth)
+        c.services["users"] = user_service
+        _log.info("service_init", extra={"service": "auth", "mode": settings.auth.auth_mode})
 
-    for agent in cfg.agents_to_start:
-        spec = AGENT_REGISTRY.get(agent)
-        if spec is None:
-            raise ValueError(f"Unkown agent '{agent}'.")
+    # --- RAG services ---
+    requested = set(settings.services_to_start)
+    generator = Generator(provider=llm, model=settings.default_gen_model)
 
-        missing_dep = [d for d in spec.deps_services if d not in c.services]
-        if missing_dep:
-            raise RuntimeError(f"Cannot start service '{svc}': missing providers {missing_dep}")
-        
-        key = spec.singleton_key or agent
-        if key in singleton_cache:
-            c.agents[svc] = singleton_cache[key]
-            continue
+    if "encDense" in requested:
+        c.services["encDense"] = DenseEncoder(provider=llm, model=settings.default_emb_model)
+        _log.info("service_init", extra={"service": "encDense", "model": settings.default_emb_model})
 
-        instance = spec.factory(c.providers, settings, c.services)
-        singleton_cache[key] = instance
-        c.agents[svc] = instance
+    if "encSparse" in requested:
+        sparse_enc = SparseEncoder(corpus_dir=settings.corpus_dir)
+        sparse_enc.preload_all()
+        c.services["encSparse"] = sparse_enc
+        _log.info("service_init", extra={"service": "encSparse", "corpus_dir": str(settings.corpus_dir)})
+
+    if "generate" in requested:
+        c.services["generate"] = generator
+        _log.info("service_init", extra={"service": "generate", "model": settings.default_gen_model})
+
+    if "chat" in requested:
+        c.services["chat"] = generator
+        _log.info("service_init", extra={"service": "chat", "model": settings.default_gen_model})
+
+    if "search" in requested:
+        c.services["search"] = Retriever(provider=c.providers["db"])
+        _log.info("service_init", extra={"service": "search", "backend": settings.db_backend})
+
+    if "ingestion" in requested:
+        dense_enc = c.services.get("encDense")
+        sparse_enc = c.services.get("encSparse")
+        if dense_enc is None or sparse_enc is None:
+            raise ConfigurationError("'ingestion' service requires 'encDense' and 'encSparse' to be enabled")
+        c.services["ingestion"] = IngestionPipeline(
+            dense_encoder=dense_enc,
+            sparse_encoder=sparse_enc,
+            db=c.providers["db"],
+        )
+        _log.info("service_init", extra={"service": "ingestion"})
 
     return c

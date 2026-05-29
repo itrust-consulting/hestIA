@@ -9,8 +9,8 @@ nodes:
     with:
       id: Generate1
       inputs:
-        prompt: ${prompt} 
+        prompt: ${prompt}
         model: ${model}
         options: ${model_kwargs}
       outputs:
-        response: response  
+        response: response

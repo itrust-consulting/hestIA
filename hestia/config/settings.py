@@ -1,0 +1,237 @@
+from __future__ import annotations
+
+import json
+import os
+import pathlib
+
+from pydantic import BaseModel
+
+from hestia.domain.exceptions import ConfigurationError
+
+
+# ---------------------------------------------------------------------------
+# Sub-configs (composed into Settings)
+# ---------------------------------------------------------------------------
+
+class AuthSettings(BaseModel):
+    auth_mode: str = "local"            # "local" | "ldap" | "oidc"
+    ldap_group_mapping: dict[str, list[str]] | None = None
+    password_min_length: int = 15
+    max_failed_attempts: int = 5
+    lockout_duration_minutes: int = 5
+    token_secret_key: str = ""          # required when auth is enabled
+    token_encoding_alg: str = "HS256"
+    token_lifetime_minutes: int = 360
+    audit_logs: bool = False
+
+
+class OIDCSettings(BaseModel):
+    provider_url: str = ""              # https://keycloak.example.com/realms/myrealm
+    client_id: str = ""
+    client_secret: str = ""
+    scopes: list[str] = ["openid", "profile", "email"]
+    role_claim: str = "roles"           # userinfo claim containing roles/groups
+    role_mapping: dict[str, list[str]] | None = None  # OIDC role → local role
+    org_claim: str = "organization"     # userinfo claim for tenant auto-assignment
+    org_mapping: dict[str, str] | None = None  # OIDC org name → hestia tenant name
+
+
+class LDAPSettings(BaseModel):
+    host: str = ""
+    port: int = 636
+    search_base: str = ""
+    user_attribute: str = "uid"
+    mail_attribute: str = "mail"
+    use_ssl: bool = True
+    validate_cert: bool = True
+    bind_dn: str | None = None
+    bind_password: str | None = None
+    user_dn_template: str | None = None
+    allowed_groups: set[str] | None = None
+    mode: str = "auto"
+
+
+# ---------------------------------------------------------------------------
+# Root settings object
+# ---------------------------------------------------------------------------
+
+class Settings(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
+    # --- app ---
+    version: str = "alpha_v0.2.2"
+    port: int = 5556
+
+    # --- backends ---
+    llm_backend: str = "vllm"
+    db_backend: str = "qdrant"
+    services_to_start: list[str] = ["encDense", "encSparse", "generate", "chat", "search", "ingestion"]
+
+    # --- urls ---
+    llm_url: str = "http://192.168.0.34:8000"
+    emb_url: str = "http://192.168.0.34:8000"
+    rrk_url: str = "http://192.168.0.34:8000"
+    db_url: str = "http://192.168.0.34:6333"
+
+    # --- models ---
+    default_gen_model: str = "ministral-3:14b"
+    default_emb_model: str = "qwen3-embedding:0.6b"
+    default_rkk_model: str = "dengcao/Qwen3-Reranker-4B:Q8_0"
+
+    # --- auth ---
+    enable_auth: bool = True
+    auth: AuthSettings | None = None
+    ldap: LDAPSettings | None = None
+    oidc: OIDCSettings | None = None
+
+    # --- paths ---
+    project_root: pathlib.Path = pathlib.Path(".")
+    app_data: pathlib.Path = pathlib.Path("./app/data")
+    udb_path: pathlib.Path = pathlib.Path("./app/data/users.db")
+    corpus_dir: pathlib.Path = pathlib.Path("./app/data/corpus_dir")
+
+    # --- logging ---
+    log_level: str = "INFO"
+    log_dir: pathlib.Path = pathlib.Path("./app/logs")
+    log_to_console: bool = True
+
+    # --- limits ---
+    pbkdf2_iterations: int = 210_000
+    max_history_pairs: int = 10
+    request_timeout: tuple[float, float] = (10.0, 800.0)
+
+    classification_labels: list[str] = [
+        "public", "public (pu)",
+        "internal", "internal (in)",
+        "confidential", "confidential (co)",
+        "restricted", "restricted (re)",
+        "secret", "secret (se)",
+    ]
+
+    # ---------------------------------------------------------------------------
+    # Factory — the single place all env vars are read
+    # ---------------------------------------------------------------------------
+
+    @classmethod
+    def load(cls) -> "Settings":
+        llm_url = os.getenv("LLM_URL", "localhost:8000")
+        default_llm_model = os.getenv("DEFAULT_GEN_MODEL")
+
+        project_root = pathlib.Path(
+            os.path.abspath(os.path.join(__file__, "../../.."))
+        ).resolve()
+        app_data = project_root / (os.getenv("HESTIA_DATA_DIR") or "app/data")
+
+        enable_auth = os.getenv("ENABLE_AUTH", "false").lower() == "true"
+
+        auth: AuthSettings | None = None
+        ldap: LDAPSettings | None = None
+        oidc: OIDCSettings | None = None
+        if enable_auth:
+            auth = _load_auth_settings()
+            if auth.auth_mode == "ldap":
+                ldap = _load_ldap_settings()
+            elif auth.auth_mode == "oidc":
+                oidc = _load_oidc_settings()
+
+        return cls(
+            port=int(os.getenv("PORT", "5555")),
+            llm_backend=os.getenv("LLM_BACKEND", "vllm"),
+            db_backend=os.getenv("DB_BACKEND", "qdrant"),
+            llm_url=llm_url,
+            emb_url=os.getenv("EMB_URL", llm_url),
+            rrk_url=os.getenv("RRK_URL", llm_url),
+            db_url=os.getenv("DB_URL", "http://localhost:6333"),
+            default_gen_model=default_llm_model,
+            default_emb_model=os.getenv("DEFAULT_EMB_MODEL", default_llm_model),
+            default_rkk_model=os.getenv("DEFAULT_RKK_MODEL", default_llm_model),
+            enable_auth=enable_auth,
+            auth=auth,
+            ldap=ldap,
+            oidc=oidc,
+            project_root=project_root,
+            app_data=app_data,
+            udb_path=app_data / "users.db",
+            corpus_dir=app_data / "corpus_dir",
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
+            log_dir=app_data.parent / (os.getenv("HESTIA_LOG_DIR") or "logs"),
+            log_to_console=os.getenv("LOG_TO_CONSOLE", "true").lower() == "true",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Private loaders — called only from Settings.load()
+# ---------------------------------------------------------------------------
+
+def _load_auth_settings() -> AuthSettings:
+    return AuthSettings(
+        auth_mode=os.getenv("AUTH_MODE", "local").lower(),
+        ldap_group_mapping=_parse_ldap_group_mapping(os.getenv("LDAP_GROUP_MAPPING")),
+        password_min_length=int(os.getenv("AUTH_PW_LENGTH", "15")),
+        max_failed_attempts=int(os.getenv("AUTH_MAX_ATTEMPTS", "5")),
+        lockout_duration_minutes=int(os.getenv("AUTH_LOCKOUT_DURATION", "5")),
+        token_secret_key=os.getenv("AUTH_SECRET_KEY", ""),
+        token_encoding_alg=os.getenv("AUTH_ENCODING_ALGORITHM", "HS256"),
+        token_lifetime_minutes=int(os.getenv("AUTH_TOKEN_LIFETIME", "360")),
+        audit_logs=os.getenv("AUTH_AUDIT_LOGS", "false").lower() == "true",
+    )
+
+
+def _load_oidc_settings() -> OIDCSettings:
+    return OIDCSettings(
+        provider_url=os.getenv("OIDC_PROVIDER_URL", ""),
+        client_id=os.getenv("OIDC_CLIENT_ID", ""),
+        client_secret=os.getenv("OIDC_CLIENT_SECRET", ""),
+        scopes=_parse_list(os.getenv("OIDC_SCOPES", "openid,profile,email")),
+        role_claim=os.getenv("OIDC_ROLE_CLAIM", "roles"),
+        role_mapping=_parse_ldap_group_mapping(os.getenv("OIDC_ROLE_MAPPING")),
+        org_claim=os.getenv("OIDC_ORG_CLAIM", "organization"),
+        org_mapping=_parse_str_mapping(os.getenv("OIDC_ORG_MAPPING")),
+    )
+
+
+def _load_ldap_settings() -> LDAPSettings:
+    return LDAPSettings(
+        host=os.getenv("LDAP_HOST", ""),
+        port=int(os.getenv("LDAP_PORT", "636")),
+        search_base=os.getenv("LDAP_SEARCH_BASE", ""),
+        user_attribute=os.getenv("LDAP_USER_ATTRIBUTE", "uid"),
+        mail_attribute=os.getenv("LDAP_MAIL_ATTRIBUTE", "mail"),
+        user_dn_template=os.getenv("LDAP_USER_DN_TEMPLATE", ""),
+        allowed_groups=_parse_set(os.getenv("LDAP_GROUP_FILTER")),
+        bind_dn=os.getenv("LDAP_APP_DN", ""),
+        bind_password=os.getenv("LDAP_APP_PASSWORD", ""),
+        use_ssl=os.getenv("LDAP_USE_SSL", "true").lower() == "true",
+        validate_cert=os.getenv("LDAP_VALIDATE_CERT", "true").lower() == "true",
+        mode=os.getenv("LDAP_MODE", "auto"),
+    )
+
+
+def _parse_str_mapping(raw: str | None) -> dict[str, str] | None:
+    if not raw:
+        return None
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ConfigurationError("OIDC_ORG_MAPPING must be a JSON object")
+    return data
+
+
+def _parse_ldap_group_mapping(raw: str | None) -> dict[str, list[str]] | None:
+    if not raw:
+        return None
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ConfigurationError("LDAP_GROUP_MAPPING must be a JSON object")
+    return {k.lower(): v for k, v in data.items()}
+
+
+def _parse_set(value: str | None) -> set[str] | None:
+    if not value:
+        return None
+    return {v.strip().lower() for v in value.split(",") if v.strip()}
+
+
+def _parse_list(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [v.strip() for v in value.split(",") if v.strip()]

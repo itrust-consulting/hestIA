@@ -1,0 +1,239 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+@import "katex/dist/katex.min.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+  color-scheme: light;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+html.dark textarea,
+html.dark select {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-900);
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--color-neutral-500);
+}
+
+html.dark {
+  color-scheme: dark;
+
+  --color-white: #0f172a;
+  --color-black: #f8fafc;
+
+  --color-neutral-50:  #283548;
+  --color-neutral-100: #1e293b;
+  --color-neutral-200: #334155;
+  --color-neutral-300: #475569;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #94a3b8;
+  --color-neutral-600: #cbd5e1;
+  --color-neutral-700: #e2e8f0;
+  --color-neutral-800: #f1f5f9;
+  --color-neutral-900: #f8fafc;
+
+  --color-blue-50:  #172554;
+  --color-blue-100: #1e3a8a;
+  --color-blue-200: #1d4ed8;
+  --color-blue-300: #2563eb;
+  --color-blue-500: #60a5fa;
+  --color-blue-600: #60a5fa;
+  --color-blue-700: #93c5fd;
+
+  --color-red-50:  #450a0a;
+  --color-red-100: #7f1d1d;
+  --color-red-300: #dc2626;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+
+  --color-green-50:  #052e16;
+  --color-green-100: #14532d;
+  --color-green-300: #16a34a;
+  --color-green-600: #4ade80;
+  --color-green-700: #86efac;
+
+  --color-yellow-50:  #422006;
+  --color-yellow-100: #78350f;
+  --color-yellow-200: #b45309;
+  --color-yellow-400: #f59e0b;
+  --color-yellow-700: #fcd34d;
+}
+
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 2000;
+
+    background: var(--color-white);
+    border-bottom: 1px solid var(--color-neutral-200);
+
+    padding-block: calc(var(--spacing) * 3);
+    padding-inline: calc(var(--spacing) * 4);
+
+    display: flex;
+    align-items: center;          /* vertically center */
+    justify-content: space-between; /* title left, buttons right */
+    height: var(--header-height);
+}
+
+.app-header h1 {
+    font-size: var(--text-xl);
+    font-weight: 600;
+}
+
+.app-header-left {
+    display: flex;
+    align-items: center;
+    gap: 235px; /* space between hestIA and breadcrumbs */
+}
+
+.app-header-left h1 {
+    margin: 0;
+    padding: 0;
+}
+
+.breadcrumbs {
+  font-size: var(--text-xl);
+  color: var(--color-neutral-600);
+  white-space: nowrap;   /* prevent wrapping to next line */
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+
+.breadcrumb-link:hover {
+    color: var(--color-black);
+}
+
+.app-header-buttons {
+    display: inline-flex;
+    gap: .5rem;                   
+}
+
+/* optional: ensure icon buttons size nicely */
+.icon-btn {
+    display: inline-flex;         /* center the svg inside */
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--spacing) * 2);
+    border-radius: var(--radius-lg);
+    transition: background-color 150ms ease;
+    transform: scale(1.3);
+    cursor: pointer;
+}
+
+.icon-btn:hover svg{
+    transform: scale(1.4);
+    transition: transform 150ms ease;
+}
+
+.user-dropdown {
+    position: absolute;
+    right: 0;
+    margin-top: calc(var(--spacing) * 4);
+    width: calc(var(--spacing) * 48);
+    z-index: 1000;
+
+    border: 1px solid var(--color-neutral-200);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 12px 24px color-mix(in oklab, black 18%, transparent);
+    background-color: var(--color-white);
+    padding: .25rem;
+
+    animation: dd-enter 120ms ease-out;
+}
+
+.dropdown-btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .5rem .75rem;
+    border-radius: .5rem;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 150ms ease;
+}
+.dropdown-btn:hover,
+.dropdown-btn:focus {
+    outline: none;
+    background: var(--color-neutral-100);
+}
+
+  .title-with-info {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+
+  .info-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    transform: scale(0.9);
+  }
+
+  .info-icon:hover{
+    stroke-width: 2.6;
+    transform: scale(1.1);
+  }
+
+
+  .tooltip {
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    bottom: -10px;
+    transform: translateY(100%); /* place below icon */
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    background: var(--color-neutral-900);
+    color: var(--color-white);
+    border: 1px solid var(--color-neutral-700);
+    padding: .75rem 1rem;
+    border-radius: var(--radius-md);
+    width: calc(var(--spacing) * 80);
+    font-size: var(--text-sm);
+    line-height: 1.35rem;
+    z-index: 999;
+    transition: opacity .15s ease;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    text-align: left;
+  }
+
+  .info-icon:hover .tooltip {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+.tooltip-portal {
+  position: fixed;
+  background: var(--color-neutral-900);
+  color: var(--color-white);
+  border: 1px solid var(--color-neutral-700);
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-md);
+  width: max-content;
+  max-width: 300px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  pointer-events: none;
+  white-space: normal;
+}

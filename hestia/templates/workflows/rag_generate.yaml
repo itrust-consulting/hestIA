@@ -29,7 +29,7 @@ nodes:
         vector: sparse_vector
 
   - use: retrieve.yaml
-    with: 
+    with:
       id: Retrieve1
       inputs:
         dense: ?dense_vector
@@ -38,11 +38,11 @@ nodes:
         options: ${query_kwargs}
       outputs:
         hits: points
-      
+
   - use: augment.yaml
     with:
       id: Augment1
-      inputs: 
+      inputs:
         prompt: ${prompt}
         hits:   ?points
       outputs:
@@ -56,4 +56,4 @@ nodes:
         model: ${model}
         options: ${model_kwargs}
       outputs:
-        response: response  
+        response: response

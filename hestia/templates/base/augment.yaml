@@ -1,6 +1,6 @@
 id: ${id}
 type: Augment
-inputs: 
+inputs:
   prompt: ${message}
   hits: ${hits}
 outputs:

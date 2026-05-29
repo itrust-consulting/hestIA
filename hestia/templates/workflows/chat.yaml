@@ -9,9 +9,9 @@ nodes:
     with:
       id: Chat1
       inputs:
-        history: ${history} 
+        history: ${history}
         last_user_message: ${last_user_message}
         model: ${model}
         options: ${model_kwargs}
       outputs:
-        response: response  
+        response: response

@@ -1,40 +1,49 @@
-
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import logging
 
 import uvicorn
+from fastapi import FastAPI
 
-import hestia.settings as s
-from hestia.container import build_container, AppStartupConfig
-from hestia.routes.registry import include_routers
-
+from hestia.api.error_handlers import register_error_handlers
+from hestia.api.routers.registry import include_routers
+from hestia.config.settings import Settings
+from hestia.container import build_container
+from hestia.domain.policies.guard import ExecutionPolicy
 from hestia.handler import RequestHandler
-from hestia.utils.policies import ExecutionPolicy
+from hestia.infrastructure.logging.config import setup_logging, shutdown_logging
+from hestia.infrastructure.logging.middleware import CorrelationMiddleware
+
+_log = logging.getLogger("hestia.system")
 
 
 def create_api() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        settings = Settings.load()
+        setup_logging(settings)
 
-        cfg = AppStartupConfig(
-            llm_backend=s.LLM_BACKEND,
-            db_backend=s.DB_BACKEND,
-            services_to_start=s.SERVICES_TO_START,
-            enable_auth=s.ENABLE_AUTH,
-        )
+        _log.info("startup", extra={"version": settings.version, "port": settings.port,
+                                    "services": settings.services_to_start})
 
-        container = build_container(s, cfg)
-        app.state.container = container
-        app.state.handler = RequestHandler(container, policy=ExecutionPolicy())
-        
-        enabled_services = set(container.services.keys())
-        include_routers(app, enabled_services)
-        yield
+        try:
+            container = build_container(settings)
+            app.state.container = container
+            app.state.handler = RequestHandler(container, policy=ExecutionPolicy())
+            include_routers(app, set(container.services.keys()))
 
-    return FastAPI(lifespan=lifespan, title="hestIA")
+            _log.info("startup_complete", extra={"services_started": list(container.services.keys())})
+            yield
+        finally:
+            _log.info("shutdown")
+            shutdown_logging()
+
+    app = FastAPI(lifespan=lifespan, title="hestIA", version="alpha_v0.3")
+    app.add_middleware(CorrelationMiddleware)
+    register_error_handlers(app)
+    return app
 
 
-if __name__=="__main__":
-
+if __name__ == "__main__":
+    settings = Settings.load()
     api = create_api()
-    uvicorn.run(api, host="0.0.0.0", port=s.PORT, log_level="debug")
+    uvicorn.run(api, host="0.0.0.0", port=settings.port, log_level="info")
