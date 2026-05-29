@@ -1,29 +1,22 @@
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
 from hestia.api.dependencies import get_container
-from hestia.api.security import create_access_token
+from hestia.api.limiter import limiter, login_rate_limit
+from hestia.api.security import _issue_token
 from hestia.container import Container
 
 router = APIRouter()
 
 
-def _issue_token(result, auth) -> dict:
-    token = create_access_token(
-        result.user_id,
-        key=auth.config.token_secret_key,
-        algorithm=auth.config.token_encoding_alg,
-        expiration_time=auth.config.token_lifetime_minutes,
-    )
-    return {"access_token": token, "token_type": "bearer", "must_change_pw": result.must_change_pw}
-
-
 @router.post("/login")
+@limiter.limit(login_rate_limit)
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     c: Container = Depends(get_container),
 ):

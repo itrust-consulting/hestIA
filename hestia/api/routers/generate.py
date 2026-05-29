@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import Response, StreamingResponse
 
 from hestia.api.dependencies import get_handler
@@ -28,9 +28,6 @@ def generate(
         stream=req.stream,
     )
 
-    try:
-        if req.stream:
-            return StreamingResponse(h.resolve(exec_req, stream=True), media_type="application/json")
-        return Response(h.resolve(exec_req), media_type="application/json")
-    except PermissionError:
-        raise HTTPException(403, "Forbidden")
+    if req.stream:
+        return StreamingResponse(h.resolve(exec_req, stream=True), media_type="application/json")
+    return Response(h.resolve(exec_req), media_type="application/json")

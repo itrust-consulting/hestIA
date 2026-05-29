@@ -18,6 +18,5 @@ RUN chown -R user:user /var/lib/itrust
 
 USER user
 
-RUN ls -la
 EXPOSE 5555
 CMD ["python", "-m", "hestia.main"]

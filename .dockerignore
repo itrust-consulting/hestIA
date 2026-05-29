@@ -7,8 +7,5 @@ dump/
 scripts/
 test_docs/
 tests/
-_regex.md
-repo_access_token.md
 hestia/__pycache__/
-hestia_old/
 .gitignore

@@ -29,7 +29,5 @@ def change_password(
         raise HTTPException(400, "Missing fields: current_pw, new_pw")
 
     svc = h.container.services.get("users")
-    ok, msg = svc.change_password(user.id, current_pw, new_pw)
-    if not ok:
-        raise HTTPException(401, msg)
+    svc.change_password(user.id, current_pw, new_pw)
     return {"status": "ok"}

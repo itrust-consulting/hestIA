@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, UploadFile, File
 
 from hestia.api.dependencies import get_handler
-from hestia.api.security import get_current_user
+from hestia.api.security import get_current_user, assert_collection_moderator
 from hestia.application.ingestion import IngestionPipeline, IngestionRequest
 from hestia.domain.auth.models import User
 from hestia.handler import RequestHandler
@@ -124,6 +124,8 @@ async def ingest_document(
     except json.JSONDecodeError:
         sheets_list = None
 
+    assert_collection_moderator(user, collection, h)
+
     pipeline = _pipeline(h)
     req = IngestionRequest(
         file_path=tmp_path,
@@ -174,7 +176,7 @@ def list_collections(
 def get_collection(
     name: str,
     h: RequestHandler = Depends(get_handler),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     result = h.container.providers["db"].get_collection(name)
     if result is None:
@@ -183,8 +185,11 @@ def get_collection(
     users_svc = h.container.services.get("users")
     if users_svc:
         grants = users_svc.get_collection_grants(name)
-        result["tenants"] = [t["abbreviation"] for t in grants["access"]]
-        result["owner_tenant"] = grants["owner"]
+        owner = grants.get("owner")
+        is_moderator = owner and owner["id"] in user.permissions.moderated_tenants
+        if user.permissions.is_admin or is_moderator:
+            result["tenants"] = [t["abbreviation"] for t in grants["access"]]
+            result["owner_tenant"] = owner
     return result
 
 
@@ -193,8 +198,9 @@ def delete_document(
     name: str,
     source_uri: str,
     h: RequestHandler = Depends(get_handler),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
+    assert_collection_moderator(user, name, h)
     h.container.providers["db"].delete_document(name, source_uri)
     sparse_enc = h.container.services.get("encSparse")
     if sparse_enc is not None:
@@ -206,8 +212,9 @@ def delete_document(
 def delete_collection(
     name: str,
     h: RequestHandler = Depends(get_handler),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
+    assert_collection_moderator(user, name, h)
     deleted = h.container.providers["db"].delete_collection(name)
     if not deleted:
         from fastapi import HTTPException

@@ -14,6 +14,54 @@ from hestia.domain.auth.models import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 
+def assert_admin(user: User) -> None:
+    if not user.permissions.is_admin:
+        raise HTTPException(403, "Admin access required.")
+
+
+def assert_admin_or_moderator(user: User) -> None:
+    if not user.permissions.is_admin and not user.permissions.moderated_tenants:
+        raise HTTPException(403, "Admin or moderator access required.")
+
+
+def assert_tenant_moderator(user: User, org_id: int) -> None:
+    if user.permissions.is_admin:
+        return
+    if org_id not in user.permissions.moderated_tenants:
+        raise HTTPException(403, "Tenant moderator access required.")
+
+
+def assert_tenant_role_assigner(user: User, org_id: int) -> None:
+    if user.permissions.is_admin:
+        return
+    if org_id not in user.permissions.role_assignable_tenants:
+        raise HTTPException(403, "Only the tenant moderator can assign roles.")
+
+
+def assert_collection_moderator(user: User, collection_id: str, h) -> None:
+    """Raise HTTP 403 unless the user is admin or moderates the org that owns the collection."""
+    if user.permissions.is_admin:
+        return
+    svc = h.container.services.get("users")
+    if svc is None:
+        raise HTTPException(503, "User service unavailable.")
+    grants = svc.get_collection_grants(collection_id)
+    owner = grants.get("owner")
+    if not owner or owner["id"] not in user.permissions.moderated_tenants:
+        raise HTTPException(403, "Only the collection owner's moderator may perform this action.")
+
+
+
+def _issue_token(result, auth) -> dict:
+    token = create_access_token(
+        result.user_id,
+        key=auth.config.token_secret_key,
+        algorithm=auth.config.token_encoding_alg,
+        expiration_time=auth.config.token_lifetime_minutes,
+    )
+    return {"access_token": token, "token_type": "bearer", "must_change_pw": result.must_change_pw}
+
+
 def create_access_token(
     user_id: uuid.UUID,
     *,

@@ -8,9 +8,10 @@ import time
 import uuid
 
 from ldap3 import ALL, SIMPLE, SUBTREE, Connection, Server, Tls
+from ldap3.utils.conv import escape_filter_chars
 
 from hestia.domain.auth.models import AuthResult, CollectionPermission, Permissions, User
-from hestia.domain.exceptions import NotFoundError, ValidationError
+from hestia.domain.exceptions import ForbiddenError, NotFoundError, ValidationError
 from hestia.infrastructure.db.user_repository import UserRepository
 
 PBKDF2_ITERATIONS = 210_000
@@ -27,8 +28,9 @@ def now_epoch() -> int:
 
 class UserService:
 
-    def __init__(self, repo: UserRepository):
+    def __init__(self, repo: UserRepository, password_min_length: int = 15):
         self.repo = repo
+        self.password_min_length = password_min_length
 
     def _generate_salt(self) -> bytes:
         return secrets.token_bytes(SALT_BYTES)
@@ -173,7 +175,7 @@ class UserService:
             roles = ["user"]
         if len(username) < 3:
             raise ValidationError("Username too short")
-        if len(password) < 6:
+        if auth_source == "local" and len(password) < self.password_min_length:
             raise ValidationError("Password too short")
 
         user_id = new_uuid()
@@ -250,6 +252,8 @@ class UserService:
         self.repo.set_user_expiration(id=user_id, expires_ts=expires_at, updated_ts=now_epoch())
 
     def reset_user_password(self, user_id: uuid.UUID, temp_password: str):
+        if len(temp_password) < self.password_min_length:
+            raise ValidationError(f"Password must be at least {self.password_min_length} characters.")
         salt = self._generate_salt()
         pwd_hash = self._hash_password(temp_password, salt)
         now = now_epoch()
@@ -296,7 +300,7 @@ class UserService:
     def get_org_users(self, org_id: int) -> list[dict]:
         return [
             {
-                "id": str(uuid.UUID(bytes=r["id"])),
+                "id": uuid.UUID(bytes=r["id"]),
                 "username": r["username"],
                 "email": r["email"],
                 "first_name": r["first_name"],
@@ -368,22 +372,21 @@ class UserService:
 
     # ---- self-service ----
 
-    def change_password(self, user_id: uuid.UUID, current_pw: str, new_pw: str) -> tuple[bool, str]:
+    def change_password(self, user_id: uuid.UUID, current_pw: str, new_pw: str) -> None:
         row = self.repo.get_user_by_id(user_id)
         if not row:
-            return False, "Invalid user."
-        if row["auth_source"] == "ldap":
-            return False, "LDAP account — password cannot be changed here."
+            raise NotFoundError("User not found.")
+        if row["auth_source"] in ("ldap", "oidc"):
+            raise ForbiddenError("Federated account — password cannot be changed here.")
         if not self._verify_password(current_pw, row["salt"], row["password_hash"]):
-            return False, "Incorrect current password."
-        if len(new_pw) < 6:
-            raise ValidationError("New password must be at least 6 characters.")
+            raise ValidationError("Incorrect current password.")
+        if len(new_pw) < self.password_min_length:
+            raise ValidationError(f"New password must be at least {self.password_min_length} characters.")
         new_salt = self._generate_salt()
         new_hash = self._hash_password(new_pw, new_salt)
         now = now_epoch()
         self.repo.update_user_password(id=user_id, new_hash=new_hash, new_salt=new_salt, updated_ts=now)
         self.repo.set_must_change_pw(change=0, id=user_id, updated_ts=now)
-        return True, "Password successfully changed."
 
     def change_username(self, user_id: uuid.UUID, new_name: str):
         if len(new_name) < 3:
@@ -412,7 +415,13 @@ class UserService:
             for c in self.repo.get_conversation(user_id, limit=20, offset=0)
         ]
 
-    def get_conversation_messages(self, c_id: uuid.UUID) -> list[dict]:
+    def assert_conversation_owner(self, user_id: uuid.UUID, c_id: uuid.UUID) -> None:
+        row = self.repo.get_conversation_owner(c_id)
+        if row is None or uuid.UUID(bytes=row["user_id"]) != user_id:
+            raise NotFoundError("Conversation not found.")
+
+    def get_conversation_messages(self, user_id: uuid.UUID, c_id: uuid.UUID) -> list[dict]:
+        self.assert_conversation_owner(user_id, c_id)
         rows = self.repo.get_messages(c_id, limit=100)
         return [
             {
@@ -428,6 +437,7 @@ class UserService:
 
     def append_conversation_message(
         self,
+        user_id: uuid.UUID,
         c_id: uuid.UUID,
         role: str,
         content: str,
@@ -435,6 +445,7 @@ class UserService:
         options: dict | None = None,
         ts: int | None = None,
     ) -> uuid.UUID:
+        self.assert_conversation_owner(user_id, c_id)
         msg_id = new_uuid()
         now = ts if ts is not None else now_epoch()
         self.repo.insert_message(
@@ -456,12 +467,15 @@ class UserService:
         return conv_id
 
     def rename_user_conversation(self, user_id: uuid.UUID, c_id: uuid.UUID, title: str):
+        self.assert_conversation_owner(user_id, c_id)
         self.repo.update_conversation_title(user_id=user_id, c_id=c_id, title=title)
 
     def delete_user_conversation(self, user_id: uuid.UUID, c_id: uuid.UUID):
+        self.assert_conversation_owner(user_id, c_id)
         self.repo.delete_conversation(user_id=user_id, c_id=c_id)
 
     def delete_conversation_message(self, user_id: uuid.UUID, c_id: uuid.UUID, msg_id: uuid.UUID):
+        self.assert_conversation_owner(user_id, c_id)
         self.repo.delete_message(c_id=c_id, msg_id=msg_id)
 
 
@@ -508,7 +522,8 @@ class LDAPService:
             return None
 
     def _search_user(self, conn: Connection, identifier: str) -> tuple[str | None, dict | None]:
-        for filt in [f"({self.user_attribute}={identifier})", f"({self.mail_attribute}={identifier})"]:
+        safe = escape_filter_chars(identifier)
+        for filt in [f"({self.user_attribute}={safe})", f"({self.mail_attribute}={safe})"]:
             try:
                 conn.search(search_base=self.search_base, search_filter=filt,
                             search_scope=SUBTREE, attributes=["uid", "sAMAccountName", "mail", "givenName", "sn", "memberOf"])
@@ -519,10 +534,24 @@ class LDAPService:
                 return entry.entry_dn, entry.entry_attributes_as_dict
         return None, None
 
+    @staticmethod
+    def _escape_dn_value(value: str) -> str:
+        """Escape a string for safe use as an RDN attribute value (RFC 4514)."""
+        value = value.replace('\\', '\\\\')
+        for ch in ('"', '+', ',', ';', '<', '>'):
+            value = value.replace(ch, f'\\{ch}')
+        value = value.replace('\x00', '\\00')
+        if value and value[0] in (' ', '#'):
+            value = '\\' + value
+        if value and value[-1] == ' ':
+            value = value[:-1] + '\\ '
+        return value
+
     def _build_direct_dn(self, identifier: str) -> str:
+        safe = self._escape_dn_value(identifier)
         if self.user_dn_template:
-            return self.user_dn_template.format(username=identifier)
-        return f"{self.user_attribute}={identifier},{self.search_base}"
+            return self.user_dn_template.format(username=safe)
+        return f"{self.user_attribute}={safe},{self.search_base}"
 
     def _lookup_user_dn(self, identifier: str) -> tuple[str, dict | None]:
         svc = self._service_bind()

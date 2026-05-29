@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 export function tooltip(node: HTMLElement, html: string) {
   let tip: HTMLDivElement | null = null;
 
@@ -5,7 +7,7 @@ export function tooltip(node: HTMLElement, html: string) {
     if (!html?.trim()) return;
     tip = document.createElement('div');
     tip.className = 'tooltip-portal';
-    tip.innerHTML = html;
+    tip.innerHTML = DOMPurify.sanitize(html);
     tip.style.visibility = 'hidden';
     document.body.appendChild(tip);
 

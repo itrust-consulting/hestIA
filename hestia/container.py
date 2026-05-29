@@ -58,7 +58,7 @@ def build_container(settings: Settings) -> Container:
         repo.initialize()
         close()
 
-        user_service = UserService(repo)
+        user_service = UserService(repo, password_min_length=settings.auth.password_min_length)
 
         ldap: LDAPService | None = None
         if settings.auth and settings.auth.auth_mode == "ldap" and settings.ldap:

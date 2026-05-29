@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
 
     const res = await fetch('/api/admin/users');
     if (!res.ok) error(res.status as any, 'Failed to load users');
-    const users = await res.json();
+    const { users } = await res.json();
 
     return { users };
 };

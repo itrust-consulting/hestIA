@@ -414,6 +414,12 @@ class UserRepository:
             (conv_id.bytes, user_id.bytes, title, metadata_json, ts, ts),
         )
 
+    def get_conversation_owner(self, c_id: uuid.UUID) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT user_id FROM conversations WHERE id = ?",
+            (c_id.bytes,),
+        ).fetchone()
+
     def get_conversation(self, user_id: uuid.UUID, limit: int, offset: int) -> list[sqlite3.Row]:
         return self._get_conn().execute(
             "SELECT id, title, metadata_json, created_at, updated_at FROM conversations "

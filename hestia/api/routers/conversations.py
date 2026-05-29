@@ -38,7 +38,7 @@ def get_conversation_messages(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
-    return h.container.services.get("users").get_conversation_messages(uuid.UUID(cid))
+    return h.container.services.get("users").get_conversation_messages(user.id, uuid.UUID(cid))
 
 
 @router.delete("/conversations/{cid}")

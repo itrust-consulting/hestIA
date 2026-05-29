@@ -1,15 +1,29 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from hestia.api.dependencies import get_container
 from hestia.api.schemas.requests import SearchRequest
+from hestia.api.security import get_current_user
 from hestia.container import Container
+from hestia.domain.auth.models import User
 from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 
 router = APIRouter()
 
 
 @router.post("/search")
-def search(req: SearchRequest, c: Container = Depends(get_container)):
+def search(
+    req: SearchRequest,
+    c: Container = Depends(get_container),
+    user: User = Depends(get_current_user),
+):
+    perms = user.permissions
+    if not perms.is_admin:
+        allowed = perms.allowed_collections
+        wildcard = allowed.get("*")
+        if not (wildcard and wildcard.access):
+            perm = allowed.get(req.collection)
+            if not perm or not perm.access:
+                raise HTTPException(403, "Access to this collection is not permitted.")
     retriever = c.services["search"]
 
     if req.mode == "semantic":

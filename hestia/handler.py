@@ -318,7 +318,7 @@ class PersistChat:
             if req.last_user_attachments:
                 user_meta["attachments"] = req.last_user_attachments
             user_msg_id = self.users.append_conversation_message(
-                c_id=c_id, role="user", content=req.last_user_message,
+                user_id=user_id, c_id=c_id, role="user", content=req.last_user_message,
                 metadata=user_meta, options=req.model_kwargs or {}, ts=now,
             )
         assistant_meta: dict = {}
@@ -327,7 +327,7 @@ class PersistChat:
         if thinking:
             assistant_meta["thinking"] = thinking
         assistant_msg_id = self.users.append_conversation_message(
-            c_id=c_id, role="assistant", content=assistant_reply,
+            user_id=user_id, c_id=c_id, role="assistant", content=assistant_reply,
             metadata=assistant_meta, options=req.model_kwargs or {}, ts=now + 1,
         )
         return c_id, user_msg_id, assistant_msg_id

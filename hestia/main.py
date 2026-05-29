@@ -3,8 +3,12 @@ import logging
 
 import uvicorn
 from fastapi import FastAPI
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from hestia.api.error_handlers import register_error_handlers
+from hestia.api.limiter import limiter, login_rate_limit
 from hestia.api.routers.registry import include_routers
 from hestia.config.settings import Settings
 from hestia.container import build_container
@@ -27,6 +31,10 @@ def create_api() -> FastAPI:
 
         try:
             container = build_container(settings)
+            auth_svc = container.services.get("auth")
+            if auth_svc and auth_svc.config:
+                cfg = auth_svc.config
+                login_rate_limit.configure(cfg.max_failed_attempts, cfg.lockout_duration_minutes)
             app.state.container = container
             app.state.handler = RequestHandler(container, policy=ExecutionPolicy())
             include_routers(app, set(container.services.keys()))
@@ -38,6 +46,9 @@ def create_api() -> FastAPI:
             shutdown_logging()
 
     app = FastAPI(lifespan=lifespan, title="hestIA", version="alpha_v0.3")
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(CorrelationMiddleware)
     register_error_handlers(app)
     return app

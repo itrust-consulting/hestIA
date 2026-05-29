@@ -164,7 +164,7 @@ class Settings(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _load_auth_settings() -> AuthSettings:
-    return AuthSettings(
+    settings = AuthSettings(
         auth_mode=os.getenv("AUTH_MODE", "local").lower(),
         ldap_group_mapping=_parse_ldap_group_mapping(os.getenv("LDAP_GROUP_MAPPING")),
         password_min_length=int(os.getenv("AUTH_PW_LENGTH", "15")),
@@ -175,6 +175,12 @@ def _load_auth_settings() -> AuthSettings:
         token_lifetime_minutes=int(os.getenv("AUTH_TOKEN_LIFETIME", "360")),
         audit_logs=os.getenv("AUTH_AUDIT_LOGS", "false").lower() == "true",
     )
+    if len(settings.token_secret_key) < 32:
+        raise ConfigurationError(
+            "AUTH_SECRET_KEY must be at least 32 characters. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    return settings
 
 
 def _load_oidc_settings() -> OIDCSettings:

@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
   if (!tenant) error(404, 'Tenant not found.');
 
   const members = membersRes.ok ? ((await membersRes.json()).members ?? []) : [];
-  const allUsers = usersRes.ok ? (await usersRes.json()) : [];
+  const allUsers = usersRes.ok ? ((await usersRes.json()).users ?? []) : [];
   const allCollections = collectionsRes.ok ? (await collectionsRes.json()).collections ?? [] : [];
 
   let ownedRaw: any[] = [];
