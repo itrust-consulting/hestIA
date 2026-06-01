@@ -6,7 +6,7 @@ import { redirect } from '@sveltejs/kit';
 const API_URL = env.PRIVATE_MICROSERVICE_URL || 'http://localhost:5555'
 const LOGIN_API = API_URL + '/login'
 
-export async function POST({ request, cookies }) {
+export async function POST({ request, cookies, url }) {
   const { username, password } = await request.json();
 
   const res = await fetch(LOGIN_API, {
@@ -29,7 +29,7 @@ export async function POST({ request, cookies }) {
 
   cookies.set('token', data.access_token, {
     httpOnly: true,
-    secure: true,
+    secure: url.protocol === 'https:',
     sameSite: 'lax',
     path: '/',
     maxAge: exp - Math.floor(Date.now() / 1000)

@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, overl
 from hestia.infrastructure.http.client import HttpClient
 from hestia.infrastructure.llm.protocol import LLMProvider
 
-Message = Dict[str, str]
+Message = Dict[str, Any]
 ChunkExtractor = Callable[[Dict[str, Any]], Optional[str]]
 
 _log = logging.getLogger("hestia.system")
@@ -21,11 +21,12 @@ class vLLMProvider(LLMProvider):
         rerank: str | HttpClient | None = None,
         model: Optional[str] = None,
         timeout: tuple[float, float] = (10.0, 800.0),
+        api_key: Optional[str] = None,
     ):
         def _hc(x):
             if isinstance(x, HttpClient):
                 return x
-            return HttpClient(base_url=x, timeout=timeout)
+            return HttpClient(base_url=x, timeout=timeout, api_key=api_key)
 
         self.http_chat = _hc(chat)
         self.http_embed = _hc(embed) if embed else self.http_chat

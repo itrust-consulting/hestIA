@@ -57,6 +57,23 @@ def _get_parser_direct(file_path: Path, itrust_template: bool):
             return ITRXLSXParser(file=str(file_path))
         from hestia.infrastructure.parsers.xlsx import XLSXParser
         return XLSXParser(file=str(file_path))
+    if ext == ".json":
+        from hestia.infrastructure.parsers.json import JSONParser
+        return JSONParser(file=str(file_path))
+    if ext == ".csv":
+        from hestia.infrastructure.parsers.csv import CSVParser
+        return CSVParser(file=str(file_path))
+    if ext == ".txt":
+        from hestia.infrastructure.parsers.txt import TXTParser
+        return TXTParser(file=str(file_path))
+    if ext in (".md", ".markdown"):
+        from hestia.infrastructure.parsers.md import MarkdownParser
+        return MarkdownParser(file=str(file_path))
+    if ext == ".pptx":
+        from hestia.infrastructure.parsers.pptx import PPTXParser
+        return PPTXParser(file=str(file_path))
+    from hestia.domain.exceptions import ConfigurationError
+    raise ConfigurationError(f"No parser registered for '{ext}'")
 
 
 @router.post("/parse")
@@ -68,6 +85,7 @@ async def parse_document(
     """Parse a document and return its metadata without ingesting."""
     import logging
     _log = logging.getLogger("hestia.system")
+    _log.info("start parsing ..", extra={"file": file.filename})
 
     data = await file.read()
     suffix = Path(file.filename).suffix.lower()
@@ -92,7 +110,7 @@ async def parse_document(
 
 
 @router.post("/upload")
-async def ingest_document(
+async def upload_document(
     file: UploadFile = File(...),
     collection: str = Form(...),
     tenants: str = Form("[]"),

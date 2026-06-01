@@ -33,7 +33,10 @@ export const handle: Handle = async ({ event, resolve }) => {
         const isAdmin = perms?.is_admin ?? false;
         const isModerator = (perms?.moderated_tenants?.length ?? 0) > 0;
         if (!isAdmin && !isModerator) {
-            return new Response('Forbidden', { status: 403 });
+            return new Response(JSON.stringify({ detail: 'Forbidden' }), {
+                status: 403,
+                headers: { 'content-type': 'application/json' },
+            });
         }
     }
 

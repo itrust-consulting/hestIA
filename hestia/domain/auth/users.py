@@ -440,7 +440,7 @@ class UserService:
         user_id: uuid.UUID,
         c_id: uuid.UUID,
         role: str,
-        content: str,
+        content: str | list,
         metadata: dict | None = None,
         options: dict | None = None,
         ts: int | None = None,
@@ -448,6 +448,10 @@ class UserService:
         self.assert_conversation_owner(user_id, c_id)
         msg_id = new_uuid()
         now = ts if ts is not None else now_epoch()
+        # Multimodal content arrives as a list of parts; extract text for storage.
+        # Images are not persisted — they're only needed for the current LLM turn.
+        if isinstance(content, list):
+            content = " ".join(p.get("text", "") for p in content if p.get("type") == "text")
         self.repo.insert_message(
             msg_id=msg_id,
             c_id=c_id,

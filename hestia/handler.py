@@ -30,7 +30,9 @@ RAG_PROMPT = """
 
     Instruction:
     - Use LaTeX-style citations when referencing retrieved data: \\cite{{key}} for a single source,
-      or \\cite{{key1,key2}} for multiple sources. Use the keys defined in <source-map>.
+      or \\cite{{key1,key2}} for multiple sources.
+    - IMPORTANT: Use ONLY the numeric keys defined in <source-map>. Do NOT derive keys from
+      filenames, document titles, or any other source. The keys are short integers (1, 2, 3, ...).
     - If the retrieved data is insufficient, say so explicitly.
     - Do NOT include a separate sources or references section at the end.
 
@@ -40,35 +42,32 @@ RAG_PROMPT = """
     """
 
 
-def _make_citekey(source: str, idx: int) -> str:
-    stem = re.sub(r'[^a-zA-Z0-9]', '', source.split('/')[-1].split('.')[0])
-    return f"{stem or 'src'}{idx}"
-
-
 def _format_citations(hits: list) -> tuple[dict, list]:
     retrieved_data = []
     source_map = []
     cite_list = []
+    source_to_key: dict[str, str] = {}
 
-    for idx, point in enumerate(hits):
+    for point in hits:
         chunk = point.payload
         doc_info = chunk.get("doc_info") or {}
         info = chunk.get("info") or {}
         source = chunk.get("source", "unknown")
         content = chunk.get("content", "")
-        subject = doc_info.get("subject", "")
-        path = info.get("path", "")
-        key = _make_citekey(source, idx + 1)
 
-        retrieved_data.append(f"[{key}: {source}]\n{content}")
-        source_map.append(f"- {key}: {source}")
-        cite_list.append({
-            "key": key,
-            "source": source,
-            "subject": subject,
-            "path": path,
-            "excerpt": content,
-        })
+        if source not in source_to_key:
+            key = str(len(source_to_key) + 1)
+            source_to_key[source] = key
+            source_map.append(f"- {key}: {source}")
+            cite_list.append({
+                "key": key,
+                "source": source,
+                "subject": doc_info.get("subject", ""),
+                "path": info.get("path", ""),
+                "excerpt": content,
+            })
+
+        retrieved_data.append(f"[{source_to_key[source]}]\n{content}")
 
     return {
         "retrieved_data": "\n\n".join(retrieved_data),
@@ -87,11 +86,15 @@ def _build_prompt(prompt: str, hits: list) -> tuple[str, list]:
     ), cite_list
 
 
+def _normalize_citekey(key: str) -> str:
+    return re.sub(r'[^a-zA-Z0-9]', '', key).lower()
+
+
 def _extract_used_citekeys(text: str) -> set[str]:
     keys: set[str] = set()
     for group in re.findall(r'\\cite\{([^}]+)\}', text):
         for k in group.split(','):
-            keys.add(k.strip())
+            keys.add(_normalize_citekey(k.strip()))
     return keys
 
 
@@ -168,6 +171,8 @@ class Runner:
         augmented, cite_list = _build_prompt(prompt, hits)
         slot[node.outputs.get("prompt", "prompt")] = augmented
         slot["_cite_list"] = cite_list
+        if hits:
+            slot["_aug_prompt"] = augmented
 
     def _run_generate(self, node, slot, stream):
         svc = self._svc("generate")
@@ -287,7 +292,7 @@ class PersistChat:
                                 in_think = True
 
             used = _extract_used_citekeys(final_text)
-            citations = [c for c in cite_list if c["key"] in used]
+            citations = [c for c in cite_list if _normalize_citekey(c["key"]) in used]
             c_id, user_msg_id, assistant_msg_id = self._persist(
                 req, final_text, citations=citations, thinking=thinking_text or None
             )
@@ -313,12 +318,19 @@ class PersistChat:
         user_msg_id = None
         if req.last_user_message:
             user_meta: dict = {}
-            if req.last_user_display_content is not None:
-                user_meta["display_content"] = req.last_user_display_content
+            aug_prompt = self.runner.last_slot.get("_aug_prompt")
+            if aug_prompt:
+                user_content = aug_prompt
+                user_meta["display_content"] = req.last_user_display_content \
+                    if req.last_user_display_content is not None else req.last_user_message
+            else:
+                user_content = req.last_user_message
+                if req.last_user_display_content is not None:
+                    user_meta["display_content"] = req.last_user_display_content
             if req.last_user_attachments:
                 user_meta["attachments"] = req.last_user_attachments
             user_msg_id = self.users.append_conversation_message(
-                user_id=user_id, c_id=c_id, role="user", content=req.last_user_message,
+                user_id=user_id, c_id=c_id, role="user", content=user_content,
                 metadata=user_meta, options=req.model_kwargs or {}, ts=now,
             )
         assistant_meta: dict = {}

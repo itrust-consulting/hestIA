@@ -29,20 +29,26 @@ function stripSourcesBlock(md: string): string {
   return md.replace(/\n{1,2}\**Sources?:?\**\s*\n[\s\S]*$/i, '').trimEnd();
 }
 
+function normalizeKey(k: string): string {
+  return k.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
+
 export function renderWithCitations(md: string, citations?: Citation[]): string {
   const cleaned = citations?.length ? stripSourcesBlock(md) : md;
   const html = renderChatContent(cleaned);
   if (!citations?.length) return html;
 
+  const citationMap = new Map(citations.map(c => [normalizeKey(c.key), c]));
+
   return html.replace(/\\cite\{([^}]+)\}/g, (_match, group: string) => {
     const keys = group.split(',').map((s: string) => s.trim());
-    const first = citations.find(c => c.key === keys[0]);
+    const first = citationMap.get(normalizeKey(keys[0]));
     if (!first) return _match;
 
     const label = shortLabel(first);
     const extra = keys.length > 1 ? ` +${keys.length - 1}` : '';
     const chipCitations = keys
-      .map(k => citations.find(c => c.key === k))
+      .map(k => citationMap.get(normalizeKey(k)))
       .filter(Boolean);
 
     return `<span class="cite-chip" data-cites="${escAttr(JSON.stringify(chipCitations))}">${escAttr(label)}${extra}</span>`;

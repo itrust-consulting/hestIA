@@ -2,26 +2,33 @@ services:
   backend:
     build:
       context: ./
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile  # Path to your Python Dockerfile
     ports:
       - "5555:5555"
+    volumes:
+      - ./app/data:/var/lib/itrust/app/data
     networks:
       - app_network
     environment:
       - 'PORT=5555'
       - 'LLM_URL=http://localhost:8000'
+      - 'LLM_API_KEY=${LLM_API_KEY}'
       - 'DB_URL=http://localhost:6333'
+      - 'DB_API_KEY=${DB_API_KEY}'
+      - 'DEFAULT_GEN_MODEL=RedHatAI/Qwen3.6-35B-A3B-NVFP4'
+      - 'DEFAULT_EMB_MODEL=Qwen/Qwen3-Embedding-0.6B'
       - 'ENABLE_AUTH=true'
       - 'AUTH_PW_LENGTH=15'
       - 'AUTH_MAX_ATTEMPTS=5'
-      - 'AUTH_LOCKOUT_DURATION=5'
+      - 'AUTH_LOCKOUT_DURATION=15'
       - 'AUTH_MODE=oidc'
       - 'OIDC_PROVIDER_URL=https://login.com/realms/identity'
-      - 'OIDC_CLIENT_ID=hestia-dev'
-      - 'OIDC_CLIENT_SECRET=some-secret'
-      - 'AUTH_SECRET_KEY=some-key'
+      - 'OIDC_CLIENT_ID=hestia'
+      - 'OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}'
+      - 'AUTH_SECRET_KEY=${AUTH_SECRET_KEY}'
       - 'AUTH_TOKEN_LIFETIME=360'
-
+      - 'LOG_LEVEL=INFO'
+ 
   frontend:
     build:
       context: ./hestia-ui
@@ -36,7 +43,7 @@ services:
       - 'PRIVATE_MICROSERVICE_URL=http://backend:5555'
       - 'PUBLIC_AUTH_MODE=oidc'
       - 'PORT=7860'
-
+ 
 
 networks:
   app_network:

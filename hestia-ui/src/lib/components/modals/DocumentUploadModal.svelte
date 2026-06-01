@@ -73,7 +73,7 @@
 
   let isDragOver = $state(false);
   const EXCEL_EXTS    = ['.xlsx', '.xlsm'];
-  const ACCEPTED_EXTS = ['.docx', '.pdf', '.xlsx', '.xlsm'];
+  const ACCEPTED_EXTS = ['.docx', '.pdf', '.xlsx', '.xlsm', '.json', '.csv', '.txt', '.md', '.markdown', '.pptx'];
 
   // Excel sheet selection / navigation
   let allSheets: string[]                   = $state([]);
@@ -465,7 +465,7 @@
         {:else}
           <label class="field">
             <span>Select File(s) <span class="req">*</span></span>
-            <input type="file" accept=".docx,.pdf,.xlsx,.xlsm" multiple onchange={onFileChange} />
+            <input type="file" accept=".docx,.pdf,.xlsx,.xlsm,.json,.csv,.txt,.md,.markdown,.pptx" multiple onchange={onFileChange} />
           </label>
         {/if}
         <label class="field toggle-field">

@@ -6,7 +6,7 @@ const BACKEND_URL = env.PRIVATE_MICROSERVICE_URL || 'http://localhost:5555';
 export async function GET({ cookies, url, locals }) {
     const isOidcUser = locals.user?.auth_source === 'oidc';
 
-    cookies.delete('token', { path: '/', sameSite: 'lax', secure: true });
+    cookies.delete('token', { path: '/', sameSite: 'lax', secure: url.protocol === 'https:' });
 
     if (isOidcUser) {
         const postLogoutUri = `${url.origin}/login`;

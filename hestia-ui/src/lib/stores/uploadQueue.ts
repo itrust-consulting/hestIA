@@ -57,8 +57,12 @@ async function _processNext() {
     }
 
     const res  = await fetch('/api/admin/collections/upload', { method: 'POST', body: form });
+    if (!res.ok) {
+      let detail = String(res.status);
+      try { detail = (await res.json()).detail ?? detail; } catch { /* non-JSON error body */ }
+      throw new Error(detail);
+    }
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail ?? String(res.status));
 
     _patch(job.id, { status: 'done', n_chunks: data.n_chunks });
     job.onDone?.(data.n_chunks);

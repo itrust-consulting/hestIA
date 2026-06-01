@@ -40,7 +40,7 @@ export async function GET({ url, cookies }) {
 
     cookies.set('token', data!.access_token, {
         httpOnly: true,
-        secure: true,
+        secure: url.protocol === 'https:',
         sameSite: 'lax',
         path: '/',
         maxAge: exp - Math.floor(Date.now() / 1000)

@@ -1,5 +1,5 @@
 import { writable, get } from 'svelte/store';
-import type { Role, ChatMessage, ChatAPIMessages } from '$lib/types';
+import type { ChatMessage, ChatAPIMessages } from '$lib/types';
 
 
 export const messages = writable<ChatMessage[]>([]);
@@ -44,7 +44,7 @@ export function buildAPIMessages(opts?: {
     systemPrompt
     } = opts ?? {};
 
-    const base: { role: Role; content: string }[] = [];
+    const base: ChatAPIMessages = [];
         if (includeSystem && systemPrompt?.trim()) {
         base.push({ role: 'system', content: systemPrompt.trim() });
     }

@@ -20,11 +20,19 @@ class HttpClient:
     api_key: Optional[str] = None
     session: requests.Session = field(default_factory=requests.Session, repr=False, compare=False)
 
+    def _auth_headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        h: Dict[str, str] = {}
+        if self.api_key:
+            h["Authorization"] = f"Bearer {self.api_key}"
+        if extra:
+            h.update(extra)
+        return h or {}
+
     @contextmanager
     def _post_stream(self, endpoint: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None):
         url = self.base_url + endpoint
         try:
-            r = self.session.post(url, json=payload, headers=headers, timeout=self.timeout, stream=True)
+            r = self.session.post(url, json=payload, headers=self._auth_headers(headers), timeout=self.timeout, stream=True)
             r.raise_for_status()
         except requests.exceptions.Timeout:
             _log.warning("http_timeout", extra={"url": url, "method": "POST"})
@@ -46,7 +54,7 @@ class HttpClient:
             return self._post_stream(endpoint, payload, headers)
         url = self.base_url + endpoint
         try:
-            r = self.session.post(url, json=payload, headers=headers, timeout=self.timeout)
+            r = self.session.post(url, json=payload, headers=self._auth_headers(headers), timeout=self.timeout)
             r.raise_for_status()
             return r
         except requests.exceptions.Timeout:
@@ -63,7 +71,7 @@ class HttpClient:
     def get(self, endpoint: str):
         url = self.base_url + endpoint
         try:
-            r = self.session.get(url, timeout=self.timeout)
+            r = self.session.get(url, headers=self._auth_headers(), timeout=self.timeout)
             r.raise_for_status()
             return r
         except requests.exceptions.Timeout:

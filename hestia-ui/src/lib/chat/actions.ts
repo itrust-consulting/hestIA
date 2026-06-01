@@ -10,10 +10,12 @@ import {
 import { activeConversationId, loadConversations } from '$lib/stores/conversations';
 import { activeCorpusName } from '$lib/stores/isms';
 import { api } from '$lib/api/client';
+import type { ContentPart } from '$lib/types';
 
 export const sending = writable<boolean>(false);
 
 export type ParsedAttachment = { name: string; markdown: string; size?: number };
+export type ImageAttachment  = { dataUrl: string; name: string; size?: number };
 
 let controller: AbortController | null = null;
 
@@ -25,15 +27,33 @@ function tempId() {
   return '__local__' + crypto.randomUUID();
 }
 
-export async function sendMessage(text: string, attachments: ParsedAttachment[] = []) {
-  if ((!text.trim() && !attachments.length) || get(sending)) return;
+export async function sendMessage(
+  text: string,
+  attachments: ParsedAttachment[] = [],
+  images: ImageAttachment[] = [],
+) {
+  if ((!text.trim() && !attachments.length && !images.length) || get(sending)) return;
 
   sending.set(true);
 
   const userTempId = tempId();
 
-  let apiContent: string | undefined;
-  if (attachments.length > 0) {
+  let apiContent: string | ContentPart[] | undefined;
+  if (images.length > 0) {
+    const parts: ContentPart[] = [];
+    if (attachments.length > 0) {
+      const blocks = attachments
+        .map(a => `<document name="${a.name}">\n${a.markdown}\n</document>`)
+        .join('\n\n');
+      parts.push({ type: 'text', text: text.trim() ? `${blocks}\n\n${text}` : blocks });
+    } else if (text.trim()) {
+      parts.push({ type: 'text', text });
+    }
+    for (const img of images) {
+      parts.push({ type: 'image_url', image_url: { url: img.dataUrl } });
+    }
+    apiContent = parts;
+  } else if (attachments.length > 0) {
     const blocks = attachments
       .map(a => `<document name="${a.name}">\n${a.markdown}\n</document>`)
       .join('\n\n');
@@ -47,6 +67,7 @@ export async function sendMessage(text: string, attachments: ParsedAttachment[] 
       role: 'user',
       content: text,
       apiContent,
+      images: images.length > 0 ? images.map(i => i.dataUrl) : undefined,
       attachments: attachments.length > 0 ? attachments.map(a => ({ name: a.name, size: a.size, markdown: a.markdown })) : undefined,
       createdAt: Date.now()
     }
@@ -225,7 +246,15 @@ export async function retryMessage(assistantId: string) {
   const newUserTempId = tempId();
   messages.update(m => [
     ...m,
-    { id: newUserTempId, role: 'user', content: userMsg.content, createdAt: Date.now() }
+    {
+      id: newUserTempId,
+      role: 'user',
+      content: userMsg.content,
+      apiContent: userMsg.apiContent,
+      images: userMsg.images,
+      attachments: userMsg.attachments,
+      createdAt: Date.now()
+    }
   ]);
 
   const newAssistantTempId = tempId();

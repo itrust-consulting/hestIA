@@ -22,6 +22,12 @@ SUPPORTED_EXTENSIONS: dict[str, str] = {
     ".pdf": "pdf",
     ".xlsx": "xlsx",
     ".xlsm": "xlsm",
+    ".json": "json",
+    ".csv": "csv",
+    ".txt": "txt",
+    ".md": "md",
+    ".markdown": "md",
+    ".pptx": "pptx",
 }
 
 
@@ -174,6 +180,21 @@ class IngestionPipeline:
                 return ITRXLSXParser(file=str(file_path), selected_sheets=selected_sheets)
             from hestia.infrastructure.parsers.xlsx import XLSXParser
             return XLSXParser(file=str(file_path), selected_sheets=selected_sheets)
+        if ext == ".json":
+            from hestia.infrastructure.parsers.json import JSONParser
+            return JSONParser(file=str(file_path))
+        if ext == ".csv":
+            from hestia.infrastructure.parsers.csv import CSVParser
+            return CSVParser(file=str(file_path))
+        if ext == ".txt":
+            from hestia.infrastructure.parsers.txt import TXTParser
+            return TXTParser(file=str(file_path))
+        if ext in (".md", ".markdown"):
+            from hestia.infrastructure.parsers.md import MarkdownParser
+            return MarkdownParser(file=str(file_path))
+        if ext == ".pptx":
+            from hestia.infrastructure.parsers.pptx import PPTXParser
+            return PPTXParser(file=str(file_path))
         raise ConfigurationError(f"No parser registered for '{ext}'")
 
     def _build_chunks(

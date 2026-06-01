@@ -4,7 +4,7 @@
   import { page } from '$app/stores';
 
   import { messages } from '$lib/stores/chat';
-  import { sendMessage, copyMessage, deleteMessage, retryMessage, sending, stop, type ParsedAttachment } from '$lib/chat/actions';
+  import { sendMessage, copyMessage, deleteMessage, retryMessage, sending, stop, type ParsedAttachment, type ImageAttachment } from '$lib/chat/actions';
   import { loadConversations, openConversation } from '$lib/stores/conversations';
   import { renderWithCitations, stripThinkingPreamble } from '$lib/render/renderChatContent';
 
@@ -61,9 +61,21 @@
   let inputBarEl: HTMLDivElement | null = null;
 
   let attachments: ParsedAttachment[] = [];
+  let images: ImageAttachment[] = [];
   let dragOver = false;
   let parsing = false;
   let fileInputEl: HTMLInputElement | undefined;
+
+  const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
+  function readAsDataURL(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
 
   let previewOpen = false;
   let previewFilename = '';
@@ -155,26 +167,34 @@
     previewOpen = true;
   }
 
-  const SUPPORTED_EXTS = ['.docx', '.pdf', '.xlsx'];
+  const SUPPORTED_EXTS = ['.docx', '.pdf', '.xlsx', '.xlsm', '.json', '.csv', '.txt', '.md', '.markdown', '.pptx'];
 
   async function parseFiles(files: FileList | File[]) {
     const list = Array.from(files);
+
+    const imageFiles = list.filter(f => IMAGE_EXTS.includes('.' + (f.name.split('.').pop()?.toLowerCase() ?? '')));
+    const docFiles   = list.filter(f => SUPPORTED_EXTS.includes('.' + (f.name.split('.').pop()?.toLowerCase() ?? '')));
     const unsupported = list.filter(f => {
-      const ext = '.' + f.name.split('.').pop()?.toLowerCase();
-      return !SUPPORTED_EXTS.includes(ext);
+      const ext = '.' + (f.name.split('.').pop()?.toLowerCase() ?? '');
+      return !IMAGE_EXTS.includes(ext) && !SUPPORTED_EXTS.includes(ext);
     });
+
     if (unsupported.length) {
-      addToast(`Unsupported file type: ${unsupported.map(f => f.name).join(', ')}. Accepted: .docx, .pdf, .xlsx`, 'error');
+      addToast(`Unsupported file type: ${unsupported.map(f => f.name).join(', ')}`, 'error');
     }
-    const supported = list.filter(f => {
-      const ext = '.' + f.name.split('.').pop()?.toLowerCase();
-      return SUPPORTED_EXTS.includes(ext);
-    });
-    if (!supported.length) return;
+
+    if (imageFiles.length) {
+      await Promise.all(imageFiles.map(async (file) => {
+        const dataUrl = await readAsDataURL(file);
+        images = [...images, { dataUrl, name: file.name, size: file.size }];
+      }));
+    }
+
+    if (!docFiles.length) return;
 
     parsing = true;
     try {
-      await Promise.all(supported.map(async (file) => {
+      await Promise.all(docFiles.map(async (file) => {
         const fd = new FormData();
         fd.append('file', file);
         const res = await fetch('/api/chat/parse', { method: 'POST', body: fd });
@@ -212,6 +232,24 @@
     attachments = attachments.filter(a => a.name !== name);
   }
 
+  function removeImage(name: string) {
+    images = images.filter(i => i.name !== name);
+  }
+
+  async function onPaste(e: ClipboardEvent) {
+    const items = Array.from(e.clipboardData?.items ?? []);
+    const imageItems = items.filter(i => i.type.startsWith('image/'));
+    if (!imageItems.length) return;
+    e.preventDefault();
+    await Promise.all(imageItems.map(async (item, idx) => {
+      const file = item.getAsFile();
+      if (!file) return;
+      const name = file.name && file.name !== 'image.png' ? file.name : `pasted-image-${images.length + idx + 1}.png`;
+      const dataUrl = await readAsDataURL(file);
+      images = [...images, { dataUrl, name, size: file.size }];
+    }));
+  }
+
   function pickFile() {
     fileInputEl?.click();
   }
@@ -230,11 +268,12 @@
   }
 
   function send(){
-    if (!input.trim() && !attachments.length) return;
+    if (!input.trim() && !attachments.length && !images.length) return;
     if (activeCitations !== null) { activeCitations = []; trackLatestCitations = true; }
-    sendMessage(input, attachments);
+    sendMessage(input, attachments, images);
     input = '';
     attachments = [];
+    images = [];
   }
 
   function onKey(e: KeyboardEvent) {
@@ -300,6 +339,15 @@
               <div class="relative group max-w-[95%]">
                 <!-- Bubble -->
                 {#if m.role === 'user'}
+                  {#if m.images?.length}
+                    <div class="message-images">
+                      {#each m.images as src}
+                        <a href={src} target="_blank" rel="noopener noreferrer">
+                          <img {src} alt="attached image" class="message-image-thumb" />
+                        </a>
+                      {/each}
+                    </div>
+                  {/if}
                   {#if m.attachments?.length}
                     <div class="message-attachments">
                       {#each m.attachments as a}
@@ -394,8 +442,14 @@
       {/if}
 
       <div class="textarea-wrapper">
-        {#if attachments.length || parsing}
+        {#if attachments.length || images.length || parsing}
           <div class="attachment-chips">
+            {#each images as img}
+              <span class="attachment-chip image-chip-compose">
+                <img src={img.dataUrl} alt={img.name} class="compose-thumb" />
+                <button class="chip-remove" on:click={() => removeImage(img.name)} aria-label="Remove {img.name}">×</button>
+              </span>
+            {/each}
             {#each attachments as a}
               <span class="attachment-chip">
                 <Paperclip />{a.name}
@@ -411,17 +465,18 @@
         <textarea
           bind:value={input}
           class="min-h-30 w-full resize-none rounded-3xl px-3 py-2 focus:ring-black"
-          style="padding-left: 3rem;{(attachments.length || parsing) ? ' padding-top: 2.25rem;' : ''}"
+          style="padding-left: 3rem;{(attachments.length || images.length || parsing) ? ' padding-top: 2.25rem;' : ''}"
           placeholder="Ask me anything…"
           rows="2"
           on:keydown={onKey}
+          on:paste={onPaste}
         ></textarea>
       </div>
 
       <input
         bind:this={fileInputEl}
         type="file"
-        accept=".docx,.pdf,.xlsx"
+        accept=".docx,.pdf,.xlsx,.xlsm,.json,.csv,.txt,.md,.markdown,.pptx,.jpg,.jpeg,.png,.gif,.webp"
         multiple
         style="display:none"
         on:change={onFileInput}
@@ -530,6 +585,40 @@
       line-height: var(--tw-leading, var(--text-sm--line-height) /* calc(1.25 / 0.875) ≈ 1.428571 */);
       color: var(--color-white);
       background-color: var(--color-blue-600);
+  }
+
+  .message-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+    justify-content: flex-end;
+  }
+
+  .message-image-thumb {
+    max-height: 120px;
+    max-width: 200px;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    cursor: pointer;
+    transition: opacity 0.12s;
+  }
+
+  .message-image-thumb:hover {
+    opacity: 0.85;
+  }
+
+  .image-chip-compose {
+    padding: 0.15rem 0.4rem 0.15rem 0.25rem;
+    gap: 0.3rem;
+  }
+
+  .compose-thumb {
+    height: 1.5rem;
+    width: 1.5rem;
+    border-radius: 0.25rem;
+    object-fit: cover;
+    flex-shrink: 0;
   }
 
   .message-attachments {

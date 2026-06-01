@@ -68,10 +68,12 @@ class Settings(BaseModel):
     services_to_start: list[str] = ["encDense", "encSparse", "generate", "chat", "search", "ingestion"]
 
     # --- urls ---
-    llm_url: str = "http://192.168.0.34:8000"
-    emb_url: str = "http://192.168.0.34:8000"
-    rrk_url: str = "http://192.168.0.34:8000"
-    db_url: str = "http://192.168.0.34:6333"
+    llm_url: str = "http://localhost:8000"
+    emb_url: str = llm_url
+    rrk_url: str = llm_url
+    db_url: str = "http://localhost:6333"
+    llm_api_key: str | None = None
+    db_api_key: str | None = None
 
     # --- models ---
     default_gen_model: str = "ministral-3:14b"
@@ -142,6 +144,8 @@ class Settings(BaseModel):
             emb_url=os.getenv("EMB_URL", llm_url),
             rrk_url=os.getenv("RRK_URL", llm_url),
             db_url=os.getenv("DB_URL", "http://localhost:6333"),
+            llm_api_key=os.getenv("LLM_API_KEY") or None,
+            db_api_key=os.getenv("DB_API_KEY") or None,
             default_gen_model=default_llm_model,
             default_emb_model=os.getenv("DEFAULT_EMB_MODEL", default_llm_model),
             default_rkk_model=os.getenv("DEFAULT_RKK_MODEL", default_llm_model),

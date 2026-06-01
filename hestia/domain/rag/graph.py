@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +11,7 @@ class ExecutionRequest(BaseModel):
     user: User
     exec_type: str
     history: Optional[List[Dict[str, Any]]] = None
-    last_user_message: Optional[str] = None
+    last_user_message: Optional[Union[str, List[Any]]] = None
     last_user_display_content: Optional[str] = None
     last_user_attachments: Optional[List[Dict[str, Any]]] = None
     prompt: Optional[str] = None

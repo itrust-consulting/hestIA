@@ -21,7 +21,7 @@ export async function GET({ url, cookies }) {
 
     cookies.set('oidc_state', state!, {
         httpOnly: true,
-        secure: true,
+        secure: url.protocol === 'https:',
         sameSite: 'lax',
         path: '/',
         maxAge: 60 * 5

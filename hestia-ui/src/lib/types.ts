@@ -26,18 +26,24 @@ export type Citation = {
   excerpt: string;
 };
 
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 export type Role = 'user' | 'assistant' | 'system';
 export type ChatMessage = {
   id: string;
   role: Role;
   content: string;
-  apiContent?: string;
+  apiContent?: string | ContentPart[];
+  images?: string[];
   attachments?: { name: string; size?: number; markdown?: string }[];
   citations?: Citation[];
   thinking?: string;
   createdAt: number;
 };
-export type ChatAPIMessages = Omit<ChatMessage, 'id' | 'createdAt'>[];
+export type APIMessage = { role: Role; content: string | ContentPart[] };
+export type ChatAPIMessages = APIMessage[];
 export type ChatResponse = { response: string };
 export type Conversation = { id: string; title: string; createdAt: number; updatedAt?: number; };
 

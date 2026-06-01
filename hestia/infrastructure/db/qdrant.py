@@ -15,8 +15,8 @@ class QdrantDB(DBProvider):
 
     UPSERT_BATCH = 64  # points per request — keeps payload size manageable
 
-    def __init__(self, http: str, timeout: float = 300.0):
-        self.client = QdrantClient(url=http, timeout=timeout)
+    def __init__(self, http: str, timeout: float = 300.0, api_key: str | None = None):
+        self.client = QdrantClient(url=http, timeout=timeout, api_key=api_key)
 
     def initialize(self, collection: str, config: Dict[str, Any]) -> None:
         if self.client.collection_exists(collection_name=collection):

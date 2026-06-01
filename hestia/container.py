@@ -36,6 +36,7 @@ def build_container(settings: Settings) -> Container:
             embed=settings.emb_url,
             rerank=settings.rrk_url,
             timeout=settings.request_timeout,
+            api_key=settings.llm_api_key,
         )
     elif settings.llm_backend == "ollama":
         llm = OllamaProvider(http=settings.llm_url, timeout=settings.request_timeout)
@@ -46,7 +47,7 @@ def build_container(settings: Settings) -> Container:
 
     # --- DB provider ---
     if settings.db_backend == "qdrant":
-        c.providers["db"] = QdrantDB(http=settings.db_url)
+        c.providers["db"] = QdrantDB(http=settings.db_url, api_key=settings.db_api_key)
     else:
         raise ConfigurationError(f"Unknown DB backend: '{settings.db_backend}'")
     _log.info("provider_init", extra={"provider": "db", "backend": settings.db_backend, "url": settings.db_url})

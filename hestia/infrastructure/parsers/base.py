@@ -99,8 +99,10 @@ class BaseParser(ABC):
                 f"File type '{file_type}' not supported by '{self.__class__.__name__}'. "
                 f"Supported: {', '.join(self._loader_map.keys())}"
             )
+        _log.debug("parse_start", extra={"parser": self.__class__.__name__, "file": str(file), "file_type": file_type})
         self.doc = self._loader_map[file_type](file)
         self.filepath = str(file)
+        _log.debug("parse_done", extra={"parser": self.__class__.__name__, "file": str(file)})
         return self.doc
 
     def normalize_key(self, k: str) -> str:
@@ -123,6 +125,7 @@ class BaseParser(ABC):
             out_dir.mkdir(parents=True, exist_ok=True)
             output_path = out_dir / f"{filename}.md"
 
+        _log.debug("dump_write", extra={"file": self.filepath, "output_path": str(output_path), "mask": mask_name})
         with open(output_path, "wb") as f:
             frontmatter.dump(post, f)
 
@@ -130,6 +133,7 @@ class BaseParser(ABC):
         mask_name = kwargs.get("mask_name", "internal_full")
         body = self.body or self.to_markdown()
         meta = self.meta or self.get_metadata(builtIn_only=builtIn_only, mask_name=mask_name)
+        _log.debug("dumps_post", extra={"file": self.filepath, "mask": mask_name, "meta_keys": list(meta.keys())})
         return frontmatter.Post(content=body, **meta)
 
     def close(self) -> None:
