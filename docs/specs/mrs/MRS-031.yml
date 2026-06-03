@@ -1,0 +1,20 @@
+acceptancecriteria: Filters applied correctly.
+active: true
+comments: |
+  Infrastructure is there to support it and is partially used under the hood, must only be properly exposed to the user
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Precision.
+ref: ''
+releasephase: beta
+requirement: The system shall support metadata-based filtering.
+reviewed: null
+status: In Progress
+text: ''
+type: F
+urgency: 4
+verification: T

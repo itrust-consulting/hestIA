@@ -12,7 +12,7 @@ COPY --from=builder /app/build build/
 COPY --from=builder /app/node_modules node_modules/
 COPY package.json .
 
-ENV PORT=7860
 ENV NODE_ENV=production
 EXPOSE 7860
+
 CMD [ "node", "build", "--host", "0.0.0.0"]

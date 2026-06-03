@@ -1,0 +1,19 @@
+acceptancecriteria: Unchanged units not reprocessed.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Efficiency.
+ref: ''
+releasephase: beta
+requirement: The system shall re-embed only modified units.
+reviewed: null
+status: Done?
+text: ''
+type: F
+urgency: 4
+verification: A

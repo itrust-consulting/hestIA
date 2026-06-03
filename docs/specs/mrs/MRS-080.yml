@@ -1,0 +1,20 @@
+acceptancecriteria: Misaligned classifications are flagged with rationale.
+active: true
+comments: Similar to above
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Similarity analysis
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall flag assets which classifications do not align with similar asset types.
+reviewed: null
+status: null
+text: ''
+type: F
+urgency: 4
+verification: T

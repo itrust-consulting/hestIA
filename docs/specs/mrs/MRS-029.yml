@@ -1,0 +1,19 @@
+acceptancecriteria: Free-text queries answered.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Primary user interaction.
+ref: ''
+releasephase: alpha
+requirement: The system shall support natural-language queries.
+reviewed: null
+status: Done
+text: ''
+type: F
+urgency: 5
+verification: T

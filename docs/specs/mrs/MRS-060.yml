@@ -1,0 +1,19 @@
+acceptancecriteria: Jobs run async.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Scalability.
+ref: ''
+releasephase: beta
+requirement: The system should support asynchronous processing.
+reviewed: null
+status: Out of scope
+text: ''
+type: O
+urgency: 3
+verification: T

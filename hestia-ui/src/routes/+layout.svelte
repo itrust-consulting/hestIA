@@ -9,9 +9,10 @@
   import HelpIcon from '$lib/components/icons/helpIcon.svelte';
   import MoonIcon from '$lib/components/icons/moonIcon.svelte';
   import SunIcon from '$lib/components/icons/sunIcon.svelte';
+  import HestiaIcon from '$lib/components/icons/hestiaIcon.svelte';
 
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { version } from '$app/environment';
   import { startInactivityWatcher, scheduleTokenExpiration } from '$lib/auth/session';
   import { clearIsmsState } from '$lib/stores/isms';
   import { page } from '$app/state';
@@ -118,7 +119,8 @@
 >
   <header class="app-header">
     <div class="app-header-left">
-      <h1><a href="/chat">hestIA</a></h1>
+      <a class="app-brand" href="/chat"><HestiaIcon /><h1>hestIA</h1>
+        <span class="app-version">{version}</span></a>
       {#if breadcrumbs.length > 0}
         <nav class="breadcrumbs" aria-label="Breadcrumb">
           {#each breadcrumbs as crumb, i}

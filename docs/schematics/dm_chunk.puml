@@ -1,0 +1,21 @@
+@startuml
+title Data Model - Chunk
+
+class Chunk {
+    metadata: dict
+    content: str
+    embeddings: dict[Embedding]
+    parent: Chunk
+    children: [Chunk]
+    tags: List[str]
+    summary: DerivedMeta
+    question: DerivedMeta
+}
+
+class Embedding {
+    name: str
+    type: [sparse, dense]
+    vector: Vector
+    to_dict()
+}
+@enduml

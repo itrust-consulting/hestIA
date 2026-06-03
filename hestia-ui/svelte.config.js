@@ -1,6 +1,6 @@
 import adapter from '@sveltejs/adapter-node';
 
-const version = 'v0.2.1'
+const version = 'v0.1'
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -19,10 +19,10 @@ const config = {
 				'base-uri': ['self'],
 			},
 		},
+		version: {
+			name: 'v0.2.1'
+		}
 	},
-	env: {
-		VERSION: version,
-	}
 };
 
 export default config;

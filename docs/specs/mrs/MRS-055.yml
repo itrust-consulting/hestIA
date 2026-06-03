@@ -1,0 +1,19 @@
+acceptancecriteria: Diff displayed.
+active: true
+comments: 'DocEngine: should move to beta'
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Review.
+ref: ''
+releasephase: beta
+requirement: The system shall provide diff view of changes.
+reviewed: null
+status: Out of scope
+text: ''
+type: F
+urgency: 4
+verification: T

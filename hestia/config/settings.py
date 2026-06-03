@@ -158,7 +158,7 @@ class Settings(BaseModel):
             udb_path=app_data / "users.db",
             corpus_dir=app_data / "corpus_dir",
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            log_dir=app_data.parent / (os.getenv("HESTIA_LOG_DIR") or "logs"),
+            log_dir=app_data.parent / (os.getenv("LOG_DIR") or "logs"),
             log_to_console=os.getenv("LOG_TO_CONSOLE", "true").lower() == "true",
         )
 

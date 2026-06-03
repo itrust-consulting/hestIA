@@ -8,8 +8,7 @@
     import Chaticon from './icons/chaticon.svelte';
     import BinIcon from './icons/binIcon.svelte';
     import BookIcon from './icons/bookIcon.svelte';
-
-    import { env } from '$env/dynamic/public';
+    import ItrustIcon from './icons/itrustIcon.svelte';
 
     import {
         conversations,
@@ -20,7 +19,6 @@
         deleteConversation as removeConversation
     } from '$lib/stores/conversations';
 
-    const currentVersion = env.PUBLIC_APP_VERSION;
 
     const { isAdmin = false }: { isAdmin?: boolean } = $props();
 
@@ -172,7 +170,11 @@
         {/each}
     </div>
     <div class="sidebar-footer">
-        <span class="version">{currentVersion}</span>
+        <span class="powered-by">Powered by</span>
+        <div class="logo-wrapper">
+            <ItrustIcon />
+        </div>
+
     </div>
 </aside>
 
@@ -406,13 +408,39 @@
     }
 
     .sidebar-footer {
-        margin-top: auto;                 
+        margin-top: auto;
         padding-top: 1rem;
         padding-bottom: .5rem;
         text-align: center;
         color: var(--color-neutral-500);
         font-size: var(--text-xs);
         user-select: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .2rem;
+    }
+
+    .powered-by {
+        font-size: 0.6rem;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: var(--color-neutral-400);
+    }
+
+    .logo-wrapper :global(svg) {
+        width: 5em;
+        filter: grayscale(1);
+        opacity: 0.55;
+        transition: opacity 150ms ease;
+    }
+
+    :global(.dark) .logo-wrapper :global(svg) {
+        filter: grayscale(1) invert(1);
+    }
+
+    .logo-wrapper:hover :global(svg) {
+        opacity: 0.85;
     }
 
     .sidebar-closed .sidebar-header {

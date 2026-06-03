@@ -1,0 +1,19 @@
+acceptancecriteria: Logs present.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Audit.
+ref: ''
+releasephase: beta
+requirement: The system shall log access and modifications.
+reviewed: null
+status: In Progress
+text: ''
+type: S
+urgency: 4
+verification: R

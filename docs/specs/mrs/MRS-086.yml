@@ -1,0 +1,20 @@
+acceptancecriteria: Visualizations are interactive and respond to user input.
+active: true
+comments: Graphs, charts, dependency visualizations
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Visualization
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall provide dynamic and interactive data visualizations.
+reviewed: null
+status: null
+text: ''
+type: F
+urgency: 5
+verification: T

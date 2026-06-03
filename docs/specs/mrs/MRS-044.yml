@@ -1,0 +1,19 @@
+acceptancecriteria: Styles unchanged.
+active: true
+comments: 'DocEngine: should move to beta'
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Document integrity.
+ref: ''
+releasephase: alpha
+requirement: The system shall preserve styles during edits.
+reviewed: null
+status: Out of scope
+text: ''
+type: F
+urgency: 5
+verification: I

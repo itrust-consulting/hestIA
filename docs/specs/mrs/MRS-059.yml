@@ -1,0 +1,19 @@
+acceptancecriteria: Job status visible.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Operational visibility.
+ref: ''
+releasephase: alpha
+requirement: The system shall provide job status tracking.
+reviewed: null
+status: Out of scope
+text: ''
+type: O
+urgency: 4
+verification: I

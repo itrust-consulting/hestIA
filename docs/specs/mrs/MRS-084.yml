@@ -1,0 +1,19 @@
+acceptancecriteria: Derived queries align with the user’s intended question.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Natural language queries.
+ref: ''
+releasephase: beta
+requirement: The system shall accept user queries in natural language.
+reviewed: null
+status: Done
+text: ''
+type: F
+urgency: 5
+verification: A

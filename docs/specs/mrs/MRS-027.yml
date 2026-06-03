@@ -1,0 +1,19 @@
+acceptancecriteria: Hybrid search returns results.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Accuracy.
+ref: ''
+releasephase: beta
+requirement: The system should support hybrid retrieval.
+reviewed: null
+status: Done
+text: ''
+type: F
+urgency: 4
+verification: T

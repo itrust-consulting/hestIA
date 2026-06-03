@@ -1,0 +1,19 @@
+acceptancecriteria: Exact matches found.
+active: true
+comments: Redundant, except when considered in DocEdit env
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Baseline search.
+ref: ''
+releasephase: alpha
+requirement: The system shall support exact-text search.
+reviewed: null
+status: Out of scope
+text: ''
+type: F
+urgency: 4
+verification: T

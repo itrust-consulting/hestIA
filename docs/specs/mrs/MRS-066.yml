@@ -1,0 +1,19 @@
+acceptancecriteria: Retention enforced.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Compliance.
+ref: ''
+releasephase: beta
+requirement: The system should support data retention policies.
+reviewed: null
+status: null
+text: ''
+type: S
+urgency: 3
+verification: R

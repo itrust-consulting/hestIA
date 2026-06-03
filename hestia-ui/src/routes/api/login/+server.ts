@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { jwtDecode } from 'jwt-decode';
-import { redirect } from '@sveltejs/kit';
 
 const API_URL = env.PRIVATE_MICROSERVICE_URL || 'http://localhost:5555'
 const LOGIN_API = API_URL + '/login'

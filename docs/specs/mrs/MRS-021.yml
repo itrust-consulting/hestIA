@@ -1,0 +1,19 @@
+acceptancecriteria: Graph representation exists.
+active: true
+comments: Planned
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Advanced analysis.
+ref: ''
+releasephase: beta
+requirement: The system may generate a document structural graph.
+reviewed: null
+status: null
+text: ''
+type: F
+urgency: 2
+verification: A

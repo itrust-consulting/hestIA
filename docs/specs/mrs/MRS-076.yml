@@ -1,0 +1,20 @@
+acceptancecriteria: Imported data is correctly mapped to the internal schema.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: 'Standardised taxonomy. '
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall map incoming fields to a normalized internal schema.
+reviewed: null
+status: null
+text: ''
+type: F
+urgency: 5
+verification: T

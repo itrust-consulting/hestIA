@@ -1,0 +1,20 @@
+acceptancecriteria: Multiple models configurable.
+active: true
+comments: |
+  Multiple embedding models may be served but since it is required to use same embedding for retrieval it is fixed to one model
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Flexibility.
+ref: ''
+releasephase: beta
+requirement: The system may support multiple embedding models.
+reviewed: null
+status: Reject
+text: ''
+type: F
+urgency: 2
+verification: R

@@ -1,0 +1,19 @@
+acceptancecriteria: Users can edit metadata.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Improves classification.
+ref: ''
+releasephase: beta
+requirement: The system may allow manual metadata enrichment.
+reviewed: null
+status: null
+text: ''
+type: F
+urgency: 2
+verification: I

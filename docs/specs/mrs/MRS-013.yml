@@ -1,0 +1,20 @@
+acceptancecriteria: Metadata visible and queryable.
+active: true
+comments: |
+  Metadata is queryable and visible in db. Not displayed in web frontend though
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Improves retrieval and governance.
+ref: ''
+releasephase: alpha
+requirement: The system shall extract and store document metadata.
+reviewed: null
+status: In Progress
+text: ''
+type: F
+urgency: 4
+verification: I

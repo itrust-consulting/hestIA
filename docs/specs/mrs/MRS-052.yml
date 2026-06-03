@@ -1,0 +1,19 @@
+acceptancecriteria: Content extracted.
+active: true
+comments: Don't understand
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Automation.
+ref: ''
+releasephase: alpha
+requirement: The system shall support semantic content extraction.
+reviewed: null
+status: Out of scope
+text: ''
+type: F
+urgency: 4
+verification: T

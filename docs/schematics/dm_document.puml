@@ -1,0 +1,73 @@
+@startuml
+
+title Data Model - Document
+
+class Document{
+    - title
+    - subtitle
+    - reference
+    - version
+    - author
+    - classification: public, restricted, confidential, secret
+    - source
+    + container[Paragraph, Table, Image]
+    - __iter__()
+    - get_formatted_text()
+    - build_paragraphs()
+}
+
+class Paragraph {
+    title: str
+    lvl: int
+}
+class Table {}
+class Image {}
+
+class TRow {}
+class TCell {}
+
+class List {}
+class Item {
+    lvl: int
+}
+class Text {
+    value: str
+}
+class Hyperlink {}
+class Math {}
+
+class Footnote {}
+
+Document *-- Paragraph
+Document *-- Table
+Document *-- Image
+
+Table *-- TRow
+TRow *-- TCell
+TCell o-- Para
+
+Table o-- Footnote
+Table o-- Caption
+
+Image o-- Caption
+
+Para <|-- Caption
+Para <|-- Footnote
+
+Paragraph *-- Para
+Paragraph o-- Footnote
+
+Para *-- Text
+Paragraph o-- List
+Para <|-- MathPara
+
+MathPara *-- Math
+
+List *-- Item
+Para <|-- Item
+
+Text o-- Math
+Text o-- Hyperlink
+
+
+@enduml

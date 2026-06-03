@@ -1,0 +1,20 @@
+acceptancecriteria: Folder ingestion processes all files.
+active: true
+comments: |
+  Batch ingestion possible, though currently only supported for files in a single directory. No sophisticated logic implemented yet
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Operational efficiency.
+ref: ''
+releasephase: alpha
+requirement: The system shall support batch ingestion from directories.
+reviewed: null
+status: In Progress
+text: ''
+type: F
+urgency: 4
+verification: T

@@ -1,0 +1,19 @@
+acceptancecriteria: K8s patterns used.
+active: true
+comments: Don't know what this means
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Cloud-native.
+ref: ''
+releasephase: beta
+requirement: The system may support Kubernetes-native patterns.
+reviewed: null
+status: null
+text: ''
+type: O
+urgency: 2
+verification: R

@@ -1,0 +1,19 @@
+acceptancecriteria: Metrics accessible.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Monitoring.
+ref: ''
+releasephase: beta
+requirement: The system shall expose performance metrics.
+reviewed: null
+status: null
+text: ''
+type: P
+urgency: 3
+verification: I

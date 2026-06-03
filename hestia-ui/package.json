@@ -55,6 +55,7 @@
 	"dependencies": {
 		"@humanspeak/svelte-virtual-list": "^0.4.3",
 		"dompurify": "^3.4.5",
+		"dotenv": "^17.4.2",
 		"highlight.js": "^11.11.1",
 		"jwt-decode": "^4.0.0",
 		"katex": "^0.16.38",

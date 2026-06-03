@@ -1,0 +1,20 @@
+acceptancecriteria: Templates filled.
+active: true
+comments: |
+  Template in the sense of document templates to populate, e.g., any ISMS policies?
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Efficiency.
+ref: ''
+releasephase: alpha
+requirement: The system shall support automated template population.
+reviewed: null
+status: Out of scope
+text: ''
+type: F
+urgency: 4
+verification: T

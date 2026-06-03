@@ -82,9 +82,36 @@ html.dark {
     height: var(--header-height);
 }
 
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.app-brand svg {
+  color: var(--color-black);
+  filter: drop-shadow(0 1px 8px color-mix(in oklab, var(--color-orange-400) 15%, transparent));
+  transition: filter 150ms ease, transform 150ms ease;
+}
+
+.app-brand:hover svg {
+  filter: drop-shadow(0 2px 8px color-mix(in oklab, var(--color-orange-400) 35%, transparent));
+  transform: scale(1.08);
+}
+
 .app-header h1 {
     font-size: var(--text-xl);
     font-weight: 600;
+}
+
+.app-version {
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: var(--color-neutral-400);
+    align-self: flex-end;
+    margin-bottom: .15rem;
 }
 
 .app-header-left {

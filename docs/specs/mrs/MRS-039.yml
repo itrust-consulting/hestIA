@@ -1,0 +1,19 @@
+acceptancecriteria: Multiple backends configurable.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Flexibility.
+ref: ''
+releasephase: beta
+requirement: The system should support multiple LLM backends.
+reviewed: null
+status: Done
+text: ''
+type: F
+urgency: 3
+verification: R

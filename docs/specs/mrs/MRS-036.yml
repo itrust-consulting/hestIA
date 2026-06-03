@@ -1,0 +1,19 @@
+acceptancecriteria: Local LLM responds.
+active: true
+comments: null
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: On-prem requirement.
+ref: ''
+releasephase: alpha
+requirement: The system shall support locally hosted LLM inference.
+reviewed: null
+status: Done
+text: ''
+type: F
+urgency: 5
+verification: T
