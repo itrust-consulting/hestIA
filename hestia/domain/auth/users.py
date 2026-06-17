@@ -81,6 +81,7 @@ class UserService:
 
     # ---- permissions ----
 
+    # @MRS-003
     def compute_user_permissions(self, user_id: uuid.UUID) -> Permissions:
         # Check admin
         admin_role = self.repo.get_role_by_name("admin")
@@ -324,6 +325,7 @@ class UserService:
                 raise ValidationError("Tenant already has a moderator.")
         self.repo.set_member_tenant_role(user_id=user_id, org_id=org_id, role=role)
 
+    # @MRS-004
     def get_tenant_collection_info(self, org_id: int) -> dict:
         rows = self.repo.get_tenant_collections(org_id)
         owned = []

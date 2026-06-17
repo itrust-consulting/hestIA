@@ -1,0 +1,19 @@
+acceptancecriteria: Preview visible.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: User trust.
+ref: ''
+releasephase: beta
+requirement: The system should support preview of changes.
+reviewed: zUcE8Pz-oAOFWEs5RiBEXD3VU8IRQwpN9jTBsl0IEhw=
+text: ''
+type: F
+urgency: 4
+verification: T

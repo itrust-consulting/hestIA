@@ -1,0 +1,48 @@
+@startuml FAD — Document Ingestion Workflow
+!theme plain
+skinparam ActivityBorderColor #444444
+skinparam ActivityBackgroundColor #F5F5F5
+skinparam ActivityFontSize 12
+skinparam ArrowColor #444444
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #CCBB55
+
+start
+
+:Moderator submits ingestion request\n(file, collection, classification level, tenants);
+
+:FC-01 authenticates request (FC-02);
+
+:FC-03 validates moderator authority\n(role check + active collection grant);
+
+if (Authorised?) then (No)
+  :Reject — 403 Forbidden;
+  stop
+else (Yes)
+endif
+
+note right
+  Optionally preview document first
+  via FC-11 Document Preview — inspect
+  extracted metadata and content
+  before committing
+end note
+
+:User supplies or confirms metadata overrides\n(title, subject, classification, source URI);
+
+:FC-06 parses document\n(text + structure + metadata extraction);
+
+:FC-06 segments content into chunks\n(section boundaries + navigation links);
+
+:FC-06 encodes each chunk\n(dense semantic vector + sparse keyword vector);
+
+:FC-06 stores encoded chunks in Vector Database\n(vectors + metadata + classification attributes);
+
+:System reports ingestion result\n(chunk count, elapsed time);
+
+:FC-18 records audit entry;
+
+:Content immediately available\nfor retrieval by authorised users;
+
+stop
+@enduml

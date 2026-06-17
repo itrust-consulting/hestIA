@@ -11,8 +11,9 @@ from hestia.handler import RequestHandler
 router = APIRouter()
 
 
+# @MRS-029, @MRS-084
 @router.post("/chat")
-def chat(
+async def chat(
     req: ChatRequest,
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
@@ -39,5 +40,5 @@ def chat(
     )
 
     if req.stream:
-        return StreamingResponse(h.resolve(exec_req, stream=True), media_type="application/json")
-    return Response(h.resolve(exec_req), media_type="application/json")
+        return StreamingResponse(await h.resolve(exec_req, stream=True), media_type="application/json")
+    return Response(await h.resolve(exec_req), media_type="application/json")

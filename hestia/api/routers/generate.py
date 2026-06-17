@@ -11,8 +11,9 @@ from hestia.handler import RequestHandler
 router = APIRouter()
 
 
+# @MRS-084
 @router.post("/generate")
-def generate(
+async def generate(
     req: GenerateRequest,
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
@@ -29,5 +30,5 @@ def generate(
     )
 
     if req.stream:
-        return StreamingResponse(h.resolve(exec_req, stream=True), media_type="application/json")
-    return Response(h.resolve(exec_req), media_type="application/json")
+        return StreamingResponse(await h.resolve(exec_req, stream=True), media_type="application/json")
+    return Response(await h.resolve(exec_req), media_type="application/json")

@@ -1,0 +1,22 @@
+acceptancecriteria: |
+  Reachable from external network via VPN without application-level configuration changes.
+active: true
+comments: |
+  VPN termination is a deployment infrastructure responsibility, not an application-level feature. This requirement documents the deployment constraint.
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Secure remote access without public exposure.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall be accessible remotely over a secure VPN connection without requiring outbound connectivity at the application level.
+reviewed: 3ekMfg-xhtHfkxGonbUWKzSOg0eoamJYFLfya2o_5dY=
+text: ''
+type: O
+urgency: 3
+verification: R

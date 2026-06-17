@@ -1,0 +1,19 @@
+acceptancecriteria: Diff displayed.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Review.
+ref: ''
+releasephase: beta
+requirement: The system shall provide diff view of changes.
+reviewed: oh--QJGyl6eXZ_p3FhBBVb2nCWnAHJeRdM52kdk6yUI=
+text: ''
+type: F
+urgency: 4
+verification: T

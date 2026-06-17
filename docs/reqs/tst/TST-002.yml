@@ -1,0 +1,44 @@
+active: true
+derived: false
+header: |
+  Verify that hestIA deploys successfully from Docker Compose with no manual dependency setup
+level: 2.0
+links:
+- SRS-002: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Docker Engine + Docker Compose)
+authors: ACR
+execution_type: Manual
+complexity: 2
+test_data: Valid .env configuration file with all required environment variables (LLM_URL, DB_URL, AUTH_SECRET_KEY, services_to_start)
+verification_method: T
+references:
+  - path: ''
+    type: ''
+expected_outcome: Both containers start cleanly; health and readiness checks pass; login page loads.
+text: |
+  ## Preconditions and setup actions
+  - Docker Engine and Docker Compose are installed on the target host
+  - The repository is cloned locally
+  - The .env file is populated with valid values for all required variables
+  - The LLM inference server and Qdrant instance are reachable at the configured URLs
+  - No hestIA containers are currently running
+
+  ## Test steps
+  1. From the repository root, run `docker compose up`.
+  2. Wait for both the backend (port 5555) and frontend (port 7860) containers to become healthy.
+  3. Call GET /health on the backend and confirm a successful response.
+  4. Call GET /ready on the backend and confirm all configured services appear as active.
+  5. Open a browser, navigate to port 7860, and confirm the login page loads.
+
+  ## Expected outcome
+  1. Both containers start without errors or restart loops.
+  2. GET /health returns a successful response.
+  3. GET /ready confirms all activated services are operational.
+  4. The frontend login page is reachable at port 7860 with no additional configuration.
+  5. All dependent requirements pass their respective tests within the same network-blocked environment.
+

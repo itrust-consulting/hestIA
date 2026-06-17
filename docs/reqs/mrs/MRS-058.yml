@@ -1,0 +1,21 @@
+acceptancecriteria: Pipeline executes all nodes in order with error capture.
+active: true
+comments: |
+  Foundational capability underpinning the RAG workflow and the interactive archiving pipeline (MRS-102).
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Pipeline orchestration foundation.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall orchestrate multi-step processing pipelines as directed acyclic graphs of typed nodes with inter-node data flow, per-step status tracking, and error handling.
+reviewed: nEcSKmUmhvUvwvSMhYIFYKhh8w19EFBtT3y_NGnRoww=
+text: ''
+type: O
+urgency: 4
+verification: T

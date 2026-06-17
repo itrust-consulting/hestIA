@@ -1,0 +1,19 @@
+acceptancecriteria: Metadata visible and queryable.
+active: true
+comments: ''
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Improves retrieval and governance.
+ref: ''
+releasephase: alpha
+requirement: The system shall extract and store document metadata.
+reviewed: oC71-zlrKcfSLqCcE6JDm0L58sZ4qUvKkV9aXK84JxA=
+text: ''
+type: F
+urgency: 4
+verification: I

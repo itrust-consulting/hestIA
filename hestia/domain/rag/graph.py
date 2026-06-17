@@ -34,6 +34,7 @@ class Node(BaseModel):
     model: Optional[str] = None
 
 
+# @MRS-058
 class ExecutionGraph(BaseModel):
     nodes: List[Node]
     edges: List[Tuple[str, str]] = Field(default_factory=list)

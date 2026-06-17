@@ -1,0 +1,24 @@
+acceptancecriteria: |
+  Inferred metadata presented for review and committed only after explicit user approval.
+active: true
+comments: |
+  Distinct from programmatic metadata extraction (MRS-013), which reads embedded document properties. This requirement covers LLM-driven semantic inference from document body content.
+coverage: 25
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Reduced manual filing effort with HITL accuracy assurance.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall infer semantic metadata from document content using an LLM based
+  on a pre-defined terminology, and present the inferred metadata to the user for
+  validation before committing.
+reviewed: jhcBYuUV0paIX0plIOweed0yyuSixPwiVz-lfKJQxr8=
+text: ''
+type: F
+urgency: 5
+verification: T

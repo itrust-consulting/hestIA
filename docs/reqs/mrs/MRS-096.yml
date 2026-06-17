@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Stored asset records contain no organization-identifying attributes.
+active: true
+comments: |
+  Applies to multi-entity aggregation scenarios. GDPR basis and pseudonymization method to be defined in the data protection assessment.
+coverage: 25
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: GDPR and NIS2 data minimization compliance.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall anonymize or pseudonymize all asset data received from external
+  contributing entities prior to storage in the central database.
+reviewed: l3CRxXAcKSE7MG3wx2HHp7W1A92SlQd4TI5Ai4tKF1U=
+text: ''
+type: S
+urgency: 4
+verification: R

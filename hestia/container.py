@@ -25,7 +25,13 @@ class Container:
     providers: Dict[str, Any] = field(default_factory=dict)
     services: Dict[str, Any] = field(default_factory=dict)
 
+    async def aclose(self) -> None:
+        llm = self.providers.get("llm")
+        if llm and hasattr(llm, "aclose"):
+            await llm.aclose()
 
+
+# @MRS-001, @MRS-039
 def build_container(settings: Settings) -> Container:
     c = Container(settings=settings)
 

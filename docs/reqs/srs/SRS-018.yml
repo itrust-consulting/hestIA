@@ -1,0 +1,38 @@
+active: true
+dependence: []
+derived: false
+difficulty: 3
+header: ''
+importance: 5
+level: 6.0
+links:
+- MRS-087: olv9LUH5ErW4Eami2xUP--YkvRQwo27MEpK6S7nPLls=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: _oX4lcPrpzTzkjIm4lJYQzdTvXJ77wDqu9lYhlfD1Vg=
+risk: 3
+status: implemented
+text: |
+  # Multilingual Operation (English, French, German)
+
+  As a user,
+  I want to submit queries in English, French, or German and receive responses in the same language,
+  so that all team members can use hestIA in their preferred working language regardless of the corpus document language.
+
+  1. Submit a query in French and verify the response is in French.
+  2. Repeat for English and German queries.
+  3. Verify that retrieval returns relevant results even when the query language differs from the document language.
+
+  ### Rationale
+  Luxembourgish organizations operate in a multilingual environment (English, French, German). All team members must be able to use hestIA in their language without degradation in retrieval or generation quality.
+
+  ### Acceptance criteria
+  - A French-language query returns a French-language response.
+  - A German-language query returns a German-language response.
+  - An English-language query returns an English-language response.
+  - Retrieval quality is not significantly degraded when the query language differs from the primary language of the ingested documents.
+type: F
+urgency: 5
+version: '0.1'

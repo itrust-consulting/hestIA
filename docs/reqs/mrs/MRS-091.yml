@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Improvement recommendations generated for each identified gap, each grounded in at least one cited source passage.
+active: true
+comments: |
+  Standard references are valid sources only when the relevant standards documents have been ingested into the corpus, making them retrieved content per MRS-038.
+coverage: 0
+derived: false
+header: ''
+importance: 2
+level: 1.0
+links: []
+normative: true
+rationale: Proactive ISMS improvement support.
+ref: ''
+releasephase: beta
+requirement: |
+  The system may, for documentation gaps identified in a control coverage evaluation,
+  generate improvement recommendations grounded in retrieved source passages.
+reviewed: abtfcKRAwqSkQP3_84eNJoLLUrmdPyTollC6QQodrpE=
+text: ''
+type: F
+urgency: 2
+verification: T

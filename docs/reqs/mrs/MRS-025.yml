@@ -1,0 +1,19 @@
+acceptancecriteria: Metadata filters work.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Filtered retrieval.
+ref: ''
+releasephase: alpha
+requirement: The system shall associate embeddings with metadata.
+reviewed: xrcbmjjPKrvjmWtWr57Rx1D2wzDHWx1OHwEsF8rtBw4=
+text: ''
+type: F
+urgency: 5
+verification: I

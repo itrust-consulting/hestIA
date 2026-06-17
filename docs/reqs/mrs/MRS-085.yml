@@ -1,0 +1,19 @@
+acceptancecriteria: Query syntax is accepted and executed.
+active: true
+comments: SQL-like, filtering DSL, PowerQuery-style
+coverage: 75
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Query interface.
+ref: ''
+releasephase: beta
+requirement: The system shall accept user queries in common query syntax.
+reviewed: sxgHXkDyYeAIQAAgD85xjQVlX_mrGtfE_rkeK0lP9qo=
+text: ''
+type: F
+urgency: 5
+verification: T

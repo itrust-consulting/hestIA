@@ -254,6 +254,7 @@
     uploadDone = true;
   }
 
+  // @MRS-102
   async function triggerParse() {
     if (!uploadFile) return;
     parsing         = true;
@@ -322,6 +323,7 @@
     });
   }
 
+  // @MRS-102
   function handleUpload() {
     if (!uploadFile) return;
     _enqueue(batchIndex);

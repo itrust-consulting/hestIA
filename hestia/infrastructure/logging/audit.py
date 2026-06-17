@@ -5,6 +5,7 @@ import logging
 _log = logging.getLogger("hestia.audit")
 
 
+# @MRS-064, @MRS-068
 class AuditLogger:
     """
     Typed facade over the hestia.audit logger.

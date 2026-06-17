@@ -1,0 +1,21 @@
+acceptancecriteria: |
+  Retrieval and generation quality verified in English, French, and German.
+active: true
+comments: ''
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Multilingual operating environment.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall process user input and produce responses in English, French, and German.
+reviewed: olv9LUH5ErW4Eami2xUP--YkvRQwo27MEpK6S7nPLls=
+text: ''
+type: F
+urgency: 5
+verification: T

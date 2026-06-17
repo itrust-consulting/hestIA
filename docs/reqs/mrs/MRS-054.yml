@@ -1,0 +1,19 @@
+acceptancecriteria: Rewrites grounded.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Safety.
+ref: ''
+releasephase: beta
+requirement: The system shall support constrained rewriting.
+reviewed: caOMg4b5a9iCe_OafPoyybrZh81jkK4jVbDR_DeYbC0=
+text: ''
+type: F
+urgency: 4
+verification: A

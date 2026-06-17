@@ -1,0 +1,21 @@
+acceptancecriteria: Sections, paragraphs, tables identified.
+active: true
+comments: |
+  Chunking currently into sections with no differention between text and tables. A modal parser is in development
+coverage: 75
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Enables high-quality RAG.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall parse documents into structurally meaningful units.
+reviewed: a8w4c0TF95qUTYX-dcYHR-2hTIFknxes_nKDPlUVVOI=
+text: ''
+type: F
+urgency: 5
+verification: A

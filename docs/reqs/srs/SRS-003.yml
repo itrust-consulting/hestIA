@@ -1,0 +1,37 @@
+active: true
+dependence: []
+derived: false
+difficulty: 1
+header: ''
+importance: 4
+level: 1.2
+links:
+- MRS-089: 3ekMfg-xhtHfkxGonbUWKzSOg0eoamJYFLfya2o_5dY=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: iGsd3ArBQCuorqSQ8S9CkrBbr_LTp1pZDsoT6HEyxc8=
+risk: 2
+status: implemented
+text: |
+  # Remote Access over VPN
+
+  As a remote user,
+  I want to access the hestIA web interface over an organizational VPN connection,
+  so that I can work from outside the office without the system being exposed to the public internet.
+
+  1. Connect to the organizational VPN using the provided client.
+  2. Navigate to the hestIA frontend URL in a browser.
+  3. Authenticate and use the chat and document interfaces normally.
+
+  ### Rationale
+  Users frequently work from remote locations. VPN-based access provides secure remote connectivity without requiring hestIA to be publicly reachable, consistent with the on-premises deployment model of MRS-001.
+
+  ### Acceptance criteria
+  - The hestIA web interface is accessible from a remote host connected to the organizational VPN.
+  - No changes to the hestIA application configuration are required to enable remote access over VPN.
+  - The system is not directly reachable from outside the internal network without a VPN connection.
+type: O
+urgency: 3
+version: '0.1'

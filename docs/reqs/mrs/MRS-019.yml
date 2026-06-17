@@ -1,0 +1,22 @@
+acceptancecriteria: Chunk size and rules configurable.
+active: true
+comments: "Currently only SectionSplitter is used to chunk documents into its sections.\\\
+  n\nOthers were tested but deemed inappropriate for the use case. A multimodal splitter\n\
+  (paragraph, tables, images) is planned to be implemented and with that configuration\
+  \ \nto be exposed.\n"
+coverage: 50
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Adaptability.
+ref: ''
+releasephase: alpha
+requirement: The system shall support configurable chunking strategies.
+reviewed: KGTTEgSkKWFj-sHPniBZ_WIWl2kED34jySi8qILo2Xk=
+text: ''
+type: F
+urgency: 4
+verification: A

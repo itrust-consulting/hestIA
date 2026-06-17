@@ -1,0 +1,44 @@
+active: true
+dependence: []
+derived: false
+difficulty: 4
+header: ''
+importance: 5
+level: 4.0
+links:
+- MRS-022: jF4OvgwnAydWvR4scqHBS7VGgUyXeIFBZP1xGvLNAGg=
+- MRS-024: phFh3faYRq0LERXKlKAteyb7q9wvsw7M0XmvQXgKB1s=
+- MRS-025: xrcbmjjPKrvjmWtWr57Rx1D2wzDHWx1OHwEsF8rtBw4=
+- MRS-028: UU9Z3xk-lKhodCb6uY0n-68uqJxP1nJGlm3n0x3C2Gw=
+- MRS-039: sPqQm5xsRQdLUySnXAqZPWKD3gtsMN7mESukheta3Ks=
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: S09tGvuHzlNL1biT4mv50zXT3xY7pRh7ysbQuXQxFuQ=
+risk: 4
+status: partial
+text: |
+  # Locally Hosted AI Inference with Configurable Backends
+
+  As a system administrator,
+  I want all AI inference to use locally hosted models and to be able to switch between LLM backends and embedding models without code changes,
+  so that no organizational data leaves the network and the system can be adapted to new or fine-tuned models as they become available.
+
+  1. Configure the LLM backend (e.g., vLLM or Ollama) and the embedding model via environment settings or UI.
+  2. Ingest documents and submit queries; verify that all inference is served by the locally configured models.
+  3. Switch to a different backend or model configuration without modifying application source code and verify the system continues to function correctly.
+  4. Confirm via network monitoring that no inference requests reach external hosts.
+
+  ### Rationale
+  On-premises inference is a data sovereignty requirement (MRS-001). Backend and model configurability without code changes allows the system to evolve with new or domain-specific models while maintaining operational continuity.
+
+  ### Acceptance criteria
+  - Document ingestion and query processing complete successfully with all outbound internet routes blocked.
+  - No requests to external hosts are observable during embedding generation or text generation.
+  - The LLM backend can be switched between supported providers without modifying application source code.
+  - The embedding model can be selected via configuration; a change takes effect after a system restart without code changes.
+  - Document embeddings are stored in the knowledge base alongside classification metadata to support access-controlled retrieval.
+type: F
+urgency: 5
+version: '0.1'

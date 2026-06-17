@@ -1,0 +1,19 @@
+acceptancecriteria: Exact matches found.
+active: true
+comments: Search in currently opened document.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Baseline search.
+ref: ''
+releasephase: beta
+requirement: The system shall support exact-text search.
+reviewed: c1_Nj6G-ew_sQ2-IJZCjHZPjfZ4yyQ470-EP3w6FHhU=
+text: ''
+type: F
+urgency: 4
+verification: T

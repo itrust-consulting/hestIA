@@ -1,0 +1,19 @@
+acceptancecriteria: Section/table queries work.
+active: true
+comments: Infrastructure partially there
+coverage: 50
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Advanced users.
+ref: ''
+releasephase: beta
+requirement: The system should support structured queries.
+reviewed: iI6IpW_IGDPlUlGCVJWCzW-8T_EqgjX8RUb_60nqHRY=
+text: ''
+type: F
+urgency: 3
+verification: T

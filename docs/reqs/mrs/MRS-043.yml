@@ -1,0 +1,19 @@
+acceptancecriteria: Tables updated.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Structured data.
+ref: ''
+releasephase: beta
+requirement: The system shall support table creation and modification.
+reviewed: jEKVNiYQFdTj-hq_qplxPrY-mSTdf5p3JNubn4qUAUY=
+text: ''
+type: F
+urgency: 4
+verification: T

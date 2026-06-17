@@ -1,0 +1,21 @@
+acceptancecriteria: Document not filed without prior user approval.
+active: true
+comments: |
+  This is the HITL gate in the interactive archiving pipeline (MRS-102). It applies to metadata approval before filing, not to general document edits.
+coverage: 70
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Human-in-the-loop accuracy and compliance.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall require explicit user approval before committing inferred metadata and filing a document in the archiving pipeline.
+reviewed: PSG7evLNtWNfutRD5t6N0VxlqX-3OHg2-8x03G2eWLY=
+text: ''
+type: F
+urgency: 5
+verification: T

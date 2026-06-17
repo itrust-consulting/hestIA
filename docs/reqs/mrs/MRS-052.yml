@@ -1,0 +1,19 @@
+acceptancecriteria: Content extracted.
+active: true
+comments: Rejected - MRS-049 already covers this.
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Automation.
+ref: ''
+releasephase: beta
+requirement: The system shall support semantic content extraction.
+reviewed: 7Rir5pl7SXDs7xnu0n7z5GRipT1YKB1yE3z_Ghl62sc=
+text: ''
+type: F
+urgency: 4
+verification: T

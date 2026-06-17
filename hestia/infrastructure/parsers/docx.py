@@ -22,6 +22,7 @@ except ModuleNotFoundError:
 _log = logging.getLogger("hestia.system")
 
 
+# @MRS-006
 class DOCXParser(BaseParser):
 
     NAMESPACES = {
@@ -195,6 +196,7 @@ class DOCXParser(BaseParser):
             rows.append(row_cells)
         return rows
 
+    # @MRS-017
     def table_to_markdown(self, table: Table) -> str:
         rows = self.extract_table_text(table)
         md_rows = ["| " + " | ".join(r) + " |" for r in rows]
@@ -223,6 +225,7 @@ class DOCXParser(BaseParser):
                     metadata[self.normalize_key(name)] = self.clean_string(val_elem.text)
         return metadata
 
+    # @MRS-013
     def get_metadata(self, builtIn_only: bool = True, mask_name: str | None = None) -> dict:
         stem = Path(self.filepath).stem
         builtin = self.get_builtin_metadata(self.filepath)
@@ -232,6 +235,7 @@ class DOCXParser(BaseParser):
         self.meta = metadata
         return metadata
 
+    # @MRS-015
     def to_markdown(self) -> str:
         lines = []
         for block in self.doc.iter_inner_content():

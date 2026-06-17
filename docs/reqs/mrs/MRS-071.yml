@@ -1,0 +1,19 @@
+acceptancecriteria: Docker and Kubernetes deployments succeed.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Portability.
+ref: ''
+releasephase: alpha
+requirement: The system shall support deployment via containers.
+reviewed: kXTBvFBBdReDvKboWwMydNW8bK8Ldxr07TUfs9iV2zM=
+text: ''
+type: O
+urgency: 4
+verification: T

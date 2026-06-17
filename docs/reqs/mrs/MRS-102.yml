@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Pipeline completes all stages; validation rejection re-enters inference with corrections applied.
+active: true
+comments: |
+  This is the core archiving workflow integrating MRS-099 (inference), MRS-056 (HITL approval), MRS-100 (filing), and MRS-101 (archival copy).
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: |
+  Primary archiving capability integrating LLM inference, human oversight, and automated filing.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall provide an interactive archiving pipeline that sequences document ingestion, LLM metadata inference, user validation, metadata commit, and rule-based filing, exposing job status and supporting rejection and correction at the validation step.
+reviewed: K-PCtT78FcWARdpfxy9zZnVzxqgn0GlBawxkAg_Y-Lg=
+text: ''
+type: F
+urgency: 5
+verification: T

@@ -1,0 +1,20 @@
+acceptancecriteria: Identified gaps are appropriate and traceable.
+active: true
+comments: null
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Compliance assessment.
+ref: ''
+releasephase: beta
+requirement: |
+  The system should assess compliance gaps for selected requirements.
+reviewed: 41dtYrCsSBf37z_aoSxRhF_dqtUN9O-Fj77QZofByxs=
+text: ''
+type: F
+urgency: 3
+verification: A

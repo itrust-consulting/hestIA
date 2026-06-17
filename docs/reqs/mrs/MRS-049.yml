@@ -1,0 +1,19 @@
+acceptancecriteria: Semantic matches found.
+active: true
+comments: Search in currently opened document
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Advanced retrieval.
+ref: ''
+releasephase: beta
+requirement: The system shall support semantic search within documents.
+reviewed: SsoX10JFid4OIeBIdcRK7w3yRTVx2T6ouP7QAyNxI80=
+text: ''
+type: F
+urgency: 4
+verification: T

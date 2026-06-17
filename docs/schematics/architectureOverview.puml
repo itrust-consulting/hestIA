@@ -1,0 +1,104 @@
+@startuml hestIA Architecture Overview
+!theme plain
+skinparam defaultTextAlignment center
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam padding 6
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #555555
+}
+
+skinparam rectangle {
+  BackgroundColor #FAFAFA
+  BorderColor #6B7280
+  RoundCorner 8
+}
+
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #6B7280
+  FontSize 11
+  RoundCorner 6
+}
+
+skinparam database {
+  BackgroundColor #FFFBEB
+  BorderColor #B45309
+  FontSize 11
+}
+
+skinparam node {
+  BackgroundColor #EFF6FF
+  BorderColor #1D4ED8
+  FontSize 11
+}
+
+
+' ── Client ──────────────────────────────────────────────────
+actor "User" as USR
+
+rectangle "Client" as CLIENT {
+  component "Web UI" as UI
+}
+
+' ── hestIA Platform ─────────────────────────────────────────
+rectangle "hestIA" as PLATFORM {
+
+  rectangle "Gateway" as GW #E8EDFF {
+    component "API Layer" as API
+    component "Request Handler" as RH
+    
+  }
+
+  rectangle "Core Logic" as CORE #E8EDFF {
+    component "Orchestrator" as WF
+    component "Ingestion Pipeline" as ING
+    component "DocEngine" as DOC
+    component "Parsers" as DP
+  }
+
+  component "Agents/Tools" as AT
+}
+
+' ── Infrastructure ──────────────────────────────────────────
+rectangle "Infrastructure  (self-hosted)" as INFRA {
+  node "LLM Server" as LLM
+  database "Vector Database" as VDB
+
+}
+
+rectangle "Access management" as AM {
+    node "Identity Provider" as IDP
+    database "User Store" as UDB
+}
+
+' ── Connections ─────────────────────────────────────────────
+USR --> UI
+UI <--> API
+
+API <-down-> RH
+RH <-down-> WF
+RH -down-> ING
+RH <-down-> DOC
+
+WF <-down-> LLM
+WF <-down-> VDB
+WF <-up-> AT
+
+DOC <-down-> DP
+ING <-left-> DP
+ING -right-> VDB
+ING -right-> LLM
+
+DOC -right-> WF
+
+GW -right-> AM 
+
+
+WF -[hidden]down-> ING
+VDB -[hidden]right-> LLM
+
+@enduml

@@ -1,0 +1,22 @@
+acceptancecriteria: |
+  Each defined CyFORT integration point has a specified data exchange format, direction, and protocol documented and verified at integration level.
+active: true
+comments: |
+  Integration points to be detailed per component as the respective CyFORT components reach sufficient maturity. IDPS-ESCAPE and SATRAP-DL feeds are partially addressed by MRS-094.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: CyFORT ecosystem integration per objective O1.2.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall provide integration interfaces for CyFORT components, including IDPS-ESCAPE and SATRAP-DL for threat intelligence ingestion, CS-GRAM for regulatory standards, and C5-DEC for SSDLC artefact alignment, each defining data exchange format, direction, and protocol.
+reviewed: 3M8cvxWOwdTAuiZtApMss71aOOn50AdMmm94Gd6btpI=
+text: ''
+type: F
+urgency: 3
+verification: T

@@ -1,0 +1,19 @@
+acceptancecriteria: Styles unchanged.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Document integrity.
+ref: ''
+releasephase: beta
+requirement: The system shall preserve styles during edits.
+reviewed: KG7ak9bxNjrZx6CAgAmK-qIbjxfRlR_Hr_6N0RdexaA=
+text: ''
+type: F
+urgency: 5
+verification: I

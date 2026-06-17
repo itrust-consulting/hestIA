@@ -1,0 +1,19 @@
+acceptancecriteria: Vector DB operational.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Performance and scalability.
+ref: ''
+releasephase: alpha
+requirement: The system shall store embeddings in a vector-capable database.
+reviewed: phFh3faYRq0LERXKlKAteyb7q9wvsw7M0XmvQXgKB1s=
+text: ''
+type: F
+urgency: 5
+verification: I

@@ -76,6 +76,7 @@ def _get_parser_direct(file_path: Path, itrust_template: bool):
     raise ConfigurationError(f"No parser registered for '{ext}'")
 
 
+# @MRS-014, @MRS-099
 @router.post("/parse")
 async def parse_document(
     file: UploadFile = File(...),
@@ -109,6 +110,7 @@ async def parse_document(
         Path(tmp_path).unlink(missing_ok=True)
 
 
+# @MRS-010, @MRS-060, @MRS-102
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),

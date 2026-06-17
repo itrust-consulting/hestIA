@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import math
@@ -9,7 +10,7 @@ import threading
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Literal, Optional, Union, overload
+from typing import Any, AsyncIterator, Dict, Iterator, List, Literal, Optional, Union, overload
 
 import Stemmer
 
@@ -30,37 +31,46 @@ class Generator:
         self.default_model = model
 
     @overload
-    def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[False] = False) -> str: ...
+    async def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[False] = False) -> str: ...
     @overload
-    def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[True]) -> Iterator[str]: ...
+    async def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[True]) -> AsyncIterator[Dict[str, str]]: ...
 
-    def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: bool = False):
+    async def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: bool = False):
         _m = model or self.default_model
         _log.debug("generator_generate", extra={"model": _m, "prompt_len": len(prompt), "stream": stream})
-        return self.provider.generate(prompt, model=_m, options=options, stream=stream)
+        return await self.provider.generate(prompt, model=_m, options=options, stream=stream)
 
     @overload
-    def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[False] = False) -> str: ...
+    async def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[False] = False) -> str: ...
     @overload
-    def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[True]) -> Iterator[str]: ...
+    async def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[True]) -> AsyncIterator[Dict[str, str]]: ...
 
-    def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: bool = False):
+    async def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: bool = False):
         _m = model or self.default_model
         _log.debug("generator_chat", extra={"model": _m, "n_messages": len(messages), "stream": stream})
-        return self.provider.chat(messages, model=_m, options=options, stream=stream)
+        return await self.provider.chat(messages, model=_m, options=options, stream=stream)
 
 
+# @MRS-030
 class DenseEncoder:
 
     def __init__(self, provider: LLMProvider, model: str = ""):
         self.provider = provider
         self.default_model = model
+        self._vector_dim: int | None = None
 
-    def encode(self, inputs: str | List[str], model: str | None = None, options: Optional[Dict[str, Any]] = None) -> DenseVector:
+    @property
+    def vector_dim(self) -> int:
+        if self._vector_dim is None:
+            vecs = self.encode_batch(["probe"])
+            self._vector_dim = len(vecs[0].vector)
+        return self._vector_dim
+
+    async def encode(self, inputs: str | List[str], model: str | None = None, options: Optional[Dict[str, Any]] = None) -> DenseVector:
         inputs = [inputs] if isinstance(inputs, str) else inputs
         _m = model or self.default_model
         _log.debug("dense_encode", extra={"model": _m, "n_inputs": len(inputs)})
-        resp = self.provider.embed(inputs, model=_m, options=options)
+        resp = await self.provider.embed(inputs, model=_m, options=options)
         vec = DenseVector(vector=resp[0])
         _log.debug("dense_encode_done", extra={"model": _m, "vector_dim": len(vec.vector)})
         return vec
@@ -68,7 +78,7 @@ class DenseEncoder:
     def encode_batch(self, inputs: List[str], model: str | None = None, options: Optional[Dict[str, Any]] = None) -> List[DenseVector]:
         _m = model or self.default_model
         _log.debug("dense_encode_batch", extra={"model": _m, "n_inputs": len(inputs)})
-        resp = self.provider.embed(inputs, model=_m, options=options)
+        resp = self.provider.embed_blocking(inputs, model=_m, options=options)
         vecs = [DenseVector(vector=emb) for emb in resp]
         _log.debug("dense_encode_batch_done", extra={"model": _m, "n_vectors": len(vecs), "vector_dim": len(vecs[0].vector) if vecs else 0})
         return vecs
@@ -340,6 +350,7 @@ class SparseEncoder:
         _log.debug("sparse_encode_done", extra={"corpus": corpus_name, "nnz": len(vec.indices)})
         return vec
 
+    # @MRS-087
     def encode_documents(self, texts: List[str], corpus_name: str,
                          source_uri: str = "", language: str = "english") -> List[SparseVector]:
         """Index-time: extend corpus, return BM25 TF-IDF vectors, update cache.
@@ -393,9 +404,10 @@ class Retriever:
     def __init__(self, provider: DBProvider):
         self.provider = provider
 
-    def retrieve(self, collection: str, query: Query, options: Dict[str, Any] = None):
+    # @MRS-030
+    async def retrieve(self, collection: str, query: Query, options: Dict[str, Any] = None):
         _log.debug("retriever_query", extra={"collection": collection, "query_type": type(query).__name__})
-        result = self.provider.search(collection, query, options=options)
+        result = await asyncio.to_thread(self.provider.search, collection, query, options=options)
         n_hits = len(result.points) if hasattr(result, "points") else 0
         _log.debug("retriever_done", extra={"collection": collection, "n_hits": n_hits})
         return result

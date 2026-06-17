@@ -1,0 +1,20 @@
+acceptancecriteria: Unchanged units not reprocessed.
+active: true
+comments: |
+  Rejected — depends on deterministic change detection (MRS-011), which is also rejected. Corpus updates are manual; per-document re-ingestion covers this case without automated change tracking.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Efficiency.
+ref: ''
+releasephase: beta
+requirement: The system shall re-embed only modified units.
+reviewed: MnYBzvDs_CdO2p_qAc4IU-zevOdzGgJTi70Gn_2ET64=
+text: ''
+type: F
+urgency: 4
+verification: A

@@ -1,0 +1,40 @@
+active: true
+derived: false
+header: |
+  Verify that hestIA is accessible over VPN and unreachable without it
+level: 3.0
+links:
+- SRS-003: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 3
+test_data: VPN client configured for the organizational VPN; remote test host located outside the local network
+verification_method: T
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: hestIA is unreachable without VPN and fully functional once connected; no application changes required.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and running
+  - VPN infrastructure is configured and accessible from an external network
+  - A remote test host is available outside the local network
+  - Valid user credentials are available for login
+
+  ## Test steps
+  1. From the remote host without VPN active, attempt to access the hestIA frontend URL. Note the result.
+  2. Connect the remote host to the organizational VPN.
+  3. Navigate to the hestIA frontend URL.
+  4. Confirm the login page loads.
+  5. Log in with valid credentials and confirm all features are accessible.
+
+  ## Expected outcome
+  1. hestIA is not reachable from outside the network without an active VPN connection.
+  2. After connecting to the VPN, the hestIA web interface loads and all features are accessible.
+  3. No changes to hestIA application configuration are required between steps 1 and 5.

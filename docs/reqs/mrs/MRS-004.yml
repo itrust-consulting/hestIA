@@ -1,0 +1,20 @@
+acceptancecriteria: Data is isolated per project or tenant.
+active: true
+comments: 'Collection only accessible with proper permissions (per tenant). '
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Supports organizational separation.
+ref: ''
+releasephase: beta
+requirement: |
+  The system should support multi-project or multi-tenant logical isolation.
+reviewed: eURsYlBUBfsHytp_0lHcrd6uaMlKfcJNvj2mTCGkmoM=
+text: ''
+type: F
+urgency: 3
+verification: A

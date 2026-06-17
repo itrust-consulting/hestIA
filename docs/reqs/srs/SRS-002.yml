@@ -1,0 +1,34 @@
+active: true
+dependence:
+- MRS-001
+derived: false
+difficulty: 2
+header: ''
+importance: 4
+level: 1.1
+links:
+- MRS-071: kXTBvFBBdReDvKboWwMydNW8bK8Ldxr07TUfs9iV2zM=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: LoyYUjAaPokzM9kkk4V0JrCAogB5AmCrBmdUjimlfQ4=
+risk: 2
+status: implemented
+text: |
+  # Container-Based Deployment
+
+  As a system administrator,
+  I want to deploy hestIA using a container-based deployment (e.g., Docker or Kubernetes),
+  so that deployment is reproducible across compatible on-premises hosts without manual dependency management.
+
+  ### Rationale
+  Container-based deployment reduces host dependency risk, enables consistent environment configuration across deployments,
+  and supports the on-premises portability requirement of MRS-001.
+
+  ### Acceptance criteria
+  - hestIA deployable using Docker or Kubernetes
+  - all core functionality works with no error (see MRS-001)
+type: O
+urgency: 4
+version: '0.1'

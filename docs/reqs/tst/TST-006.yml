@@ -1,0 +1,39 @@
+active: true
+derived: false
+header: |
+  Verify all core features are accessible through the web interface
+level: 6.0
+links:
+- SRS-006: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 1
+test_data: Valid standard user credentials; moderator credentials; admin credentials; at least one collection with ingested content
+verification_method: I
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: All core hestIA features are accessible through the browser without direct API interaction.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is fully deployed and all dependent SRS requirements (SRS-004 through SRS-018) are satisfied
+  - User, moderator, and admin accounts are available
+  - At least one collection with ingested documents exists
+
+  ## Test steps
+  1. Open a browser and navigate to hestIA's frontend URL (e.g. http://localhost:7860).
+  2. Log in as a standard user. Navigate to the chat interface, select a collection, and submit a query.
+  3. Log out, log in as a moderator, and navigate to the document upload interface. Confirm upload is accessible.
+  4. Log out, log in as admin, and navigate to the admin panel. Confirm user and organization management are accessible.
+  5. Navigate to the help section and confirm content is displayed.
+
+  ## Expected outcome
+  1. All core features (chat, document upload, admin, help) are accessible through the browser.
+  2. Each feature behaves according to the role of the logged-in user.
+  3. No direct API calls are needed to use any core feature.

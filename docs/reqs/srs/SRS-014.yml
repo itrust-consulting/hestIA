@@ -1,0 +1,39 @@
+active: true
+dependence: []
+derived: false
+difficulty: 4
+header: ''
+importance: 5
+level: 5.0
+links:
+- MRS-029: G6EmoBdK12yaoT6RtqoILbwpDQg8jL6FfqBA7IURxNw=
+- MRS-030: FhEsTjH1iFZ6dZGq8PBjmnLIGHAVeXDJpi18_uNcjKY=
+- MRS-038: bOf0PrSG54pUuMcYIxC0ol-FHoaUbGXwYBbaZOk4H7o=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: PRvQzFEwRKyS_KacIYryYktIxKMWFi0f9bwlhUNG6Kc=
+risk: 3
+status: implemented
+text: |
+  # RAG-Based Natural Language Query
+
+  As an analyst,
+  I want to ask questions in natural language and receive answers grounded exclusively in the ingested document corpus,
+  so that I can find accurate, verifiable information from organizational documents without manually searching through them.
+
+  1. Select a knowledge base collection and enter a question in natural language.
+  2. The system retrieves the most relevant passages from the collection and generates an answer using only that content.
+  3. Review the response and the accompanying source citations.
+
+  ### Rationale
+  Natural-language querying over organizational documents is the primary user-facing capability of hestIA. Restricting generation strictly to retrieved content prevents hallucination and ensures all answers are grounded in verified source material.
+
+  ### Acceptance criteria
+  - A question whose answer exists in the corpus returns a relevant, non-empty answer with at least one source citation.
+  - A question with no relevant content in the corpus produces a response that explicitly acknowledges the information is unavailable rather than fabricating an answer.
+  - The system does not generate answers from general model knowledge when querying a collection; all factual claims are traceable to retrieved passages.
+type: F
+urgency: 5
+version: '0.1'

@@ -64,7 +64,7 @@
   position: sticky;
   top: var(--header-height);
   height: calc(100vh - var(--header-height));
-  width: 260px;
+  width: var(--sidebar-width);
   flex-shrink: 0;
   overflow-y: auto;
   border-right: 1px solid var(--color-neutral-200);

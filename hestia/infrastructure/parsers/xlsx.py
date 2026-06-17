@@ -22,6 +22,7 @@ _NAMESPACES = {
 }
 
 
+# @MRS-075
 class XLSXParser(BaseParser):
 
     def __init__(self, file=None, selected_sheets: list[str] | None = None):
@@ -114,6 +115,7 @@ class XLSXParser(BaseParser):
         _log.debug("xlsx_to_markdown", extra={"file": self.filepath, "n_sheets": len(sheets)})
         return md
 
+    # @MRS-017
     def to_markdown_sheets(self) -> Dict[str, str]:
         if self.doc is None:
             raise ValidationError("Empty document. Parse a file first.")

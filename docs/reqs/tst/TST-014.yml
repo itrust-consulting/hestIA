@@ -1,0 +1,46 @@
+active: true
+derived: false
+header: |
+  Verify natural language, filtered, and structured queries against the knowledge base
+level: 14.0
+links:
+- SRS-014: null
+normative: true
+ref: ''
+reviewed: null
+release: beta
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 3
+test_data: |
+  A collection with at least 10 ingested documents including varied metadata (author, classification, document type);
+  a set of test questions with known answers in the corpus;
+  at least one out-of-scope question (answer not in corpus);
+  analyst credentials
+verification_method: T
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: Grounded answers with citations; no fabrication for out-of-scope queries; metadata filters and structured syntax work; templates persist.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and running with all core services active
+  - A test collection contains known documents with varied metadata (at least 3 distinct authors, 2 classification levels, 2 document types)
+  - An analyst user account is available
+  - The test question set and expected answers are documented in advance
+
+  ## Test steps
+  1. Submit a natural-language question whose answer exists in the corpus. Verify the response is grounded and includes at least one citation.
+  2. Submit an out-of-scope question (no relevant content in corpus). Verify the system acknowledges the information is unavailable without fabricating an answer.
+  3. Apply a metadata filter (e.g. restrict to documents by a specific author). Submit a query and verify only documents matching that filter appear in citations.
+  4. Submit a structured query targeting a specific document type or attribute. Verify results are scoped accordingly.
+  5. Save the structured query from step 4 as a template. Log out, log back in, and verify the template is available for reuse.
+
+  ## Expected outcome
+  1. In-corpus questions return grounded answers with citations traceable to specific documents.
+  2. Out-of-scope questions produce an honest acknowledgement, not fabricated content.
+  3. Metadata filters correctly restrict the retrieval scope.
+  4. Structured query syntax returns filtered results aligned with the specified attributes.
+  5. Saved query templates persist across sessions and can be reused.

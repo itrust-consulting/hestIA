@@ -55,6 +55,7 @@ class LDAPSettings(BaseModel):
 # Root settings object
 # ---------------------------------------------------------------------------
 
+# @MRS-005
 class Settings(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 

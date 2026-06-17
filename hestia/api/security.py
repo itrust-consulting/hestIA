@@ -14,6 +14,7 @@ from hestia.domain.auth.models import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 
+# @MRS-003
 def assert_admin(user: User) -> None:
     if not user.permissions.is_admin:
         raise HTTPException(403, "Admin access required.")
@@ -74,6 +75,7 @@ def create_access_token(
     return jwt.encode(payload, key, algorithm=algorithm)
 
 
+# @MRS-062
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     c: Container = Depends(get_container),

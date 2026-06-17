@@ -1,0 +1,41 @@
+active: true
+dependence: []
+derived: false
+difficulty: 3
+header: ''
+importance: 5
+level: 2.1
+links:
+- MRS-003: vCv0JUWyUyhA8O5vlIlPe9Yqsaf3HCEtLCjJsBrlpVU=
+- MRS-063: 905dT8aZvun481a2Z3oVcttFNp7svK5RQCSNVhYrT9k=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: xwTYgbFGRmlw6GsFZSj1aCs7x_tWQDq_WDjnibUKat8=
+risk: 5
+status: implemented
+text: |
+  # Role-Based Authorization and Document Classification
+
+  As a system administrator,
+  I want to assign system roles and per-organization classification levels to users,
+  so that each user's access to collections and sensitive document content is enforced according to their authorization level.
+
+  1. Create a user account and assign it a system role (administrator or standard user).
+  2. Add the user to an organization and assign a document classification clearance level.
+  3. Grant the organization access to a knowledge base collection.
+  4. Log in as the user and verify that access is restricted according to the assigned role and clearance.
+
+  ### Rationale
+  Multi-user enterprise deployments require that access to sensitive documents is gated by both organizational membership and individual information classification clearance, preventing unauthorized data exposure.
+
+  ### Acceptance criteria
+  - A standard user cannot access administrative functions reserved for administrators.
+  - A user's queries return only document content at or below their assigned classification clearance level.
+  - A moderator of one organization cannot manage other organizations.
+  - An administrator has unrestricted access to all collections and classification levels.
+  - Each organization may have at most one moderator.
+type: S
+urgency: 5
+version: '0.1'

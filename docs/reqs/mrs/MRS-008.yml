@@ -1,0 +1,20 @@
+acceptancecriteria: OCR text is searchable.
+active: true
+comments: |
+  tesserect OCR is used as fallback, but not activated in current deployment.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Supports legacy documents.
+ref: ''
+releasephase: beta
+requirement: The system should ingest scanned PDF documents using OCR.
+reviewed: ljfsjimgcfm3V0507mZw7ZAzPbL_sNwnOpu05h7rxkk=
+text: ''
+type: F
+urgency: 3
+verification: T

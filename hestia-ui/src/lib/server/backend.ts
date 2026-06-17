@@ -16,6 +16,20 @@ export function backendFetch(
   });
 }
 
+export async function proxyBinaryResponse(upstream: Response): Promise<Response> {
+  if (!upstream.ok) {
+    const body = await upstream.text();
+    return new Response(body, {
+      status: upstream.status,
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream' }
+  });
+}
+
 export async function proxyResponse(upstream: Response): Promise<Response> {
   const body = await upstream.text();
   if (upstream.status >= 500) {

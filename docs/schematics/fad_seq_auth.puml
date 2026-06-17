@@ -1,0 +1,43 @@
+@startuml FAD — Authentication Flow
+!theme plain
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign left
+skinparam maxMessageSize 180
+
+actor "User" as USR
+participant "FC-01\nAPI Gateway" as API
+participant "FC-02\nAuthentication" as AUTH
+database "User Store" as UDB
+participant "FC-03\nAccess Policy" as POL
+participant "FC-18\nLogging & Audit" as LOG
+
+== Token Issuance ==
+
+USR -> API : present credentials
+API -> AUTH : validate credentials
+
+AUTH -> UDB : load account state
+UDB --> AUTH : account record
+
+AUTH -> AUTH : verify credentials
+
+alt Invalid credentials or expired account
+  AUTH -> LOG : audit(login_failed)
+  AUTH --> API : failure
+  API --> USR : 401 Unauthorized
+else Valid credentials
+  AUTH -> LOG : audit(login_success)
+  AUTH --> API : JWT token + must_change_pw flag
+  API --> USR : JWT token
+end
+
+== Token Validation (every subsequent request) ==
+
+USR -> API : request + Bearer JWT
+API -> AUTH : validate token\n(signature + expiry)
+AUTH -> UDB : load user profile\n(roles + memberships + grants)
+UDB --> AUTH : full user record + permissions
+AUTH --> API : validated identity + permissions
+API -> POL : check(identity, resource, operation)
+POL --> API : ALLOW / FILTER / DENY
+@enduml

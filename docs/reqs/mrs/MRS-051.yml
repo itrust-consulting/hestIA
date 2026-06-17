@@ -1,0 +1,21 @@
+acceptancecriteria: Differences detected.
+active: true
+comments: "System allows importing multiple documents for the LLM to compare but will\
+  \ results in\ninconsistent results. For this requirement to be fulfilled a programmatic\
+  \ comparison \nis to be implemented.\n"
+coverage: 30
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Analysis.
+ref: ''
+releasephase: beta
+requirement: The system should support cross-document comparison.
+reviewed: zIddFPMJ0I4WrN17gSrmCQ4Kgpn4DK4Id-tAZ0sU1RQ=
+text: ''
+type: F
+urgency: 3
+verification: A

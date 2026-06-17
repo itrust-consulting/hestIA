@@ -14,6 +14,7 @@ _log = logging.getLogger("hestia.system")
 _META_KEYS = {"title", "description", "author", "version", "lang", "source", "subject", "tags"}
 
 
+# @MRS-075
 class JSONParser(BaseParser):
 
     def __init__(self, file=None):

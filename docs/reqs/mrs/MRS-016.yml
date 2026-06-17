@@ -1,0 +1,20 @@
+acceptancecriteria: Hierarchy reconstructed correctly.
+active: true
+comments: |
+  Document chunks stored with next and previous chunk ids to reconstruct documents iteratively.
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Context preservation.
+ref: ''
+releasephase: alpha
+requirement: The system shall preserve document hierarchy.
+reviewed: n8JlDohxxUQbah232WCbV3DOMtzwEfN_U0W2Y0q5fKI=
+text: ''
+type: F
+urgency: 5
+verification: A

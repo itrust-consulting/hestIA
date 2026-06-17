@@ -10,14 +10,14 @@ router = APIRouter()
 
 
 @router.post("/encode", response_model=EncodeResponse)
-def encode(
+async def encode(
     req: EncodeRequest,
     c: Container = Depends(get_container),
     _user: User = Depends(get_current_user),
 ):
     if req.type == "dense":
         encoder = c.services["encDense"]
-        vec = encoder.encode(req.input, model=req.model, options=req.options)
+        vec = await encoder.encode(req.input, model=req.model, options=req.options)
         return EncodeResponse(type="dense", vector=vec.vector, model=req.model or encoder.default_model,
                               meta={"count": len(vec.vector)})
 

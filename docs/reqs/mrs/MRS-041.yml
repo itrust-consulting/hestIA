@@ -1,0 +1,20 @@
+acceptancecriteria: DOCX edited successfully.
+active: true
+comments: "System should parse docx and work on the respective markdown document internally.\
+  \ \nExport to docx upon save.\n"
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Automation core.
+ref: ''
+releasephase: beta
+requirement: The system shall support programmatic DOCX modification.
+reviewed: z5ti3-qkrWu-6dMoXHyxVlLNGRTuFr97Vukhot5W4Es=
+text: ''
+type: F
+urgency: 5
+verification: T

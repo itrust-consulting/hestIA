@@ -1,0 +1,24 @@
+acceptancecriteria: |
+  Incoming asset data normalized against the registry; non-conforming records rejected or flagged.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Consistent multi-entity aggregation and NIS2 alignment.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall maintain a terminology and ontology registry for the asset
+  management domain, defining asset types, NIS2-required attributes, and dependency
+  relationships, and shall normalize incoming asset data against this registry at
+  ingestion time.
+reviewed: mB_M4qIcZEiaBWlWN4ZQ-qItLdkKRtAVvd_R-t79-zM=
+text: ''
+type: F
+urgency: 3
+verification: R

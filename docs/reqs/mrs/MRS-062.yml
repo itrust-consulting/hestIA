@@ -1,0 +1,19 @@
+acceptancecriteria: Unauthenticated access denied.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Security baseline.
+ref: ''
+releasephase: alpha
+requirement: The system shall enforce authentication.
+reviewed: 9e0HD_l8rPdnAcRf4fsU5-60GAL19-bsFOR6mxSYikQ=
+text: ''
+type: S
+urgency: 5
+verification: I

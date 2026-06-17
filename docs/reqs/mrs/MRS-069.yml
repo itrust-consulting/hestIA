@@ -1,0 +1,19 @@
+acceptancecriteria: Evaluation metrics exist.
+active: true
+comments: null
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Quality assurance.
+ref: ''
+releasephase: stable
+requirement: The system should support retrieval quality evaluation.
+reviewed: NKAd0ayGMl-TXC_u19OEx9Y2GNm7cmmwhF4rhHUj8K4=
+text: ''
+type: P
+urgency: 3
+verification: A

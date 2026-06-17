@@ -1,0 +1,21 @@
+acceptancecriteria: |
+  Risk classification, technical documentation, oversight logging, and transparency disclosure all present and verified.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: EU AI Act compliance obligation.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall comply with applicable EU AI Act obligations covering risk classification, technical documentation, human-oversight logging, and user transparency disclosures.
+reviewed: aHr6rDXio2OPD82SS5uzJtPkF4erVlvtzInk3pxpyCk=
+text: ''
+type: C
+urgency: 4
+verification: R

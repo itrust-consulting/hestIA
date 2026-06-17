@@ -1,0 +1,22 @@
+acceptancecriteria: |
+  Stable operation confirmed under 5 simultaneous user sessions within the response-time threshold.
+active: true
+comments: |
+  Quantitative response-time threshold to be established during T1.4 stress testing and recorded as an acceptance criterion update.
+coverage: 75
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Multi-analyst concurrent use.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall support at least 5 concurrent user sessions without significant degradation in response time.
+reviewed: xlWNuNKxRZA_6XDhYyQAHau67-hPQNq86G1ywd33Tq8=
+text: ''
+type: NF
+urgency: 4
+verification: T

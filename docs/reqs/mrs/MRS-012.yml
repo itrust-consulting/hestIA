@@ -1,0 +1,20 @@
+acceptancecriteria: Previous versions are accessible.
+active: false
+comments: |
+  Rejected - I consider this outside of the scope of the system since it is not responsible for doc mgmt.
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Audit and rollback.
+ref: ''
+releasephase: alpha
+requirement: The system shall maintain document version history.
+reviewed: null
+coverage: 0
+text: ''
+type: F
+urgency: 4
+verification: I

@@ -10,6 +10,7 @@ from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 router = APIRouter()
 
 
+# @MRS-034, @MRS-085
 @router.post("/search")
 def search(
     req: SearchRequest,

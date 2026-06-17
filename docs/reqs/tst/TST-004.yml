@@ -1,0 +1,40 @@
+active: true
+derived: false
+header: |
+  Verify that authentication gates access and sessions expire as configured
+level: 4.0
+links:
+- SRS-004: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 2
+test_data: Valid local user credentials; a set of intentionally wrong credentials (wrong password); AUTH_TOKEN_LIFETIME set to a known value
+verification_method: T
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: Unauthenticated and invalid access is denied; valid credentials grant access; sessions expire and require re-authentication.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and running with authentication enabled (ENABLE_AUTH=true)
+  - At least one local user account exists with known valid credentials
+  - Invalid credentials (wrong password for an existing user) are prepared
+  - AUTH_TOKEN_LIFETIME is set to a known value for expiry testing
+
+  ## Test steps
+  1. Attempt to access a protected resource (e.g. the chat interface) without logging in. Confirm access is denied.
+  2. Navigate to the login screen and enter the invalid credentials. Confirm a clear error is displayed and no session is established.
+  3. Enter the valid credentials and confirm a session is established and protected features are accessible.
+  4. Allow the session to expire (or manually invalidate the token) and attempt to use a protected feature. Confirm re-authentication is required.
+
+  ## Expected outcome
+  1. Unauthenticated access to any protected feature is denied with no data exposed.
+  2. Invalid credentials are rejected with a clear, non-revealing error message.
+  3. Valid credentials successfully establish a session and grant access to the system.
+  4. After session expiry the user is prompted to re-authenticate before accessing protected features.

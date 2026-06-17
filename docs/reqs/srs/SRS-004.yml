@@ -1,0 +1,37 @@
+active: true
+dependence: []
+derived: false
+difficulty: 3
+header: ''
+importance: 5
+level: 2.0
+links:
+- MRS-062: 9e0HD_l8rPdnAcRf4fsU5-60GAL19-bsFOR6mxSYikQ=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: jHbPA3bieoDWML5bmzyc4sbmyyYbSFUO4PSs6UB6GPE=
+risk: 5
+status: implemented
+text: |
+  # User Authentication
+
+  As a user,
+  I want to authenticate to hestIA using my username and password before accessing any functionality,
+  so that only authenticated personnel can interact with the system.
+
+  1. Navigate to the login screen and enter credentials (username and password).
+  2. On successful authentication, access the system's protected features.
+  3. After the session expires, re-authenticate to regain access.
+
+  ### Rationale
+  Authentication is the baseline security control ensuring that access to organizational documents and AI capabilities is restricted to identified, authorized users.
+
+  ### Acceptance criteria
+  - Access to any protected feature is denied without prior authentication.
+  - Valid credentials grant access to the system; invalid credentials are rejected with a clear error.
+  - Authenticated sessions expire after a configurable period; re-authentication is required after expiry.
+type: S
+urgency: 5
+version: '0.1'

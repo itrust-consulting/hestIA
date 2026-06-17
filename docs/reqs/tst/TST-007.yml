@@ -1,0 +1,41 @@
+active: true
+derived: false
+header: |
+  Verify the REST API is documented, consistently structured, and covers all core capabilities
+level: 7.0
+links:
+- SRS-007: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual/Automated
+complexity: 2
+test_data: Admin credentials; API client (curl, Postman, or equivalent); at least one collection with ingested content
+verification_method: I
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: API documentation available; all endpoints respond with consistent structure; errors are clearly described.
+text: |
+  ## Preconditions and setup actions
+  - hestIA backend is running on port 5555
+  - All services are active (confirmed via GET /ready)
+  - An admin account exists with known credentials
+  - An API client is available
+
+  ## Test steps
+  1. Call GET /openapi.json. Confirm an OpenAPI 3.x schema is returned listing all registered endpoints.
+  2. Open GET /docs in a browser and confirm the Swagger UI renders with all endpoint groups visible.
+  3. Authenticate via the API and confirm an access token is returned.
+  4. Use the token to call one endpoint from each major group (chat, upload, user management, collections). Confirm each responds with a consistently structured envelope.
+  5. Call an endpoint with a deliberately malformed request body. Confirm the error response includes a clear description of the validation failure.
+
+  ## Expected outcome
+  1. API documentation is available and describes all supported operations with their expected inputs and outputs.
+  2. All endpoint responses follow a consistent structure.
+  3. Error responses include a description of what went wrong.
+  4. All core capabilities from dependent SRS are accessible via the API.

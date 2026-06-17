@@ -1,0 +1,19 @@
+acceptancecriteria: Citations present.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Trust and audit.
+ref: ''
+releasephase: alpha
+requirement: The system shall return citations with document location.
+reviewed: kBtVpBCEhKkL0u1Eo5KUz6jyZyR57usHc33j97GzmUg=
+text: ''
+type: F
+urgency: 5
+verification: I

@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Query responses use only registry-defined attribute names and asset types.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Vocabulary consistency and downstream interoperability.
+ref: ''
+releasephase: beta
+requirement: |
+  The system should inject relevant ontology context from the registry into the LLM
+  prompt for asset management queries, constraining generated output to the
+  standardized asset vocabulary, attribute names, and dependency schema.
+reviewed: t2gGkcii7sF7z6mS5_C7KJwfMAF6xTj9aIAf1LNP-OU=
+text: ''
+type: F
+urgency: 2
+verification: T

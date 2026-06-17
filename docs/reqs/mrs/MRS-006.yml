@@ -1,0 +1,19 @@
+acceptancecriteria: DOCX files successfully ingested.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Primary enterprise format.
+ref: ''
+releasephase: alpha
+requirement: The system shall ingest DOCX documents.
+reviewed: gq47ab_dC3lyx2xemqUaK_KvHRh4fd-IMdp_n2sFREs=
+text: ''
+type: F
+urgency: 5
+verification: T

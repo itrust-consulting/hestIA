@@ -1,0 +1,20 @@
+acceptancecriteria: Parameters adjustable.
+active: true
+comments: "Is allowed but not exposed via web-interface since it requires differentiation\
+  \ \nbetween internal and external users.\n"
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Control.
+ref: ''
+releasephase: alpha
+requirement: The system shall allow configuration of generation parameters.
+reviewed: AfG6Zfk3FRpdrdP2JrLwCtSemQg6grFrPfNBnIDHxe8=
+text: ''
+type: F
+urgency: 4
+verification: I

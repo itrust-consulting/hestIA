@@ -1,0 +1,46 @@
+active: true
+dependence: []
+derived: false
+difficulty: 3
+header: ''
+importance: 5
+level: 3.0
+links:
+- MRS-006: gq47ab_dC3lyx2xemqUaK_KvHRh4fd-IMdp_n2sFREs=
+- MRS-007: HsQc5b69taVsJQsaEALuHFfRb7R_uyBFXKd156nFPjQ=
+- MRS-009: Glr7N7Q5076oWd7B0AJzvENW5DUpPvzPFIuiik5qZzE=
+- MRS-019: KGTTEgSkKWFj-sHPniBZ_WIWl2kED34jySi8qILo2Xk=
+- MRS-063: 905dT8aZvun481a2Z3oVcttFNp7svK5RQCSNVhYrT9k=
+- MRS-087: olv9LUH5ErW4Eami2xUP--YkvRQwo27MEpK6S7nPLls=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: Z0bDGQYkFPg_9xepLhA01CVmiHo0Fssxzfx2r2PtRDE=
+risk: 3
+status: implemented
+text: |
+  # Document Ingestion
+
+  As a moderator,
+  I want to upload documents to a named knowledge base,
+  so that the content of those documents becomes available for AI-assisted natural-language queries.
+
+  1. Upload documents in any of the supported file formats: DOCX, PDF, XLSX/XLSM, TXT, MD, CSV, JSON, PPTX.
+  2. Support upload of individual documents and batches (folder ingestion).
+  3. Optionally preview and edit parsed documents and extracted metadata before upload.
+  4. Configure the chunking strategy.
+  5. Set the document classification level.
+  6. Automatically identify the document language, or set it manually.
+
+  ### Rationale
+  Ingestion is the prerequisite for all RAG query functionality. Supporting multiple formats, batch ingestion, metadata control, and correct classification assignment ensures the knowledge base is comprehensive, accurate, and access-controlled from the start.
+
+  ### Acceptance criteria
+  - Documents in all supported formats can be ingested into a named collection.
+  - Batch ingestion from a folder processes all supported documents without requiring individual uploads.
+  - Ingested documents are queryable through the chat interface after upload.
+  - Document classification level is applied at ingestion time and governs which users can retrieve its content.
+type: F
+urgency: 5
+version: '0.1'

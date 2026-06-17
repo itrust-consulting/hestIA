@@ -15,6 +15,7 @@ class DenseVector(BaseModel):
     vector: List[float]
 
 
+# @MRS-027
 class HybridQuery(BaseModel):
     dense: DenseVector
     sparse: SparseVector

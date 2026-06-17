@@ -1,0 +1,18 @@
+settings:
+  digits: 3
+  parent: MRS
+  prefix: SRS
+  sep: '-'
+  itemformat: yaml
+attributes:
+  defaults:
+    dependence: []
+    status: ''
+    importance: ''
+    urgency: ''
+    difficulty: ''
+    risk: ''
+    outlay: ''
+    type: ''
+    version: ''
+    release: ''

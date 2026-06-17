@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Archival copy retrievable by document identifier independently of the vector index.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Document lifecycle management and audit trail.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall store a structured archival copy of each ingested document as
+  a JSON envelope containing the document content representation and its committed
+  metadata, separately from the vector index.
+reviewed: XE0BBT7b2X30TJ7WtOAlo_5lJKuq3Fwhjj_d51956o0=
+text: ''
+type: F
+urgency: 5
+verification: T

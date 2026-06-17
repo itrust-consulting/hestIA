@@ -1,0 +1,40 @@
+active: true
+dependence: []
+derived: false
+difficulty: 3
+header: ''
+importance: 4
+level: 3.2
+links:
+- MRS-013: oC71-zlrKcfSLqCcE6JDm0L58sZ4qUvKkV9aXK84JxA=
+- MRS-014: OpiOzXS_Dbneoiv9vldDwyoICGJAVCDFYAI4MTfYa6g=
+- MRS-018: -AUd-zDR37jMIt2EQkeTquxoQsbq9mV-y1BlUP1iA0E=
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: usCAS3pypdoDwr8JirOG5CNK9haPynARymfRBaY9ohE=
+risk: 2
+status: implemented
+text: |
+  # Document Metadata Extraction and Management
+
+  As a moderator,
+  I want the system to automatically extract document metadata during ingestion and allow me to edit it at any time,
+  so that documents are correctly identified, classified, and traceable throughout their lifecycle.
+
+  1. Upload a document; the system extracts metadata (title, author, classification level, etc.) automatically.
+  2. Review and correct the extracted metadata before confirming the upload.
+  3. After ingestion, update specific metadata fields of an already-ingested document without re-ingesting it.
+
+  ### Rationale
+  Document traceability and correct classification require that metadata is captured at ingestion time. The ability to enrich or correct metadata after the fact supports ongoing governance workflows without forcing a full re-ingestion.
+
+  ### Acceptance criteria
+  - Document metadata (at minimum title and classification level) is extracted automatically during ingestion without requiring manual entry.
+  - A moderator can review and correct extracted metadata before the document is committed to the collection.
+  - A moderator can edit specific metadata fields of an already-ingested document without re-ingesting it.
+  - Retrieval does consider edited metadata correctly.
+type: F
+urgency: 4
+version: '0.1'

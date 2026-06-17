@@ -1,0 +1,37 @@
+active: true
+dependence: []
+derived: false
+difficulty: 2
+header: ''
+importance: 4
+level: 3.1
+links:
+- MRS-009: Glr7N7Q5076oWd7B0AJzvENW5DUpPvzPFIuiik5qZzE=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: ObFzITcb5aBprsseO2ijWzWPkv2vyVD5PUO5_B5Vi-4=
+risk: 2
+status: implemented
+text: |
+  # Batch Document Ingestion
+
+  As a moderator,
+  I want to ingest all documents in a folder in a single operation,
+  so that I can efficiently populate a knowledge base without uploading each document individually.
+
+  1. Prepare a folder containing all documents to be ingested.
+  2. Trigger the batch ingestion for that folder, specifying the target collection.
+  3. Verify that each document in the folder has been processed and is queryable.
+
+  ### Rationale
+  Initial corpus population and periodic bulk updates require processing many documents at once. A folder-level batch operation reduces operator effort compared to repeated individual uploads.
+
+  ### Acceptance criteria
+  - All documents with supported formats present in the specified folder are ingested in a single operation.
+  - A document that fails to process does not prevent the remaining documents from being ingested; failures are reported per document.
+  - Each successfully ingested document contributes searchable content to the target collection.
+type: F
+urgency: 4
+version: '0.1'

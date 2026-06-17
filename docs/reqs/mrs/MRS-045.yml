@@ -1,0 +1,19 @@
+acceptancecriteria: Templates populated.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Efficiency.
+ref: ''
+releasephase: beta
+requirement: The system should support template-based population.
+reviewed: wi05GwnTwCwHZZE0hEOnJrWicMBFdtZQrQLOv7sb-FE=
+text: ''
+type: F
+urgency: 3
+verification: T

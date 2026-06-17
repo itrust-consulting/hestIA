@@ -18,6 +18,7 @@ class QdrantDB(DBProvider):
     def __init__(self, http: str, timeout: float = 300.0, api_key: str | None = None):
         self.client = QdrantClient(url=http, timeout=timeout, api_key=api_key)
 
+    # @MRS-024, @MRS-093
     def initialize(self, collection: str, config: Dict[str, Any]) -> None:
         if self.client.collection_exists(collection_name=collection):
             return
@@ -79,6 +80,7 @@ class QdrantDB(DBProvider):
             batch = qdrant_points[i:i + self.UPSERT_BATCH]
             self.client.upsert(collection_name=collection, wait=True, points=batch)
 
+    # @MRS-027
     def search(self, collection: str, query: Query, *, options: Dict[str, Any] = None):
         limit = 50
         with_payload = True
@@ -101,6 +103,7 @@ class QdrantDB(DBProvider):
             "has_filter": filter_ is not None,
         })
 
+        # @MRS-027
         if isinstance(query, HybridQuery):
             result = self.client.query_points(
                 collection_name=collection,
@@ -133,6 +136,7 @@ class QdrantDB(DBProvider):
                 score_threshold=score_threshold,
                 query_filter=filter_,
             )
+        # @MRS-030
         elif isinstance(query, DenseVector):
             result = self.client.query_points(
                 collection_name=collection,
@@ -151,6 +155,7 @@ class QdrantDB(DBProvider):
         _log.debug("qdrant_search_done", extra={"collection": collection, "n_hits": n_hits})
         return result
 
+    # @MRS-031
     def _build_filter(self, filter_opts: dict | None):
         if not filter_opts:
             return None

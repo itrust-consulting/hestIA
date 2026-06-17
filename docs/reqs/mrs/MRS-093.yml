@@ -1,0 +1,22 @@
+acceptancecriteria: |
+  100 GB documentation corpus ingested, indexed, and retrieved without errors or performance degradation beyond defined thresholds.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Large-corpus capacity.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall support the ingestion, storage, and efficient retrieval of at
+  least 100 GB of documentation without functional limitations.
+reviewed: GW9ckdjnkXmvULyJuFXg5YKhJ8atnCKvRc647tc1Ezo=
+text: ''
+type: NF
+urgency: 5
+verification: T

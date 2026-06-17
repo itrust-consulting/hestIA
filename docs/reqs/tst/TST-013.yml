@@ -1,0 +1,43 @@
+active: true
+derived: false
+header: |
+  Verify all inference is served by locally hosted models and that backends are switchable without code changes
+level: 13.0
+links:
+- SRS-013: null
+normative: true
+ref: ''
+reviewed: null
+release: beta
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 4
+test_data: Network monitoring tool; .env configuration variants for two LLM backends (e.g. vLLM and Ollama); one test document; a collection to ingest into
+verification_method: T
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: No external inference calls observed; backends switch via configuration only; embedding model configurable via environment.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with a locally hosted LLM inference server and embedding server (e.g. vLLM on port 8000)
+  - Network monitoring is active and logging all outbound connections
+  - All outbound internet routes are blocked at the network level
+  - A test collection exists
+  - A second LLM backend configuration (e.g. Ollama) is prepared in a separate .env variant
+  - A moderator account is available for ingestion
+
+  ## Test steps
+  1. With outbound internet blocked, ingest the test document. Confirm ingestion completes successfully and the chunk count matches expectations.
+  2. Submit a natural-language query against the ingested document. Confirm a response is returned.
+  3. Inspect network monitoring logs. Confirm all embedding and generation requests were routed to the local inference server and no external hosts were contacted.
+  4. Stop hestIA, switch to the second backend configuration (updating only .env), and restart. Confirm the system starts without errors.
+  5. Repeat steps 1–2 with the second backend. Confirm equivalent functionality.
+
+  ## Expected outcome
+  1. Ingestion and query succeed with all outbound internet blocked.
+  2. Network logs confirm zero requests to external inference APIs.
+  3. The LLM backend switches between supported providers via configuration without source code changes.
+  4. Embedding model selection via configuration takes effect after restart.

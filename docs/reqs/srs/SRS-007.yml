@@ -1,0 +1,48 @@
+active: true
+dependence:
+- SRS-004
+- SRS-008
+- SRS-009
+- SRS-010
+- SRS-011
+- SRS-012
+- SRS-013
+- SRS-014
+- SRS-015
+- SRS-016
+- SRS-018
+derived: false
+difficulty: 3
+header: ''
+importance: 4
+level: 2.3
+links:
+- MRS-002: Ph7Xj_SJq17FLukz6vK1VpvY7SE5HvEvzv5UlBw4pUE=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: Dz8m9KS-sKUl4YzjNurOsKACMosXV2bl_qT25T_jII4=
+risk: 2
+status: implemented
+text: |
+  # REST API Access
+
+  As a power user or system integrator,
+  I want to interact with hestIA through a REST API,
+  so that I can automate workflows or integrate hestIA directly with other tools.
+
+  1. Authenticate and obtain an access token.
+  2. Use the token to call any core feature through the API.
+  3. Verify that responses are consistently structured and that errors include a clear description of what went wrong.
+
+  ### Rationale
+  Machine-driven workflows and integrations with other iTrust tools require programmatic access to all core capabilities, independent of the web interface.
+
+  ### Acceptance criteria
+  - API documentation is available and describes all supported operations with their expected inputs and outputs.
+  - API responses follow a consistent structure across all endpoints.
+  - All depending requirements are implemented and accessible through the API.
+type: F
+urgency: 4
+version: '0.1'

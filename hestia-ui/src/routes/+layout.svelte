@@ -10,6 +10,7 @@
   import MoonIcon from '$lib/components/icons/moonIcon.svelte';
   import SunIcon from '$lib/components/icons/sunIcon.svelte';
   import HestiaIcon from '$lib/components/icons/hestiaIcon.svelte';
+  import { sending } from '$lib/chat/actions';
 
   import { onMount } from 'svelte';
   import { version } from '$app/environment';
@@ -119,7 +120,7 @@
 >
   <header class="app-header">
     <div class="app-header-left">
-      <a class="app-brand" href="/chat"><HestiaIcon /><h1>hestIA</h1>
+      <a class="app-brand" href="/chat"><HestiaIcon thinking={$sending} /><h1>hestIA</h1>
         <span class="app-version">{version}</span></a>
       {#if breadcrumbs.length > 0}
         <nav class="breadcrumbs" aria-label="Breadcrumb">
@@ -165,7 +166,7 @@
                 <AdminIcon /> Admin Panel
               </a>
             {/if}
-            <a class="dropdown-btn" href="." onclick={closeDropdown}>
+            <a class="dropdown-btn" href="/help" onclick={closeDropdown}>
               <HelpIcon /> Help
             </a>
             <button class="dropdown-btn" onclick={handleLogout}>

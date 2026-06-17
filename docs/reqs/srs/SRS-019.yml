@@ -1,0 +1,37 @@
+active: true
+dependence: []
+derived: false
+difficulty: 4
+header: ''
+importance: 5
+level: 6.1
+links:
+- MRS-093: GW9ckdjnkXmvULyJuFXg5YKhJ8atnCKvRc647tc1Ezo=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: 2oCeZWZf3l_g5AakqKWo5gCBYXeODR9mhHjzCNKVzTE=
+risk: 3
+status: implemented
+text: |
+  # Large Documentation Corpus Support
+
+  As a knowledge base administrator,
+  I want the system to ingest, store, and efficiently retrieve from a documentation corpus of at least 100 GB,
+  so that the entire organizational document repository can be served from a single hestIA instance without functional limitations.
+
+  1. Ingest a representative corpus totalling at least 100 GB across multiple documents and collections.
+  2. Confirm that all documents are ingested without errors or data loss.
+  3. Submit representative queries against the large corpus and verify that results are returned correctly within acceptable response times.
+
+  ### Rationale
+  Organizational document corpora are large. The system must handle the full corpus without degradation so that users are not forced to maintain multiple instances or exclude documents from the knowledge base.
+
+  ### Acceptance criteria
+  - A corpus of at least 100 GB can be fully ingested without errors or data loss.
+  - Queries against a 100 GB corpus return semantically relevant results within the response-time thresholds established during stress testing.
+  - All system services remain fully operational while serving a 100 GB corpus.
+type: NF
+urgency: 5
+version: '0.1'

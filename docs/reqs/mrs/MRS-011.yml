@@ -1,0 +1,21 @@
+acceptancecriteria: Only changed docs are reprocessed.
+active: true
+comments: |
+  Rejected - No automated ingestion is planned. Updating the corpus Is expected to be done manually
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Avoids unnecessary reprocessing.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall detect document changes using deterministic identifiers.
+reviewed: u2pKvQI_GnXJMZz3WAJNendCC4_aofx2wiplcXMbHDw=
+text: ''
+type: F
+urgency: 4
+verification: A

@@ -1,0 +1,21 @@
+acceptancecriteria: Fine-tuned model loadable without code changes.
+active: true
+comments: |
+  Rejected — merged into MRS-039. Full PEFT of models within the platform is excluded per the T1.3 architecture decision to use RAG as the primary domain adaptation strategy. Fine-tuned models are prepared externally and loaded via the LLM provider interface.
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Domain adaptation flexibility.
+ref: ''
+releasephase: beta
+requirement: |
+  The system may integrate fine-tuned LLM or embedding models in place of general-purpose models.
+reviewed: 5VMeLsJGP_uMaUEXRk9GniKMX2msuNkCloLu4QTyMvc=
+text: ''
+type: F
+urgency: 2
+verification: R

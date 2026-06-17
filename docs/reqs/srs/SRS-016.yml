@@ -1,0 +1,37 @@
+active: true
+dependence: []
+derived: false
+difficulty: 2
+header: ''
+importance: 4
+level: 5.2
+links:
+- MRS-037: AfG6Zfk3FRpdrdP2JrLwCtSemQg6grFrPfNBnIDHxe8=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: 9BtAru4HRqH2Xzk0RWPvM1_xpKxZZuYxSwerf5PFtNw=
+risk: 2
+status: implemented
+text: |
+  # Generation Parameter Configuration
+
+  As a system administrator,
+  I want to configure AI text generation parameters (such as model selection, response length, and generation temperature),
+  so that response characteristics can be tuned to specific use cases without modifying the system deployment.
+
+  1. Supply generation options alongside a query (model name, temperature, maximum output length).
+  2. Submit the query and observe that the response reflects the configured parameters.
+  3. Adjust parameters and re-submit to confirm the change takes effect.
+
+  ### Rationale
+  Different query types benefit from different generation settings. Deterministic output aids reproducible compliance checks; length limits prevent overly verbose responses in summarization tasks.
+
+  ### Acceptance criteria
+  - Generation parameters supplied with a query (model, temperature, maximum output length) are applied to the AI response.
+  - Setting temperature to its minimum value produces consistent output for the same prompt submitted multiple times.
+  - The available models are discoverable through the system without consulting external documentation.
+type: F
+urgency: 4
+version: '0.1'

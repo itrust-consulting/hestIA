@@ -1,0 +1,20 @@
+acceptancecriteria: Chunks do not split structures.
+active: true
+comments: |
+  Implemented text splitter splits document into sections.
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Improves semantic accuracy.
+ref: ''
+releasephase: beta
+requirement: The system should preserve boundaries during chunking.
+reviewed: lMa3ruiBb-1TJwfoJC_9FXtjKo0i8c7o-h3k1IQUiEo=
+text: ''
+type: F
+urgency: 3
+verification: A

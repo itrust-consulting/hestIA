@@ -1,0 +1,39 @@
+active: true
+derived: false
+header: |
+  Verify that hestIA operates fully without outbound internet connectivity
+level: 1.0
+links:
+- SRS-001: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 3
+test_data: One ingestion-ready DOCX or PDF test document; network monitoring tool (e.g. Wireshark, tcpdump, or ss/netstat)
+verification_method: R
+references:
+  - path: ''
+    type: ''
+expected_outcome: No outbound connections observed; all operations complete successfully with internet blocked.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and all services are running (confirmed by GET /ready)
+  - All outbound routes to external internet addresses are blocked at the OS or firewall level (e.g. via iptables drop rule or network namespace restriction)
+  - An admin account exists with known credentials
+  - A network monitoring tool is active and logging all connection attempts
+
+  ## Test steps
+  1. Confirm hestIA responds to requests from within the internal network (e.g. health check).
+  2. Upload the test document via the ingestion interface.
+  3. Submit a natural-language query against the ingested document via the chat interface.
+  4. Inspect network monitoring logs for any outbound connection attempts made during steps 2–3.
+
+  ## Expected outcome
+  1. hestIA responds correctly to all requests with no dependency on external connectivity.
+  2. Network logs show zero outbound TCP/UDP connections to external internet addresses during ingestion or query processing.
+  3. All dependent requirements pass their respective tests within the same network-blocked environment.

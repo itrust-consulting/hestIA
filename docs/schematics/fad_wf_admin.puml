@@ -1,0 +1,42 @@
+@startuml FAD — Administration Workflow
+!theme plain
+skinparam ActivityBorderColor #444444
+skinparam ActivityBackgroundColor #F5F5F5
+skinparam ActivityFontSize 12
+skinparam ArrowColor #444444
+skinparam PartitionBackgroundColor #FAFAFA
+skinparam PartitionBorderColor #888888
+
+start
+
+:Administrator or Moderator\ninitiates administration task;
+
+split
+  partition "User Management (FC-14)" {
+    :Create user account\n(credentials + platform role);
+    :Update attributes or\ndeactivate account as required;
+    note right: Changes effective\nimmediately on next\nrequest evaluation
+  }
+split again
+  partition "Organisation & Membership (FC-15)" {
+    :Create organisation — admin only;
+    :Add users: assign tenant role\n(moderator / co-moderator / member)\n+ classification level (0–4);
+    :Update roles / clearance levels\nor remove members as required;
+  }
+split again
+  partition "Collection Grant Management (FC-16)" {
+    :Grant organisation access\nto a collection — admin only;
+    :Members may now query\nsubject to classification level;
+    :Revoke grant if required\n— immediate effect;
+  }
+split again
+  partition "Help Content (FC-17)" {
+    :Create or update help sections\n(markdown + optional images)\n— admin only;
+    note right: All authenticated users\ncan read at any time
+  }
+end split
+
+:FC-18 records audit entry\n(administrative action + resource + outcome);
+
+stop
+@enduml

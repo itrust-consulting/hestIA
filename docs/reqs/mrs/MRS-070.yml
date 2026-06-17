@@ -1,0 +1,19 @@
+acceptancecriteria: Feedback captured.
+active: true
+comments: null
+coverage: 0
+derived: false
+header: ''
+importance: 2
+level: 1.0
+links: []
+normative: true
+rationale: Improvement.
+ref: ''
+releasephase: stable
+requirement: The system may support human feedback mechanisms.
+reviewed: -UDYK1paLX9-zJ5SQNzOCOjXbGaEc11MUNkxn_xKLdE=
+text: ''
+type: P
+urgency: 2
+verification: R

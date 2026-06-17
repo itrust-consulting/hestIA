@@ -1,0 +1,19 @@
+acceptancecriteria: Documents ingested programmatically.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Automation and integration.
+ref: ''
+releasephase: alpha
+requirement: The system shall support document ingestion via API.
+reviewed: s17FSQ5NyNEOIrUd0QZ-n2HeB3sMk_8bzX66YPq0T9o=
+text: ''
+type: F
+urgency: 4
+verification: T

@@ -20,6 +20,7 @@ from hestia.infrastructure.logging.middleware import CorrelationMiddleware
 _log = logging.getLogger("hestia.system")
 
 
+# @MRS-073, @MRS-092
 def create_api() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -43,6 +44,7 @@ def create_api() -> FastAPI:
             yield
         finally:
             _log.info("shutdown")
+            await app.state.container.aclose()
             shutdown_logging()
 
     app = FastAPI(lifespan=lifespan, title="hestIA", version="alpha_v0.3")

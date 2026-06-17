@@ -1,0 +1,42 @@
+active: true
+derived: false
+header: |
+  Verify that queries in English, French, and German each produce responses in the same language
+level: 18.0
+links:
+- SRS-018: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 2
+test_data: |
+  A collection containing English-language documents;
+  three equivalent test questions — one in English, one in French, one in German — each with a known answer present in the corpus;
+  analyst credentials
+verification_method: T
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: Responses are in the language of the query; retrieval succeeds across all three languages despite the corpus being in English.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with a multilingual-capable LLM and embedding model
+  - A test collection contains English-language documents with known content
+  - An analyst user is authenticated
+  - The three language-variant test questions and their expected topics are documented
+
+  ## Test steps
+  1. Submit the French-language test question against the collection. Record the response language and check whether a citation is present.
+  2. Submit the German-language test question. Record the response language and check for a citation.
+  3. Submit the English-language test question. Record the response language and check for a citation.
+
+  ## Expected outcome
+  1. The French query produces a French-language response with at least one citation.
+  2. The German query produces a German-language response with at least one citation.
+  3. The English query produces an English-language response with at least one citation.
+  4. Retrieval quality (presence of relevant citations) is comparable across all three languages despite the corpus being in English.

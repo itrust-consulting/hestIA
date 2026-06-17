@@ -1,0 +1,20 @@
+acceptancecriteria: Users can edit metadata.
+active: true
+comments: |
+  Metadata nerichment is allowed though only specific fields are currently allowed to be set via the UI.
+coverage: 90
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Improves classification.
+ref: ''
+releasephase: beta
+requirement: The system may allow manual metadata enrichment.
+reviewed: OpiOzXS_Dbneoiv9vldDwyoICGJAVCDFYAI4MTfYa6g=
+text: ''
+type: F
+urgency: 2
+verification: I

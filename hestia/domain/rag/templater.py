@@ -26,20 +26,31 @@ class TemplateRepository:
         if not os.path.isdir(templates_dir):
             raise ConfigurationError(f"Templates directory not found: {templates_dir}")
         self.templates_dir = templates_dir
+        self._cache: Dict[str, Dict[str, Any]] = {}
 
     def load_yaml(self, rel_path: str) -> Dict[str, Any]:
         path = os.path.join(self.templates_dir, rel_path)
+        if path in self._cache:
+            return self._cache[path]
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Template not found: {path}")
         with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            data = yaml.safe_load(f)
+        self._cache[path] = data
+        return data
 
 
-
+# @MRS-035
 class TemplatePlanBuilder:
 
     def __init__(self, repo: TemplateRepository):
         self.repo = repo
+
+    def preload(self, template_rel_paths: list) -> None:
+        for rel_path in template_rel_paths:
+            root = self.repo.load_yaml(rel_path)
+            self._load_fragments(root, rel_path)
+            _log.debug("template_preloaded", extra={"template": rel_path})
 
     def build(self, request: ExecutionRequest, template_rel_path: str) -> ExecutionGraph:
         _log.debug("template_build", extra={

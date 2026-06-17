@@ -1,0 +1,19 @@
+acceptancecriteria: System installs and runs without network.
+active: true
+comments: null
+coverage: 75
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Supports high-security environments.
+ref: ''
+releasephase: beta
+requirement: The system may support air-gapped deployments.
+reviewed: NXY-gZ48hRwBO6te8cKlAppEt8WD_lN3vzkxtas0ZE8=
+text: ''
+type: O
+urgency: 2
+verification: R

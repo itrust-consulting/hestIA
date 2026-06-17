@@ -1,0 +1,20 @@
+acceptancecriteria: Different roles enforce different permissions.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Required for enterprise usage.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall support multi-user access with role-based authorization.
+reviewed: vCv0JUWyUyhA8O5vlIlPe9Yqsaf3HCEtLCjJsBrlpVU=
+text: ''
+type: F
+urgency: 5
+verification: T

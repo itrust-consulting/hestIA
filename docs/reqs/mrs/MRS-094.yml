@@ -1,0 +1,21 @@
+acceptancecriteria: |
+  Threat records from a test feed are ingested, linked to asset types, and queryable via the asset management interface.
+active: true
+comments: Primary feed sources within CyFORT are IDPS-ESCAPE and SATRAP-DL.
+coverage: 0
+derived: false
+header: ''
+importance: 2
+level: 1.0
+links: []
+normative: true
+rationale: Comprehensive risk assessment enablement.
+ref: ''
+releasephase: beta
+requirement: |
+  The system may provide an ingestion interface for threat and vulnerability intelligence from IDPS-ESCAPE and SATRAP-DL, mapping threats and vulnerabilities to asset types in the CMDB.
+reviewed: YPfAwWcPlVEQSdz5-BQLAaZoxpLImc-4P3MTNhngWOs=
+text: ''
+type: F
+urgency: 2
+verification: T

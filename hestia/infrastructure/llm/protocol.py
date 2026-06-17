@@ -1,8 +1,9 @@
-from typing import Any, Dict, Iterator, List, Optional, Protocol, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, Union
 
 
+# @MRS-039
 class LLMProvider(Protocol):
-    def embed(
+    async def embed(
         self,
         inputs: Union[str, List[str]],
         *,
@@ -10,23 +11,23 @@ class LLMProvider(Protocol):
         options: Optional[Dict[str, Any]] = None,
     ) -> List[List[float]]: ...
 
-    def generate(
+    async def generate(
         self,
         prompt: str,
         *,
         model: str | None,
         options: Optional[Dict[str, Any]] = None,
         stream: bool = False,
-    ) -> Union[str, Iterator[Dict[str, str]]]: ...
+    ) -> Union[str, AsyncIterator[Dict[str, str]]]: ...
 
-    def chat(
+    async def chat(
         self,
         messages: List[Dict[str, str]],
         *,
         model: str | None,
         options: Optional[Dict[str, Any]] = None,
         stream: bool = False,
-    ) -> Union[str, Iterator[Dict[str, str]]]: ...
+    ) -> Union[str, AsyncIterator[Dict[str, str]]]: ...
 
     @property
     def models(self) -> dict: ...

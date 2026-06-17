@@ -17,6 +17,7 @@ _IMG_PLACEHOLDER = re.compile(
 )
 
 
+# @MRS-007
 class PDFParser(BaseParser):
 
     def __init__(self, file=None):
@@ -42,6 +43,7 @@ class PDFParser(BaseParser):
             metadata[self.normalize_key(key)] = self.clean_string(str(val) if val else "")
         return metadata
 
+    # @MRS-013
     def get_metadata(self, builtIn_only: bool = True, mask_name: str | None = None) -> dict:
         stem = Path(self.filepath).stem
         builtin = self.get_builtin_metadata()
@@ -105,6 +107,7 @@ class ITRPDFParser(PDFParser):
     def __init__(self, file=None):
         super().__init__(file=file)
 
+    # @MRS-013
     def get_metadata(self, builtIn_only: bool = True, mask_name: str | None = None) -> dict:
         stem = Path(self.filepath).stem
         builtin = self.get_builtin_metadata()

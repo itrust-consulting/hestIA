@@ -28,6 +28,7 @@ GenerateResponse = Response[GenerateData]
 
 # ---- Chat ----
 
+# @MRS-037
 class ChatRequest(Request):
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None

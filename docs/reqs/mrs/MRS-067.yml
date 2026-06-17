@@ -1,0 +1,21 @@
+acceptancecriteria: |
+  Defined metrics accessible via admin interface and reflect live system state.
+active: true
+comments: Supports verification of the concurrent-user SLO defined in MRS-092.
+coverage: 25
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Operational observability.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall expose operational performance metrics, including request latency, throughput, active session count, queue depth, and error rates, to administrators.
+reviewed: e2u4r-l0fTd0zlNaIP-PrbfSxTGj_pFOtKuuRbrnaGs=
+text: ''
+type: P
+urgency: 3
+verification: T

@@ -1,0 +1,20 @@
+acceptancecriteria: Jobs execute asynchronously.
+active: true
+comments: "FastAPI handles traffic asynchornously. \nDocument ingestion runs asynchronous\
+  \ in backend.\n"
+coverage: 50
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Scalability.
+ref: ''
+releasephase: beta
+requirement: The system should support asynchronous processing.
+reviewed: 1vc4UbG3h_YIldXG4C_xA2FXOZbRy9Vge5NFikS-z6w=
+text: ''
+type: O
+urgency: 3
+verification: T

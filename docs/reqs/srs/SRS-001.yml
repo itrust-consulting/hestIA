@@ -1,0 +1,48 @@
+active: true
+dependence:
+- SRS-004
+- SRS-007
+- SRS-008
+- SRS-009
+- SRS-010
+- SRS-011
+- SRS-012
+- SRS-013
+- SRS-014
+- SRS-015
+- SRS-017
+derived: false
+difficulty: 2
+header: ''
+importance: 5
+level: 1.0
+links:
+- MRS-001: 45lmKVbZK4mjSx4xzX7GKeB4_603lS6iawtl_HyHq5k=
+- MRS-022: jF4OvgwnAydWvR4scqHBS7VGgUyXeIFBZP1xGvLNAGg=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: gYHIs_Due6y0p3zGaQjwXX02Tn6qdH-hO9rd9h24aFw=
+risk: 4
+status: implemented
+text: |
+  # On-Premises Core Operation
+
+  As a system administrator,
+  I want to deploy hestIA locally without requiring any outbound internet connectivity for core functionality,
+  so that all organizational data and AI inference remain within the on-premises security perimeter.
+
+  1. Deploy hestIA in an environment where all outbound routes to external internet hosts are blocked at the OS or firewall level.
+  2. Use all hestIA's core functionalities.
+
+  ### Rationale
+  Data sovereignty and regulatory compliance require that organizational documents and AI-generated outputs never leave the controlled network boundary.
+  This is the foundational constraint from which all other deployment decisions derive.
+
+  ### Acceptance criteria
+  - Confirm via network monitoring that no external connections were made during any operation.
+  - All dependent requirements are implemented and tested successfully.
+type: O
+urgency: 5
+version: '0.1'

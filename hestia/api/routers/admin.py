@@ -129,6 +129,7 @@ def list_organizations_alias(
     return {"organizations": svc.list_orgs()}
 
 
+# @MRS-004
 @router.post("/organizations/create")
 def create_organization(
     req: CreateOrgRequest,
@@ -316,7 +317,7 @@ def create_collection(
     pipeline = h.container.services.get("ingestion")
     if pipeline is None:
         raise HTTPException(503, "Ingestion service not available.")
-    dense_dim = len(pipeline.dense_encoder.encode("probe").vector)
+    dense_dim = pipeline.dense_encoder.vector_dim
     owner_org_id: int | None = req.get("owner_org_id") or None
     if owner_org_id is not None and not user.permissions.is_admin:
         if owner_org_id not in user.permissions.moderated_tenants:

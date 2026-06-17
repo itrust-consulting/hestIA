@@ -1,0 +1,19 @@
+acceptancecriteria: Kubernetes-native patterns applied.
+active: true
+comments: null
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Cloud-native.
+ref: ''
+releasephase: beta
+requirement: The system may support Kubernetes-native patterns.
+reviewed: aMR98ScgCBJE7a-T8w8D2Kg2D5cxv8lqG3wGtPiBx4s=
+text: ''
+type: O
+urgency: 2
+verification: R

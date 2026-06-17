@@ -23,6 +23,7 @@ class Chunk:
     previous: UUID | None = None
     next: UUID | None = None
 
+    # @MRS-013, @MRS-018
     def to_payload(self) -> dict[str, Any]:
         return {
             "id": str(self.id),
@@ -51,12 +52,14 @@ class SectionSplitter:
     # ~100 k chars ≈ 25 k tokens at 4 chars/token — well within 32 768-token limits.
     DEFAULT_MAX_CHARS = 100_000
 
+    # @MRS-019
     def __init__(self, max_depth: int = 5, max_chars: int = DEFAULT_MAX_CHARS):
         if not 1 <= max_depth <= 6:
             raise ValueError("max_depth must be between 1 and 6")
         self._max_depth = max_depth
         self._max_chars = max_chars
 
+    # @MRS-015, @MRS-016
     def split(self, text: str) -> list[dict[str, Any]]:
         """
         Returns a list of section dicts, each with:
@@ -90,6 +93,7 @@ class SectionSplitter:
                 heading_stack[j] = None
             heading_stack[level - 1] = header
 
+            # @MRS-018
             current = {"header": header, "path": _path(level), "level": level, "content": [], "position": i}
             sections.append(current)
 
@@ -118,6 +122,7 @@ class SectionSplitter:
                     })
         return result
 
+    # @MRS-020
     def _split_paragraphs(self, text: str) -> list[str]:
         """Split ``text`` at blank-line boundaries, keeping each part under
         ``max_chars``.  A single paragraph that still exceeds ``max_chars`` is

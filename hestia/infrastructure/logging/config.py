@@ -85,6 +85,7 @@ class _SystemFilter(logging.Filter):
 _listener: logging.handlers.QueueListener | None = None
 
 
+# @MRS-066
 def setup_logging(settings: "Settings") -> None:
     global _listener
 

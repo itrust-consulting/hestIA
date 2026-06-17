@@ -1,0 +1,36 @@
+@startuml Document Ingestion
+!theme plain
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign left
+
+actor "Admin" as ADM
+participant "Web UI" as UI
+participant "API Layer" as API
+participant "Request Handler" as RH
+participant "Ingestion Pipeline" as ING
+participant "Parsers" as PAR
+participant "LLM Server" as LLM
+database "Vector DB" as VDB
+
+ADM -> UI : upload file + select collection
+UI -> API : POST /upload  (Bearer token)
+API -> API : validate JWT\ncheck admin / moderator role
+API -> RH : trigger ingestion
+RH -> ING : ingest(file, collection)  [background]
+API --> UI : 202 Accepted
+
+ING -> PAR : parse(file)
+PAR --> ING : structured elements\n(paragraphs, tables, images) + metadata
+
+ING -> ING : chunk(elements, strategy)
+
+loop for each chunk
+  ING -> LLM : embed(chunk.text)
+  LLM --> ING : dense_vector
+  ING -> ING : sparse_encode(chunk.text)  [BM25, local]
+  ING -> VDB : upsert(chunk + dense_vector\n+ sparse_vector + payload)
+  VDB --> ING : OK
+end
+
+ING --> RH : done  (chunk_count, elapsed_ms)
+@enduml

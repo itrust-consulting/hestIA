@@ -1,0 +1,21 @@
+acceptancecriteria: Inconsistencies in test data detected and reported.
+active: true
+comments: |
+  Scope is SAMORAI asset data ingestion. ISMS document inconsistency detection (study R3) is a separate analytical capability not covered by this item.
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: CMDB data integrity.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall detect inconsistencies in asset data during ingestion.
+reviewed: 2Jgr35lLZj6QVxHiIp94qUdzSfg5sD2F9llLtKP7krg=
+text: ''
+type: F
+urgency: 5
+verification: T

@@ -1,0 +1,37 @@
+active: true
+dependence: []
+derived: false
+difficulty: 3
+header: ''
+importance: 4
+level: 3.4
+links:
+- MRS-019: KGTTEgSkKWFj-sHPniBZ_WIWl2kED34jySi8qILo2Xk=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: Vh7nsBJ6Gile74Za-yOu3b7G9LabMiOEgmDLEGDWSC4=
+risk: 3
+status: partial
+text: |
+  # Configurable Document Chunking Strategy
+
+  As a system administrator,
+  I want to configure the strategy used to split documents into chunks during ingestion,
+  so that chunking granularity can be adapted to the structure of different document types without code changes.
+
+  1. Review the active chunking strategy in the system configuration.
+  2. Change the strategy to one suited to the target document type.
+  3. Re-ingest a test document and confirm that the resulting chunk granularity reflects the new strategy.
+
+  ### Rationale
+  Different document corpora benefit from different chunking granularities. Configurability avoids the need for code changes when adapting to new document types or corpus structures.
+
+  ### Acceptance criteria
+  - The default chunking strategy (section-level splitting) is active out of the box and produces one chunk per document section.
+  - Changing the chunking configuration and re-ingesting the same document produces a different chunk distribution.
+  - The configuration change takes effect without modifying application source code.
+type: F
+urgency: 4
+version: '0.1'

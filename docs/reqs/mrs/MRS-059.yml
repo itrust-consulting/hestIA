@@ -1,0 +1,20 @@
+acceptancecriteria: Job status visible.
+active: false
+comments: Rejected — subsumed by MRS-058, which already mandates per-step status
+  tracking as part of pipeline orchestration.
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Operational visibility.
+ref: ''
+releasephase: alpha
+requirement: The system shall provide job status tracking.
+reviewed: null
+coverage: 0
+text: ''
+type: F
+urgency: 4
+verification: T

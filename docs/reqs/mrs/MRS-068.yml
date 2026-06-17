@@ -1,0 +1,20 @@
+acceptancecriteria: Traces viewable.
+active: true
+comments: |
+  Expose retrieved data in Debug level logs.
+coverage: 50
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Debugging.
+ref: ''
+releasephase: beta
+requirement: The system shall support retrieval and generation tracing.
+reviewed: IT6D7ZrCx9LX9-cPlwnVNeIMeXKOmAA5AqXliwAfkBQ=
+text: ''
+type: P
+urgency: 4
+verification: I

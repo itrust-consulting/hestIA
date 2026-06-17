@@ -13,6 +13,7 @@ from hestia.infrastructure.logging.config import request_id_var
 _log = logging.getLogger("hestia.system")
 
 
+# @MRS-064, @MRS-067
 class CorrelationMiddleware(BaseHTTPMiddleware):
     """
     Assigns a request_id to every request (reads X-Request-ID header or

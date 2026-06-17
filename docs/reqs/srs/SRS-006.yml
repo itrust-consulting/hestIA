@@ -1,0 +1,46 @@
+active: true
+dependence:
+- SRS-004
+- SRS-008
+- SRS-009
+- SRS-010
+- SRS-011
+- SRS-012
+- SRS-013
+- SRS-014
+- SRS-015
+- SRS-016
+- SRS-018
+derived: false
+difficulty: 3
+header: ''
+importance: 4
+level: 2.2
+links:
+- MRS-002: Ph7Xj_SJq17FLukz6vK1VpvY7SE5HvEvzv5UlBw4pUE=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: Z0oA-nO820SepO7jyw_j3a_G3PcRiq0BOSapFzk1YCI=
+risk: 2
+status: implemented
+text: |
+  # Web Interface Access
+
+  As a user,
+  I want to interact with hestIA through a web interface,
+  so that I can work through a browser.
+
+  1. User opens their browser and navigates to hestIA's exposed url, e.g., 'http://localhost:7860'
+  2. hestIA and all its core functionalities are accessible via the exposed url.
+
+  ### Rationale
+  Both human-driven and machine-driven workflows must be supported for operational flexibility.
+  The API also enables integration with other frontends, tools and automated testing pipelines.
+
+  ### Acceptance criteria
+  - All depending requirements implemented and tested successfully.
+type: F
+urgency: 4
+version: '0.1'

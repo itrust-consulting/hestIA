@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Coverage status and citations to relevant source passages returned; gaps explicitly identified.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Structured audit evidence over ad-hoc search.
+ref: ''
+releasephase: beta
+requirement: |
+  The system should evaluate whether a specified control or requirement is supported
+  by the ingested ISMS documentation and return a structured coverage report with
+  a coverage status and citations to relevant source passages.
+reviewed: F2G0Na2gNpIJ5Sg-9dmJ8UaiVue8Ofq7ARveVYwW-RI=
+text: ''
+type: F
+urgency: 3
+verification: T

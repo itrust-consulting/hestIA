@@ -1,0 +1,22 @@
+acceptancecriteria: |
+  No external API calls observed during embedding generation or text generation; all inference requests are served by the locally hosted model server.
+active: true
+comments: |
+  Merges MRS-023 (on-premises embedding models) and MRS-036 (locally hosted LLM inference) into one requirement.
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Data sovereignty and MRS-001 compliance.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall use only locally hosted AI models for all inference tasks — vector embeddings and text generation — with no external API calls.
+reviewed: jF4OvgwnAydWvR4scqHBS7VGgUyXeIFBZP1xGvLNAGg=
+text: ''
+type: F
+urgency: 5
+verification: T

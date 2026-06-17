@@ -1,0 +1,21 @@
+acceptancecriteria: |
+  Applicable requirements are identified and linked to assets.
+active: true
+comments: null
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Compliance mapping.
+ref: ''
+releasephase: beta
+requirement: |
+  The system should map assets against applicable standard and regulation requirements.
+reviewed: 2Ig3DPMzu5ky5puEeJOD7ZD7fX7aFP7Imosq7syW4n0=
+text: ''
+type: F
+urgency: 3
+verification: A

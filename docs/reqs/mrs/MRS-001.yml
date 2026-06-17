@@ -1,0 +1,20 @@
+acceptancecriteria: System operates with outbound connectivity disabled.
+active: true
+comments: Done
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Ensures data sovereignty and compliance.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall operate fully on-premises without requiring external connectivity for core functionality.
+reviewed: 45lmKVbZK4mjSx4xzX7GKeB4_603lS6iawtl_HyHq5k=
+text: ''
+type: F
+urgency: 5
+verification: R

@@ -1,0 +1,39 @@
+active: true
+derived: false
+header: |
+  Verify that every collection-based AI response includes citations and that retrieved context is accessible
+level: 15.0
+links:
+- SRS-015: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 2
+test_data: A collection with at least 3 ingested documents with known content; analyst credentials
+verification_method: I
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: Citations present in all collection queries; each citation traces to a source; retrieved context accessible; plain completions produce no citations.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and all services are active
+  - A test collection contains at least 3 documents with known, distinct content
+  - An analyst user is authenticated
+
+  ## Test steps
+  1. Submit a question against the collection. Confirm the response includes at least one citation.
+  2. For each citation, confirm it identifies the source document name and the specific section or passage that contributed.
+  3. Confirm the retrieved passages used to generate the response are accessible in the response payload (not only the generated text itself).
+  4. Submit a plain completion request without specifying a collection. Confirm the response contains no citations.
+
+  ## Expected outcome
+  1. Every collection-based response that retrieved at least one chunk includes citations.
+  2. Each citation identifies the source document and the contributing section or passage.
+  3. The raw retrieved context passages are present in the response and accessible for independent inspection.
+  4. A plain completion response contains an empty citations list.

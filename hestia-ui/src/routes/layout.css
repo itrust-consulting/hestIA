@@ -5,6 +5,10 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+:root {
+  --sidebar-width: 260px;
+}
+
 html {
   color-scheme: light;
 }
@@ -117,7 +121,11 @@ html.dark {
 .app-header-left {
     display: flex;
     align-items: center;
-    gap: 235px; /* space between hestIA and breadcrumbs */
+    gap: 2rem;
+}
+
+.app-brand {
+    min-width: calc(var(--sidebar-width) - calc(var(--spacing) * 4) - 1rem);
 }
 
 .app-header-left h1 {

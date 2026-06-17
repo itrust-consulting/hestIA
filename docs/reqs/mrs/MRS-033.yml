@@ -1,0 +1,20 @@
+acceptancecriteria: Context visible to user.
+active: true
+comments: "Context is hidden in the web interface. \nTo meet this requirement the\
+  \ retrieved context should be able to be inspected\n"
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Transparency.
+ref: ''
+releasephase: alpha
+requirement: The system shall expose retrieved context.
+reviewed: 5W19ZaMOXG8nEcnHa7zCFFOr7nyqMXfx3hNQRDJUzXM=
+text: ''
+type: F
+urgency: 5
+verification: I

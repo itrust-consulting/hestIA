@@ -10,6 +10,7 @@ from hestia.container import Container
 router = APIRouter()
 
 
+# @MRS-074
 @router.get("/health")
 def health() -> Dict[str, Any]:
     return Response(json.dumps({"ok": True, "status": "up"}), media_type="application/json")

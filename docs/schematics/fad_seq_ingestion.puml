@@ -1,0 +1,45 @@
+@startuml FAD — Document Ingestion Flow
+!theme plain
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign left
+skinparam maxMessageSize 180
+
+actor "Moderator" as MOD
+participant "FC-01\nAPI Gateway" as API
+participant "FC-02\nAuthentication" as AUTH
+participant "FC-03\nAccess Policy" as POL
+participant "FC-06\nDocument Ingestion" as ING
+participant "LLM Server" as LLM
+database "Vector Database" as VDB
+participant "FC-18\nLogging & Audit" as LOG
+
+MOD -> API : upload(file, collection, tenants, classification)\n[Bearer JWT]
+API -> AUTH : validate JWT
+AUTH --> API : identity + permissions
+
+API -> POL : check(moderator role, collection grant)
+alt DENY
+  POL --> API : DENY
+  API --> MOD : 403 Forbidden
+else ALLOW
+  POL --> API : ALLOW
+  API -> ING : ingest(document, metadata)
+
+  ING -> ING : parse(file)\nextract text + structure + metadata
+  ING -> ING : apply metadata overrides
+  ING -> ING : segment into chunks\n(section boundaries + navigation links)
+
+  loop per chunk
+    ING -> LLM : encode_dense(chunk text)
+    LLM --> ING : dense vector
+    ING -> ING : encode_sparse(chunk text)\nupdate corpus statistics
+  end
+
+  ING -> VDB : upsert(chunks + dense vectors\n+ sparse vectors + metadata)
+  VDB --> ING : confirmed
+
+  ING --> API : IngestionResult\n(n_chunks, n_upserted, elapsed_ms)
+  API -> LOG : audit(document_uploaded)
+  API --> MOD : ingestion confirmed
+end
+@enduml

@@ -1,0 +1,19 @@
+acceptancecriteria: Track changes present.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Legal workflows.
+ref: ''
+releasephase: stable
+requirement: The system may support tracked changes.
+reviewed: ACG8LKrVB1JEm2YCRT2xkxsfBMtyqlWGgaTFnAAlAuY=
+text: ''
+type: F
+urgency: 2
+verification: I

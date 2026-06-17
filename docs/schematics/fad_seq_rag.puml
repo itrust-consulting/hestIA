@@ -1,0 +1,59 @@
+@startuml FAD — Knowledge Query (RAG) Flow
+!theme plain
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign left
+skinparam maxMessageSize 180
+
+actor "User" as USR
+participant "FC-01\nAPI Gateway" as API
+participant "FC-02\nAuthentication" as AUTH
+participant "FC-03\nAccess Policy" as POL
+participant "FC-04\nRequest Handling" as RH
+participant "FC-05\nWorkflow Orchestration" as ORCH
+participant "FC-07\nDocument Retrieval" as RET
+participant "FC-08\nPrompt Augmentation" as AUG
+participant "FC-09\nAI Generation" as GEN
+participant "FC-10\nConversation Mgmt" as CONV
+participant "LLM Server" as LLM
+database "Vector Database" as VDB
+participant "FC-18\nLogging & Audit" as LOG
+
+USR -> API : query(text, collection, [conversation_id])\n[Bearer JWT]
+API -> AUTH : validate JWT
+AUTH --> API : identity + permissions
+
+API -> POL : check(collection access, classification level)
+alt DENY
+  POL --> API : DENY
+  API --> USR : 403 Forbidden
+else ALLOW or FILTER
+  POL --> API : decision + [max_classification filter]
+  API -> RH : dispatch(request, policy_result)
+  RH -> CONV : load conversation history\n(last N message pairs)
+  CONV --> RH : message history
+  RH -> ORCH : execute(workflow_graph, context)
+
+  ORCH -> LLM : encode_dense(query)
+  LLM --> ORCH : dense vector
+  ORCH -> ORCH : encode_sparse(query)\n[against collection corpus]
+
+  ORCH -> RET : retrieve(dense + sparse vectors,\ncollection, [classification filter])
+  RET -> VDB : hybrid search\n[with payload filter]
+  VDB --> RET : ranked chunks
+  RET --> ORCH : ranked chunks
+
+  ORCH -> AUG : augment(chunks, query)
+  AUG --> ORCH : augmented prompt + citation map
+
+  ORCH -> GEN : generate(augmented prompt, history)\n[stream]
+  GEN -> LLM : completion request
+  LLM --> GEN : response [streamed]
+  GEN --> ORCH : response + citations
+
+  ORCH --> RH : response + citations
+  RH -> CONV : persist(user message,\nassistant response, citations)
+  RH -> LOG : audit(ai_interaction, doc_access)
+  RH --> API : response
+  API --> USR : response + citations
+end
+@enduml

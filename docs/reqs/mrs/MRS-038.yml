@@ -1,0 +1,20 @@
+acceptancecriteria: |
+  Every factual claim in the response is traceable to a cited retrieved chunk; a response produced without any retrieved context is rejected or flagged.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Hallucination prevention.
+ref: ''
+releasephase: alpha
+requirement: The system shall restrict generation to retrieved content.
+reviewed: bOf0PrSG54pUuMcYIxC0ol-FHoaUbGXwYBbaZOk4H7o=
+text: ''
+type: F
+urgency: 5
+verification: A

@@ -11,13 +11,12 @@
   const currentVersion = env.PUBLIC_APP_VERSION;
   
   export let currentSection: string = "profile";
-  export let onSelect: (section: string) => void;
 
   const sections = [
-    { id: "profile", label: "Profile", icon: UserIcon },
-    { id: "security", label: "Security", icon: LockIcon},
-    { id: "support", label: "Support", icon: HelpIcon },
-    { id: "logout", label: "Logout", icon: LogoutIcon, danger: true },
+    { id: "profile",   label: "Profile",   icon: UserIcon,   href: "/account/overview?section=profile" },
+    { id: "security",  label: "Security",  icon: LockIcon,   href: "/account/overview?section=security" },
+    { id: "support",   label: "Support",   icon: HelpIcon,   href: "/account/overview?section=support" },
+    { id: "logout",    label: "Logout",    icon: LogoutIcon, href: "/api/logout", danger: true, noPreload: true },
   ];
 </script>
 
@@ -27,17 +26,18 @@
   <div class="sidebar-list">
 
     {#each sections as s}
-      <div
+      <a
+        href={s.href}
         class="sidebar-item"
         class:active={currentSection === s.id}
         class:danger={s.danger}
-        on:click={() => onSelect(s.id)}
+        data-sveltekit-preload-data={s.noPreload ? 'off' : 'hover'}
       >
         <div class="icon-wrapper">
           <s.icon />
         </div>
         <span class="sidebar-label">{s.label}</span>
-      </div>
+      </a>
     {/each}
   </div>
 
@@ -54,7 +54,7 @@
         position: sticky;
         top: var(--header-height);
         height: calc(100vh - var(--header-height));
-        width: 280px;         /* your expanded width */
+        width: var(--sidebar-width);         /* your expanded width */
         flex-shrink: 0;
         overflow-y: auto;
         border-right: 1px solid var(--color-neutral-200);
@@ -110,10 +110,12 @@
         gap: .75rem;
         line-height: 1.5rem;
         height: 1.75rem;
-        padding: -5rem .75rem;
+        padding: 0 .75rem;
         border-radius: var(--radius-md);
         transition: background-color 120ms ease, color 120ms ease;
         cursor: pointer;
+        text-decoration: none;
+        color: inherit;
     }
 
     .sidebar-item:hover {

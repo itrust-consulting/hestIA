@@ -1,0 +1,22 @@
+acceptancecriteria: |
+  Asset fields from multiple entities mapped and terminology differences resolved.
+active: true
+comments: |
+  Internal schema normative basis defined in MRS-097 (ontology registry).
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Cross-entity schema normalization.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall map incoming asset fields to a normalized internal schema aligned with NIS2-required asset attributes and resolve terminology differences against the ontology registry.
+reviewed: y91KcXgu3gwStZzi1XmPkooyTQkOnm_Am7WPJd1aLMc=
+text: ''
+type: F
+urgency: 5
+verification: T

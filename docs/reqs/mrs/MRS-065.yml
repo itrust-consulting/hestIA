@@ -1,0 +1,22 @@
+acceptancecriteria: Encryption verified.
+active: false
+comments: |
+  Rejected - System assumed to be deployed locally and thus no application level enforcement 
+  of this required. For "distributed" deployments set up behind firewalls and use 
+  proper protocols in communication (VPN, https,...). Encrypt disks hosting databases.
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Confidentiality.
+ref: ''
+releasephase: alpha
+requirement: The system shall encrypt data at rest and in transit.
+reviewed: null
+coverage: 0
+text: ''
+type: S
+urgency: 5
+verification: I

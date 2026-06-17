@@ -1,0 +1,42 @@
+active: true
+derived: false
+header: |
+  Verify automatic metadata extraction and post-ingestion metadata editing
+level: 10.0
+links:
+- SRS-010: null
+normative: true
+ref: ''
+reviewed: null
+release: beta
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 2
+test_data: A DOCX document with known embedded metadata (title, author, subject); moderator credentials
+verification_method: I
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: Metadata extracted automatically; overrides applied before upload; post-ingestion edits reflected in citations without re-ingesting.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and running with the ingestion and metadata services active
+  - A named test collection exists
+  - A moderator account is available
+  - The test document's original embedded metadata values (title, author, classification) are documented for comparison
+
+  ## Test steps
+  1. Open the document preview/parse interface and upload the test document without committing. Inspect the automatically extracted metadata fields.
+  2. Override the classification level field with a different value.
+  3. Complete the upload and confirm the override value is stored.
+  4. Submit a query whose answer appears in the test document. Inspect the citation and confirm the overridden classification is reflected.
+  5. Via the metadata management interface, edit the document title field of the already-ingested document (without re-ingesting).
+  6. Submit the same query again and confirm the updated title appears in the citation.
+
+  ## Expected outcome
+  1. Title, classification level, and author are extracted automatically without manual input.
+  2. The classification override applied before upload takes precedence over the automatically extracted value.
+  3. Post-ingestion metadata edits are applied without requiring re-ingestion.
+  4. Query citations reflect the current (edited) metadata values.

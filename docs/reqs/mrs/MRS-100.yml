@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  After metadata approval, the document is placed in the correct logical directory as determined by the defined classification rules applied to the committed metadata values.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Consistent document organization and retrieval.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall, upon user approval of inferred metadata, place the document
+  in a logical directory or collection determined by pre-defined classification
+  rules applied to the approved metadata values.
+reviewed: 4mvbQxat04-VZ780Wyl5iKnlWdXBX-83PlqgJpKegtQ=
+text: ''
+type: F
+urgency: 5
+verification: T

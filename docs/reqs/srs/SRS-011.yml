@@ -1,0 +1,40 @@
+active: true
+dependence: []
+derived: false
+difficulty: 4
+header: ''
+importance: 5
+level: 3.3
+links:
+- MRS-015: a8w4c0TF95qUTYX-dcYHR-2hTIFknxes_nKDPlUVVOI=
+- MRS-016: n8JlDohxxUQbah232WCbV3DOMtzwEfN_U0W2Y0q5fKI=
+- MRS-017: Cc_wViU8qtb57JHiN_crYuAt3VvzMaA7XAUuImpVqNk=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: ieHAPWqEbUmcXz4rUde3KqbwtXl1hhj-qOXtOrcVAH8=
+risk: 3
+status: implemented
+text: |
+  # Structural Document Parsing
+
+  As a knowledge base administrator,
+  I want ingested documents to be parsed into structurally meaningful units — sections, headings, and tables — with document hierarchy preserved,
+  so that the AI retrieves contextually precise content rather than arbitrary text fragments.
+
+  1. Upload a document containing multiple sections with nested headings and at least one table.
+  2. The system identifies section boundaries, preserves heading hierarchy, and extracts table content in a structured form.
+  3. Verify that queries targeting specific sections or tables return content from the correct structural unit.
+
+  ### Rationale
+  High-quality RAG retrieval requires that retrieved chunks correspond to coherent semantic units. Splitting at arbitrary character boundaries degrades retrieval precision and loses structural context critical for governance document use cases.
+
+  ### Acceptance criteria
+  - A document with distinct sections produces separate retrievable chunks aligned to those sections.
+  - Tables within a document are extractable as structured content and remain queryable.
+  - The structural position of each chunk within the document (e.g., its section heading) is preserved and surfaced in citations.
+  - Adjacent chunks within a document can be linked to reconstruct surrounding context.
+type: F
+urgency: 5
+version: '0.1'

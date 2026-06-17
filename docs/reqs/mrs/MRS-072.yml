@@ -1,0 +1,19 @@
+acceptancecriteria: GPU utilized.
+active: true
+comments: null
+coverage: 100
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Performance.
+ref: ''
+releasephase: beta
+requirement: The system shall support GPU acceleration.
+reviewed: fN96CgdAHTAIXZLxBcejjwRZHLGJa7VkBm-_OzMV8sk=
+text: ''
+type: O
+urgency: 3
+verification: T

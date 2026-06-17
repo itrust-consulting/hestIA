@@ -1,0 +1,21 @@
+acceptancecriteria: |
+  All supported formats imported and exported without data loss.
+active: true
+comments: JSON, xlsx, and CSV parsing supported.
+coverage: 25
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: Automation and integration.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall import and export CMDB/asset inventory data in JSON, XLSX, and CSV formats.
+reviewed: u5kZ5NI63uxQK14wsWioiH_2qA_BKg1C1y3A-EUibXw=
+text: ''
+type: F
+urgency: 5
+verification: T

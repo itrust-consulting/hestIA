@@ -1,0 +1,58 @@
+@startuml FAD — Knowledge Query Workflow
+!theme plain
+skinparam ActivityBorderColor #444444
+skinparam ActivityBackgroundColor #F5F5F5
+skinparam ActivityFontSize 12
+skinparam ArrowColor #444444
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #CCBB55
+
+start
+
+:User submits natural language query\n(text, collection, [conversation_id]);
+
+:FC-01 authenticates request (FC-02);
+
+:FC-03 evaluates collection access policy;
+
+if (Policy decision?) then (DENY)
+  :Reject — 403 Forbidden;
+  stop
+else (ALLOW or FILTER)
+endif
+
+note right
+  FILTER decision: classification ceiling
+  injected as hard retrieval constraint
+end note
+
+if (Multi-turn mode?) then (Yes)
+  :FC-10 loads bounded conversation history\n(last N message pairs);
+else (No)
+endif
+
+:FC-05 begins workflow execution;
+
+fork
+  :FC-05 — EncodeDense\ndense semantic vector via LLM Server;
+fork again
+  :FC-05 — EncodeSparse\nkeyword vector against collection corpus;
+end fork
+
+:FC-07 retrieves ranked chunks\n(hybrid search + classification filter applied);
+
+:FC-08 constructs augmented prompt\n(chunks + citation keys + user query);
+
+:FC-09 invokes LLM for generation\n(streaming or non-streaming);
+
+:Response delivered to user\n(text + citations);
+
+if (Persist conversation?) then (Yes)
+  :FC-10 appends user message\nand assistant response;
+else (No)
+endif
+
+:FC-18 records audit entry\n(interaction + accessed resources);
+
+stop
+@enduml

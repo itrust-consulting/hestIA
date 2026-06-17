@@ -1,0 +1,55 @@
+@startuml RAG Chat
+!theme plain
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign left
+
+actor "User" as USR
+participant "Web UI" as UI
+participant "API Layer" as API
+participant "Request Handler" as RH
+participant "Access Policy" as POL
+participant "Orchestrator" as ORCH
+participant "LLM Server" as LLM
+database "Vector DB" as VDB
+database "User Store" as UDB
+
+USR -> UI : submit message
+UI -> API : POST /chat  (Bearer token)
+API -> API : validate JWT
+API -> RH : ExecutionRequest
+
+RH -> POL : check(user, collection)
+POL -> UDB : load roles + classification level
+UDB --> POL : permissions
+POL --> RH : ALLOW / FILTER / DENY
+
+alt DENY
+  RH --> API : 403 Forbidden
+  API --> UI : 403
+else ALLOW or FILTER
+  RH -> ORCH : execute(rag_chat workflow)
+
+  ORCH -> LLM : embed(user_message)
+  LLM --> ORCH : dense_vector
+
+  ORCH -> ORCH : sparse_encode(user_message)  [BM25, local]
+
+  ORCH -> VDB : hybrid_search(dense + sparse)\n[+ classification filter if FILTER]
+  VDB --> ORCH : ranked chunks
+
+  ORCH -> ORCH : augment(user_message + chunks)
+
+  ORCH -> UDB : load conversation history
+  UDB --> ORCH : prior messages
+
+  ORCH -> LLM : chat(history + augmented_message)  [stream]
+  LLM --> ORCH : streamed tokens
+
+  ORCH --> RH : response + citations
+  RH -> UDB : persist(message + citations)
+
+  RH --> API : SSE stream
+  API --> UI : SSE stream
+  UI --> USR : real-time response + citations
+end
+@enduml

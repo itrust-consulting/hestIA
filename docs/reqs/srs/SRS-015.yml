@@ -1,0 +1,39 @@
+active: true
+dependence: []
+derived: false
+difficulty: 3
+header: ''
+importance: 5
+level: 5.1
+links:
+- MRS-032: kBtVpBCEhKkL0u1Eo5KUz6jyZyR57usHc33j97GzmUg=
+- MRS-033: 5W19ZaMOXG8nEcnHa7zCFFOr7nyqMXfx3hNQRDJUzXM=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: 0Ak4kAgCs_baWJd_KOXypCxS6VQ7OHms8mFHA_Hx2hI=
+risk: 3
+status: implemented
+text: |
+  # Cited and Transparent AI Responses
+
+  As an analyst,
+  I want every AI response to include citations identifying the source documents and passages used to generate the answer,
+  so that I can verify claims and trace each response to authoritative source material.
+
+  1. Submit a query against a collection.
+  2. Review the AI-generated answer alongside the citations provided.
+  3. Use the citations to locate the original source passages in the referenced documents.
+
+  ### Rationale
+  Transparency is essential for trust in AI-assisted governance and compliance workflows. Users and auditors must be able to verify that answers are grounded in actual organizational documentation, not model inference alone.
+
+  ### Acceptance criteria
+  - Every AI response produced from a collection query includes at least one citation when relevant passages were retrieved.
+  - Each citation identifies the source document and the specific section or passage that contributed to the answer.
+  - The retrieved passages used to generate the answer are accessible for inspection, not only the generated text.
+  - A response produced without any collection query (plain completion) contains no citations.
+type: F
+urgency: 5
+version: '0.1'

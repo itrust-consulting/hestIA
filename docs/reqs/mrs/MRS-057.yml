@@ -1,0 +1,19 @@
+acceptancecriteria: Inconsistencies reported.
+active: true
+comments: null
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Quality.
+ref: ''
+releasephase: beta
+requirement: The system may support consistency validation.
+reviewed: l2jbZp8mYcZqdppBbtWoctUthlAoZSLK_-MblbXKVAg=
+text: ''
+type: F
+urgency: 2
+verification: A

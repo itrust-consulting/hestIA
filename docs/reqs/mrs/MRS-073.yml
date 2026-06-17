@@ -1,0 +1,19 @@
+acceptancecriteria: Components scale.
+active: true
+comments: null
+coverage: 25
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Scalability.
+ref: ''
+releasephase: beta
+requirement: The system should support horizontal scaling.
+reviewed: p7eOPMxdsLiXAoBk1uccw6eJiIVkwrHMEqSGn0G2l1A=
+text: ''
+type: O
+urgency: 3
+verification: A

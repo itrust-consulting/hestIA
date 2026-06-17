@@ -1,0 +1,19 @@
+acceptancecriteria: Scheduled jobs run.
+active: true
+comments: null
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Automation.
+ref: ''
+releasephase: beta
+requirement: The system may support scheduling or triggers.
+reviewed: 7s2dP4JBmRVLvESYX-BEj2e-9mBZlMDo5nkyiGzLcHg=
+text: ''
+type: O
+urgency: 2
+verification: R

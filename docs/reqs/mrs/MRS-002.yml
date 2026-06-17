@@ -1,0 +1,22 @@
+acceptancecriteria: All core features available via UI and API.
+active: true
+comments: "Chat access via API possible by using curl. \nUser mgmt, fully supported\
+  \ via CLI and partially via web interface. \nDb management currently via CLI invoking\
+  \ scripts.\n"
+coverage: 80
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Supports human and system integrations.
+ref: ''
+releasephase: alpha
+requirement: |
+  The system shall provide both a user interface and an API for all core capabilities.
+reviewed: Ph7Xj_SJq17FLukz6vK1VpvY7SE5HvEvzv5UlBw4pUE=
+text: ''
+type: F
+urgency: 4
+verification: I

@@ -1,0 +1,21 @@
+acceptancecriteria: |
+  Multiple LLM backends configurable without code changes; fine-tuned model loadable as a named backend without code changes.
+active: true
+comments: Merges MRS-040 (fine-tuned model integration).
+coverage: 100
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: Flexibility.
+ref: ''
+releasephase: beta
+requirement: |
+  The system should support multiple interchangeable LLM backends, including fine-tuned model variants, without code changes.
+reviewed: sPqQm5xsRQdLUySnXAqZPWKD3gtsMN7mESukheta3Ks=
+text: ''
+type: F
+urgency: 3
+verification: R

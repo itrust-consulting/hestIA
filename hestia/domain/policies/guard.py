@@ -29,6 +29,7 @@ class PolicyGuard(Protocol):
     def check(self, req: ExecutionRequest) -> PolicyResult: ...
 
 
+# @MRS-063, @MRS-031
 class CollectionAccessPolicy:
 
     def check(self, req: ExecutionRequest) -> PolicyResult:

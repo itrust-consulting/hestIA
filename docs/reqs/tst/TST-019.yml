@@ -1,0 +1,46 @@
+active: true
+derived: false
+header: |
+  Verify ingestion, retrieval, and service stability with a documentation corpus of at least 100 GB
+level: 19.0
+links:
+- SRS-019: null
+normative: true
+ref: ''
+reviewed: null
+release: alpha
+version: 0.1
+platform: GNU/Linux (Dockerized deployment environment)
+authors: ACR
+execution_type: Manual
+complexity: 5
+test_data: |
+  A representative documentation corpus totalling at least 100 GB distributed across multiple collections;
+  a benchmark query set with known relevant documents;
+  response-time thresholds from T1.4 stress testing;
+  system monitoring tooling (log access, service health endpoint)
+verification_method: T
+references:
+  - path: docs/reqs/tst/assets
+    type: file
+expected_outcome: Full corpus ingested without errors or data loss; queries return relevant results within benchmark thresholds; all services remain operational.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with sufficient disk storage and memory for the 100 GB target corpus
+  - Qdrant and the LLM/embedding server are running and reachable
+  - Batch ingestion tooling is available for the corpus
+  - System logs are accessible for error monitoring
+  - Response-time thresholds from the T1.4 stress test are documented
+
+  ## Test steps
+  1. Ingest the full corpus in batches across multiple collections. Log any per-document ingestion errors.
+  2. After ingestion completes, call GET /ready. Confirm all services report as operational.
+  3. Inspect system logs for data-loss or corruption errors.
+  4. Submit the benchmark query set against the full corpus. Record response times for each query.
+  5. Compare recorded response times against the T1.4 benchmark thresholds.
+
+  ## Expected outcome
+  1. The full 100 GB corpus is ingested with no data loss (all expected documents are retrievable).
+  2. All services remain operational throughout and after ingestion.
+  3. System logs contain no data-loss or corruption errors.
+  4. Query response times remain within the T1.4 benchmark thresholds.

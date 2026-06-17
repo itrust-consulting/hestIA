@@ -1,0 +1,22 @@
+acceptancecriteria: |
+  Threats and vulnerabilities for a queried asset type returned from the ingested threat intelligence database.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 2
+level: 1.0
+links: []
+normative: true
+rationale: Integrated threat context for risk assessment.
+ref: ''
+releasephase: beta
+requirement: |
+  The system may enable users to query threats and vulnerabilities associated
+  with a selected asset or asset type.
+reviewed: dluVzmprdgvCWiKy0I8_Tz4kXFR8ZQVY0S_YzNm6JXk=
+text: ''
+type: F
+urgency: 2
+verification: T

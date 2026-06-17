@@ -16,6 +16,7 @@ from hestia.infrastructure.logging.audit import audit
 
 _log = logging.getLogger("hestia.system")
 
+# @MRS-038
 RAG_PROMPT = """
     You are an assistant with access to an organizations ISMS knowledge base of Markdown documents.
     Below are the most relevant excerpts retrieved from that database.
@@ -42,6 +43,7 @@ RAG_PROMPT = """
     """
 
 
+# @MRS-032, @MRS-068
 def _format_citations(hits: list) -> tuple[dict, list]:
     retrieved_data = []
     source_map = []
@@ -98,11 +100,11 @@ def _extract_used_citekeys(text: str) -> set[str]:
     return keys
 
 
+# @MRS-058
 class Runner:
 
     def __init__(self, container):
         self.container = container
-        self.last_slot: dict = {}
         self.node_handlers = {
             "EncodeDense":  self._run_encode_dense,
             "EncodeSparse": self._run_encode_sparse,
@@ -112,7 +114,8 @@ class Runner:
             "Chat":         self._run_chat,
         }
 
-    def run(self, plan, stream=False):
+    # @MRS-058
+    async def run(self, plan, stream=False):
         slot = {}
         order = self._linear_order(plan)
         nodes = {n.id: n for n in plan.nodes}
@@ -124,7 +127,7 @@ class Runner:
             if not handler:
                 raise ConfigurationError(f"Node type '{node.type}' is not supported.")
             _log.debug("runner_node", extra={"node_id": nid, "node_type": node.type})
-            handler(node, slot, stream=False)
+            await handler(node, slot, stream=False)
 
         final = nodes[order[-1]]
         handler = self.node_handlers.get(final.type)
@@ -132,26 +135,24 @@ class Runner:
             raise ConfigurationError(f"Node type '{final.type}' is not supported.")
         _log.debug("runner_node", extra={"node_id": final.id, "node_type": final.type, "is_final": True})
 
-        # Expose slot so PersistChat can read _cite_list after intermediates have run
-        self.last_slot = slot
-
         if not stream:
-            handler(final, slot, stream=False)
-            return slot.get("final")
-        return handler(final, slot, stream=True)
+            await handler(final, slot, stream=False)
+            return slot.get("final"), slot
+        gen = await handler(final, slot, stream=True)
+        return gen, slot
 
-    def _run_encode_dense(self, node, slot, stream):
+    async def _run_encode_dense(self, node, slot, stream):
         svc = self._svc("encDense")
-        dense = svc.encode(self._resolve(node.inputs.get("data"), slot))
+        dense = await svc.encode(self._resolve(node.inputs.get("data"), slot))
         slot[node.outputs.get("vector", "vector")] = dense
 
-    def _run_encode_sparse(self, node, slot, stream):
+    async def _run_encode_sparse(self, node, slot, stream):
         svc = self._svc("encSparse")
         data = self._resolve(node.inputs.get("data"), slot)
         collection = self._resolve(node.inputs.get("collection"), slot)
         slot[node.outputs.get("vector", "vector")] = svc.encode(data, collection)
 
-    def _run_retrieve(self, node, slot, stream):
+    async def _run_retrieve(self, node, slot, stream):
         svc = self._svc("search")
         dense = self._resolve(node.inputs.get("dense"), slot)
         sparse = self._resolve(node.inputs.get("sparse"), slot)
@@ -162,10 +163,11 @@ class Runner:
             raise ConfigurationError("Retrieve node received no query vector — check template wiring.")
         collection = self._resolve(node.inputs.get("collection"), slot)
         options = self._resolve(node.inputs.get("options"), slot) or {}
-        hits = svc.retrieve(collection, query, options=options)
+        hits = await svc.retrieve(collection, query, options=options)
         slot[node.outputs.get("hits", "hits")] = hits.points
 
-    def _run_augment(self, node, slot, stream):
+    # @MRS-033
+    async def _run_augment(self, node, slot, stream):
         prompt = self._resolve(node.inputs.get("prompt"), slot) or ""
         hits = self._resolve(node.inputs.get("hits"), slot) or []
         augmented, cite_list = _build_prompt(prompt, hits)
@@ -174,23 +176,23 @@ class Runner:
         if hits:
             slot["_aug_prompt"] = augmented
 
-    def _run_generate(self, node, slot, stream):
+    async def _run_generate(self, node, slot, stream):
         svc = self._svc("generate")
         prompt = self._resolve(node.inputs.get("prompt"), slot)
         if stream:
-            return svc.generate(prompt=prompt, model=node.model, options=node.options, stream=True)
-        resp = svc.generate(prompt=prompt, model=node.model, options=node.options, stream=False)
+            return await svc.generate(prompt=prompt, model=node.model, options=node.options, stream=True)
+        resp = await svc.generate(prompt=prompt, model=node.model, options=node.options, stream=False)
         slot[node.outputs.get("response", "response")] = resp
         slot["final"] = resp
 
-    def _run_chat(self, node, slot, stream):
+    async def _run_chat(self, node, slot, stream):
         svc = self._svc("generate")
         history = self._resolve(node.inputs.get("history"), slot) or []
         last = self._resolve(node.inputs.get("last_user_message"), slot)
         messages = history + [{"role": "user", "content": last}]
         if stream:
-            return svc.chat(messages=messages, model=node.model, options=node.options, stream=True)
-        resp = svc.chat(messages=messages, model=node.model, options=node.options, stream=False)
+            return await svc.chat(messages=messages, model=node.model, options=node.options, stream=True)
+        resp = await svc.chat(messages=messages, model=node.model, options=node.options, stream=False)
         slot[node.outputs.get("response", "response")] = resp
         slot["final"] = resp
 
@@ -229,25 +231,24 @@ class PersistChat:
         self.req = req
         self.users = runner.container.services.get("users")
 
-    def run(self, plan, stream=False):
-        result = self.runner.run(plan, stream=stream)
+    async def run(self, plan, stream=False):
+        result, slot = await self.runner.run(plan, stream=stream)
         if stream:
-            return self._wrap_stream(result, self.req)
-        self._persist(self.req, result)
-        return result
+            return self._wrap_stream(result, self.req, slot), slot
+        self._persist(self.req, result, slot)
+        return result, slot
 
-    def _wrap_stream(self, iterable, req: ExecutionRequest):
-        final_text = ""
-        thinking_text = ""
-        cite_list: list = self.runner.last_slot.get("_cite_list", [])
+    def _wrap_stream(self, iterable, req: ExecutionRequest, slot: dict):
+        cite_list: list = slot.get("_cite_list", [])
 
-        def generator():
-            nonlocal final_text, thinking_text
+        async def generator():
+            final_text = ""
+            thinking_text = ""
             # Buffer for splitting inline <think>...</think> tags across chunks
             tag_buf = ""
             in_think = False
 
-            for chunk in iterable:
+            async for chunk in iterable:
                 if isinstance(chunk, dict):
                     raw_content = chunk.get("content", "")
                     # reasoning_content from vLLM / Ollama thinking field
@@ -294,7 +295,7 @@ class PersistChat:
             used = _extract_used_citekeys(final_text)
             citations = [c for c in cite_list if _normalize_citekey(c["key"]) in used]
             c_id, user_msg_id, assistant_msg_id = self._persist(
-                req, final_text, citations=citations, thinking=thinking_text or None
+                req, final_text, slot, citations=citations, thinking=thinking_text or None
             )
             yield (json.dumps({
                 "conversation_id": str(c_id),
@@ -306,7 +307,7 @@ class PersistChat:
 
         return generator()
 
-    def _persist(self, req: ExecutionRequest, assistant_reply: str, citations: list | None = None, thinking: str | None = None):
+    def _persist(self, req: ExecutionRequest, assistant_reply: str, slot: dict, citations: list | None = None, thinking: str | None = None):
         user_id = req.user.id
         now = now_epoch()
         if req.conversation_id:
@@ -318,7 +319,7 @@ class PersistChat:
         user_msg_id = None
         if req.last_user_message:
             user_meta: dict = {}
-            aug_prompt = self.runner.last_slot.get("_aug_prompt")
+            aug_prompt = slot.get("_aug_prompt")
             if aug_prompt:
                 user_content = aug_prompt
                 user_meta["display_content"] = req.last_user_display_content \
@@ -358,9 +359,10 @@ class RequestHandler:
         self.container = container
         self.policy = policy or ExecutionPolicy()
         self.builder = TemplatePlanBuilder(TemplateRepository())
+        self.builder.preload(list(self.TEMPLATE_MAP.values()))
         self.runner = Runner(container)
 
-    def resolve(self, req: ExecutionRequest, stream: bool = False):
+    async def resolve(self, req: ExecutionRequest, stream: bool = False):
         result: PolicyResult = self.policy.check(req)
 
         if result.decision == PolicyDecision.DENY:
@@ -393,10 +395,11 @@ class RequestHandler:
         runner = PersistChat(self.runner, req) if req.save_chat else self.runner
 
         if stream:
-            return runner.run(graph, stream=True)
+            gen, _ = await runner.run(graph, stream=True)
+            return gen
 
         t0 = time.perf_counter()
-        response = runner.run(graph, stream=False)
+        response, _ = await runner.run(graph, stream=False)
         latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
         audit.ai_response(
