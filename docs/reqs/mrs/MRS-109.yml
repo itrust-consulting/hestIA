@@ -1,0 +1,29 @@
+acceptancecriteria: |
+  Audit logs are written append-only and cannot be modified via the
+  application API; a complete structured audit extract for a specified
+  time window and principal can be produced by an authorised administrator;
+  log integrity can be verified independently of the application.
+active: true
+comments: |
+  Extends MRS-064 with tamper-evidence and structured extractability as
+  explicit security properties. These are prerequisites for any incident
+  investigation regardless of the specific regulatory framework that applies.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: Auditability and incident investigation capability.
+ref: ''
+releasephase: beta
+requirement: |
+  The system's audit logs shall be tamper-evident and shall support extraction
+  of a complete structured audit record scoped by time window, principal, or
+  resource by an authorised administrator.
+reviewed: null
+text: ''
+type: S
+urgency: 3
+verification: R

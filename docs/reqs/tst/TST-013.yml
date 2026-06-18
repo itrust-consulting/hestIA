@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 4
 derived: false
+execution_type: Manual
+expected_outcome: |
+  No external inference calls observed; backends switch via configuration only; embedding model configurable via environment.
 header: |
   Verify all inference is served by locally hosted models and that backends are switchable without code changes
 level: 13.0
 links:
-- SRS-013: null
+- SRS-013: qd00gjVuUOE8l0Lz608MfPnW5GVn8bPpE_uQA_mVtKs=
 normative: true
-ref: ''
-reviewed: null
-release: beta
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 4
-test_data: Network monitoring tool; .env configuration variants for two LLM backends (e.g. vLLM and Ollama); one test document; a collection to ingest into
-verification_method: T
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: No external inference calls observed; backends switch via configuration only; embedding model configurable via environment.
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: HUTubSTPRx4gWkB3iKVdUnt2dS9LKRG4gKQy2OTWMNA=
+test_data: |
+  Network monitoring tool; .env configuration variants for two LLM backends (e.g. vLLM and Ollama); one test document; a collection to ingest into
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed with a locally hosted LLM inference server and embedding server (e.g. vLLM on port 8000)
@@ -41,3 +41,5 @@ text: |
   2. Network logs confirm zero requests to external inference APIs.
   3. The LLM backend switches between supported providers via configuration without source code changes.
   4. Embedding model selection via configuration takes effect after restart.
+verification_method: T
+version: 0.1

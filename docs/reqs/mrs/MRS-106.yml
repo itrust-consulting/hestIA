@@ -1,0 +1,33 @@
+acceptancecriteria: |
+  Deployment documentation specifies encryption controls for storage and
+  inter-component transport; operator confirms implementation prior to
+  go-live and the confirmation is recorded.
+active: true
+comments: |
+  Intentionally a deployment-level requirement rather than application-level.
+  MRS-065 was correctly rejected because encryption is delegated to
+  infrastructure (TLS, disk encryption, VPN). This requirement ensures those
+  controls are formally mandated and auditable rather than implied. Satisfies
+  NIS2 Art. 21(1)(h) and GDPR Art. 32(1)(a).
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: >
+  GDPR Article 32 and NIS2 Article 21 encryption obligation; replaces the
+  infrastructure delegation implicit in rejected MRS-065.
+ref: ''
+releasephase: beta
+requirement: |
+  The system's deployment guide shall mandate encrypted storage for all
+  databases and encrypted transport between components, and shall specify
+  the minimum required controls. Operator confirmation of compliance shall
+  be a prerequisite for production deployment.
+reviewed: null
+text: ''
+type: S
+urgency: 4
+verification: R

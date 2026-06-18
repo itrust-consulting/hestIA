@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  A mechanism for correcting inaccurate personal data is available and
+  its use is recorded in the audit log.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 5.1d (accuracy principle).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall maintain personal data in an accurate and up-to-date
+  state in cooperation with the controller.
+reviewed: null
+text: ''
+type: S
+urgency: 2
+verification: T

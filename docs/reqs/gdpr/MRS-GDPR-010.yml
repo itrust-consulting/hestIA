@@ -1,0 +1,29 @@
+acceptancecriteria: |
+  Breach events are recorded in the audit log; a notification mechanism
+  to the controller is operational and includes sufficient information
+  for the controller to fulfil its Art. 33.1 and Art. 34 obligations.
+active: true
+comments: |
+  The processor's obligation under Art. 33.2 is to notify the controller
+  once a breach is discovered, not to proactively detect breaches.
+  Detection is covered as a security measure by MRS-GDPR-005.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 33.2 (processor obligation to notify controller of personal data breach without undue delay).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall record any personal-data breach and notify the
+  controller without undue delay, providing sufficient information for
+  the controller to meet its notification obligations under Art. 33.1
+  and Art. 34.
+reviewed: null
+text: ''
+type: S
+urgency: 3
+verification: T

@@ -1,0 +1,37 @@
+active: true
+dependence:
+- SRS-004
+derived: false
+difficulty: 2
+header: ''
+importance: 4
+level: 2.1
+links:
+- MRS-062: null
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: null
+risk: 4
+status: implemented
+text: |
+  # Login Rate Limiting
+
+  As a security-conscious system,
+  I want to limit the rate of failed authentication attempts from a single source,
+  so that automated brute-force or credential-stuffing attacks against the login endpoint are prevented.
+
+  1. Submit repeated failed login attempts within a short time window from the same source.
+  2. Observe that successful login remains available after the rate-limit window expires.
+
+  ### Rationale
+  Unrestricted login attempts enable automated credential-guessing attacks. Rate limiting is a standard authentication hardening measure that raises the cost of brute-force attacks without impeding legitimate users.
+
+  ### Acceptance criteria
+  - Repeated failed login attempts from the same source return HTTP 429 Too Many Requests after exceeding the configured threshold.
+  - Successful login is possible again once the rate-limit window has elapsed.
+  - The rate-limit threshold and window are configurable via deployment settings.
+type: S
+urgency: 4
+version: '0.1'

@@ -1,0 +1,27 @@
+acceptancecriteria: |
+  AI system documentation, risk assessment record, and human oversight
+  controls are present and traceable to ISO/IEC 42001 clauses.
+active: true
+comments: |
+  Scope conditioned on whether the operating organization pursues ISO 42001
+  certification. Links to MRS-088 (EU AI Act), which shares overlapping
+  human-oversight and documentation obligations.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: []
+normative: true
+rationale: ISO/IEC 42001 conformance recommendation for AI systems deployed in ISMS contexts.
+ref: ''
+releasephase: beta
+requirement: |
+  The system should be developed and operated in conformance with applicable
+  ISO/IEC 42001 obligations, covering AI system documentation, risk
+  assessment, and human oversight provisions.
+reviewed: null
+text: ''
+type: C
+urgency: 2
+verification: R

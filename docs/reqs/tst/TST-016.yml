@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 2
 derived: false
+execution_type: Manual/Automated
+expected_outcome: |
+  Parameters demonstrably affect output; minimum temperature produces consistent results; models are discoverable.
 header: |
   Verify that generation parameters affect response behaviour and that available models are discoverable
 level: 16.0
 links:
-- SRS-016: null
+- SRS-016: A-b-0n5buxq3IBDM2Bb1nN4kw1VAcKOpHcr6cm2rCIs=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual/Automated
-complexity: 2
-test_data: Analyst credentials; a fixed test prompt with a deterministic expected answer; two max_tokens values (e.g. 50 and 500)
-verification_method: T
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Parameters demonstrably affect output; minimum temperature produces consistent results; models are discoverable.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: SbP1JDfpcU7X_5ytYeICncg5G7mjwfMGJZaegS5Eb8s=
+test_data: |
+  Analyst credentials; a fixed test prompt with a deterministic expected answer; two max_tokens values (e.g. 50 and 500)
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running with the LLM service active
@@ -37,3 +37,5 @@ text: |
   1. Available models are returned by the system without consulting external sources.
   2. Two identical prompts at minimum temperature produce consistent (identical or near-identical) responses.
   3. A max_tokens value of 50 produces a measurably shorter response than 500 tokens.
+verification_method: T
+version: 0.1

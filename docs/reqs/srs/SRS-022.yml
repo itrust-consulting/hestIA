@@ -1,0 +1,43 @@
+active: true
+dependence:
+- SRS-004
+- SRS-005
+derived: false
+difficulty: 2
+header: ''
+importance: 3
+level: 7.0
+links:
+- MRS-002: null
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: null
+risk: 1
+status: implemented
+text: |
+  # Help Content Management
+
+  As a system administrator,
+  I want to create, update, and delete user-facing help documentation directly through the system,
+  so that the help manual can be maintained without redeploying the application.
+
+  1. Create or overwrite a named help section with Markdown content.
+  2. Upload images to accompany the help content and reference them in Markdown.
+  3. Rename an image; all Markdown references to that image across all sections are automatically updated.
+  4. Delete sections and images that are no longer needed.
+  5. End-users read help sections and images through the same API without requiring admin privileges.
+
+  ### Rationale
+  Operational guidance and user onboarding content evolves with each release. Allowing administrators to manage help content in-system, without code changes or redeployment, keeps documentation current and reduces maintenance overhead.
+
+  ### Acceptance criteria
+  - Administrators can create, update, and delete help sections via the API.
+  - Images can be uploaded, renamed, and deleted by administrators.
+  - Renaming an image automatically rewrites all Markdown references to that image across all help sections atomically.
+  - Non-administrative users can read sections and retrieve images but cannot create, modify, or delete them.
+  - Help sections are listed in a consistent order determined by their frontmatter metadata.
+type: F
+urgency: 2
+version: '0.1'

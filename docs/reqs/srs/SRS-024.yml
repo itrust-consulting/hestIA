@@ -1,0 +1,39 @@
+active: true
+dependence:
+- SRS-014
+derived: false
+difficulty: 3
+header: ''
+importance: 4
+level: 5.1
+links:
+- MRS-027: null
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: null
+risk: 2
+status: implemented
+text: |
+  # Hybrid Retrieval Mode
+
+  As an analyst,
+  I want to search the knowledge base using semantic similarity, keyword matching, or a combination of both,
+  so that I can trade precision for recall depending on the query type, and benefit from both retrieval strategies simultaneously.
+
+  1. Submit a search or chat query specifying semantic, keyword, or hybrid retrieval mode.
+  2. The system retrieves passages ranked by the selected strategy.
+  3. Compare results across modes for the same query to select the most relevant approach.
+
+  ### Rationale
+  Semantic retrieval excels at conceptual queries but can miss exact-match requirements; keyword (BM25) retrieval is precise for named entities and technical terms but misses paraphrase. Hybrid retrieval combines both, producing more robust results across the full range of queries hestIA receives.
+
+  ### Acceptance criteria
+  - Semantic mode ranks passages by vector similarity.
+  - Keyword mode ranks passages by BM25 term frequency.
+  - Hybrid mode combines both scores and returns a merged, re-ranked result set.
+  - All three modes are accessible via the /search endpoint and the /chat and /generate endpoints when a collection is specified.
+type: F
+urgency: 4
+version: '0.1'

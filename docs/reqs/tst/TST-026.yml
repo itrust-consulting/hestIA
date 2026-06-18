@@ -1,0 +1,55 @@
+active: true
+authors: ACR
+complexity: 4
+derived: false
+execution_type: Manual
+expected_outcome: |
+  Organisations can be created, updated, and deleted; members can be enrolled and removed; tenant-collection grants control retrieval scope; the one-moderator-per-org constraint is enforced.
+header: |
+  Verify organisation lifecycle and tenant-collection management
+level: 26.0
+links:
+- SRS-005: null
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  An admin account; two test user accounts (user A and user B); an existing collection.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with the admin account active
+  - The test users exist but are not yet members of any organisation
+  - At least one collection exists
+
+  ## Test steps
+  1. As admin, call POST /organizations/create with a name and abbreviation. Confirm 201 Created and a valid org_id is returned.
+  2. Call GET /organizations. Confirm the new organisation appears in the list.
+  3. Call PUT /organizations/{org_id} to update the organisation name. Confirm 200 OK and the updated name.
+  4. Call POST /organizations/{org_id}/members/{user_id} to add user A. Confirm 200 OK. Call GET /organizations/{org_id}/members and confirm user A is listed.
+  5. Assign user A as moderator via PATCH /organizations/{org_id}/members/{user_id}/role. Confirm 200 OK.
+  6. Attempt to assign user B as a second moderator of the same organisation. Confirm the request is rejected (the one-moderator constraint).
+  7. Call PUT /organizations/{org_id}/collections/{collection_id} to grant the organisation owner access to the collection. Confirm 200 OK.
+  8. Call GET /organizations/{org_id}/collections. Confirm the collection appears with owner-level access.
+  9. Call DELETE /organizations/{org_id}/collections/{collection_id}. Confirm 200 or 204. Call GET /organizations/{org_id}/collections and confirm the collection is no longer listed.
+  10. Call DELETE /organizations/{org_id}/members/{user_id} to remove user A. Confirm 200 or 204. Call GET /organizations/{org_id}/members and confirm user A is absent.
+  11. Call DELETE /organizations/{org_id}. Confirm 200 or 204. Call GET /organizations and confirm the organisation is no longer listed.
+
+  ## Expected outcome
+  1. Organisation is created with a valid org_id.
+  2. Organisation appears in the listing.
+  3. Name update is reflected immediately.
+  4. User A is enrolled and appears in the member list.
+  5. User A is assigned moderator role.
+  6. Second moderator assignment is rejected.
+  7. Collection grant succeeds.
+  8. Collection appears in the org's collection list with correct access level.
+  9. Collection grant is removed.
+  10. User A is removed from the member list.
+  11. Organisation is deleted and absent from subsequent listings.
+verification_method: T
+version: 0.1

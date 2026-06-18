@@ -91,7 +91,7 @@ class Settings(BaseModel):
     project_root: pathlib.Path = pathlib.Path(".")
     app_data: pathlib.Path = pathlib.Path("./app/data")
     udb_path: pathlib.Path = pathlib.Path("./app/data/users.db")
-    corpus_dir: pathlib.Path = pathlib.Path("./app/data/corpus_dir")
+    corpus_stats: pathlib.Path = pathlib.Path("./app/data/corpus_stats")
 
     # --- logging ---
     log_level: str = "INFO"
@@ -157,7 +157,7 @@ class Settings(BaseModel):
             project_root=project_root,
             app_data=app_data,
             udb_path=app_data / "users.db",
-            corpus_dir=app_data / "corpus_dir",
+            corpus_stats=app_data / "corpus_stats",
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             log_dir=app_data.parent / (os.getenv("LOG_DIR") or "logs"),
             log_to_console=os.getenv("LOG_TO_CONSOLE", "true").lower() == "true",

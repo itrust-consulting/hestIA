@@ -1,0 +1,44 @@
+active: true
+dependence:
+- SRS-004
+- SRS-014
+derived: false
+difficulty: 3
+header: ''
+importance: 4
+level: 5.2
+links:
+- MRS-002: null
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: null
+risk: 2
+status: implemented
+text: |
+  # Conversation History Management
+
+  As an analyst,
+  I want my chat exchanges to be saved and retrievable across sessions,
+  so that I can review past queries and their answers, continue ongoing investigations, and build on previous research.
+
+  1. Submit a chat query with the option to persist the exchange to the conversation history.
+  2. Retrieve the list of saved conversations, ordered by most recent activity, up to the configured limit.
+  3. Open a saved conversation and review the full message history.
+  4. Rename a conversation to reflect the topic of the investigation.
+  5. Delete a conversation or an individual message from a conversation.
+
+  ### Rationale
+  Analytical work is iterative; users revisit and extend earlier queries. Persistent conversation history allows users to trace their research path, share findings with colleagues, and continue interrupted investigations without re-entering context.
+
+  ### Acceptance criteria
+  - A chat exchange submitted with persistence enabled appears in the conversation list after completion.
+  - The conversation list returns at most the configured maximum number of recent conversations (default: 20).
+  - The full message history of a saved conversation is retrievable by its identifier.
+  - Conversations can be renamed; the new title is reflected in subsequent list calls.
+  - Individual messages and entire conversations can be permanently deleted; deleted items are absent from subsequent retrievals.
+  - A user cannot access, modify, or delete conversations belonging to another user.
+type: F
+urgency: 3
+version: '0.1'

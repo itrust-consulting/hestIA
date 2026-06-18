@@ -1,28 +1,27 @@
 active: true
+authors: ACR
+complexity: 3
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Role and classification restrictions are enforced; admin has full access; moderators are scoped to their organization.
 header: |
   Verify role enforcement and classification-level filtering across user roles
 level: 5.0
 links:
-- SRS-005: null
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 3
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: RPx55sPKPWCTIAnKj5TsqpLBnKexOjrg0t-tKrCXlZU=
 test_data: |
   Admin account; standard user account (classification level 1 = INTERNAL);
   test collection containing documents at classification levels 1 (INTERNAL) and 3 (CONFIDENTIAL);
   organization moderator account; a second separate organization
-verification_method: T
-references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Role and classification restrictions are enforced; admin has full access; moderators are scoped to their organization.
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running
@@ -43,3 +42,5 @@ text: |
   2. A user with classification level 1 receives only content classified at level ≤ 1; higher-classified content is filtered out.
   3. Admin users have unrestricted access to all collections and classification levels.
   4. Moderators cannot manage organizations outside their own scope.
+verification_method: T
+version: 0.1

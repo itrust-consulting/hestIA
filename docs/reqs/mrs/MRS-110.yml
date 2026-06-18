@@ -1,0 +1,34 @@
+acceptancecriteria: |
+  A security review report covering authentication controls, authorization
+  enforcement, and input validation of all external-facing endpoints is
+  produced before each major release; all critical and high findings are
+  resolved or formally accepted before release sign-off.
+active: true
+comments: |
+  Review scope should include: JWT handling, access policy bypass scenarios,
+  file upload input validation, and multi-tenant data isolation. Does not
+  mandate a full penetration test for every release, but a structured review
+  by someone not on the implementing team.
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: []
+normative: true
+rationale: >
+  NIS2 Article 21(1)(e) vulnerability management; good practice for a system
+  handling sensitive ISMS and compliance documentation for public-sector operators.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall undergo a security review prior to each major release,
+  covering at minimum authentication controls, authorization enforcement,
+  and input validation of all external-facing endpoints. A review report
+  shall be produced and open findings resolved or formally accepted before
+  release.
+reviewed: null
+text: ''
+type: Q
+urgency: 3
+verification: R

@@ -103,10 +103,10 @@ def build_container(settings: Settings) -> Container:
         _log.info("service_init", extra={"service": "encDense", "model": settings.default_emb_model})
 
     if "encSparse" in requested:
-        sparse_enc = SparseEncoder(corpus_dir=settings.corpus_dir)
+        sparse_enc = SparseEncoder(corpus_stats=settings.corpus_stats)
         sparse_enc.preload_all()
         c.services["encSparse"] = sparse_enc
-        _log.info("service_init", extra={"service": "encSparse", "corpus_dir": str(settings.corpus_dir)})
+        _log.info("service_init", extra={"service": "encSparse", "corpus_stats": str(settings.corpus_stats)})
 
     if "generate" in requested:
         c.services["generate"] = generator

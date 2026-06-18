@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 4
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Successful RAG query confirms pipeline stages ran in order; Qdrant failure returns an error not a hallucination; new YAML template loads without code changes.
 header: |
   Verify multi-step pipeline execution, upstream failure handling, and extensibility via YAML templates
 level: 17.0
 links:
-- SRS-017: null
+- SRS-017: XnxZn6IbCnPK8eU5U2MZyq6SKUNrEcezemLvjMyDzmg=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 4
-test_data: Collection with ingested documents; a valid custom YAML workflow template file; Docker access to stop/start Qdrant; analyst credentials
-verification_method: T
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Successful RAG query confirms pipeline stages ran in order; Qdrant failure returns an error not a hallucination; new YAML template loads without code changes.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: kCv4pc5Ic79QN02nQcwRItqJDWdP9T-bKUathSWBIVw=
+test_data: |
+  Collection with ingested documents; a valid custom YAML workflow template file; Docker access to stop/start Qdrant; analyst credentials
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed with all pipeline services active
@@ -41,3 +41,5 @@ text: |
   2. With Qdrant unavailable, the system returns an error — not a hallucinated or empty response.
   3. After Qdrant restarts, queries succeed again.
   4. The new YAML workflow template takes effect after backend restart without any source code change.
+verification_method: T
+version: 0.1

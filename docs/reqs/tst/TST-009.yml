@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 2
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Valid documents are ingested in a single operation; the corrupted file is reported per-document without blocking others.
 header: |
   Verify batch ingestion processes all valid files and isolates failures per document
 level: 9.0
 links:
-- SRS-009: null
+- SRS-009: igjnfVtWJESKiB0D1mOfJhe0aOXZqmDpNrLOkh4Q0lY=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 2
-test_data: A folder containing 5 valid documents (DOCX and PDF) and 1 intentionally corrupted file; moderator credentials
-verification_method: T
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Valid documents are ingested in a single operation; the corrupted file is reported per-document without blocking others.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: RpW_cHCD8C49292ye571WZU7viutM7lZZlFBXLneVJY=
+test_data: |
+  A folder containing 5 valid documents (DOCX and PDF) and 1 intentionally corrupted file; moderator credentials
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running with the ingestion service active
@@ -37,3 +37,5 @@ text: |
   1. All 5 valid documents are ingested in a single batch operation.
   2. The corrupted file fails with a per-document error; the failure does not prevent ingestion of the remaining files.
   3. All successfully ingested documents contribute searchable content to the collection.
+verification_method: T
+version: 0.1

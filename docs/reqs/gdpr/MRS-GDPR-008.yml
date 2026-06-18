@@ -1,0 +1,27 @@
+acceptancecriteria: |
+  Rectification, erasure, and portability requests are executable by an
+  authorised administrator and recorded in the audit log.
+active: true
+comments: |
+  itrust as processor does not respond to data subject requests directly;
+  it provides the technical mechanism for the controller to do so.
+  Specific implementation is to be defined at SRS level.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 16-20 (data subject rights); GDPR Art. 28.3e (processor obligation to assist controller).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall support the controller in fulfilling data-subject
+  rights, including rectification, erasure, and portability, within
+  the processor's scope.
+reviewed: null
+text: ''
+type: F
+urgency: 3
+verification: T

@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 3
 derived: false
+execution_type: Manual
+expected_outcome: |
+  hestIA is unreachable without VPN and fully functional once connected; no application changes required.
 header: |
   Verify that hestIA is accessible over VPN and unreachable without it
 level: 3.0
 links:
-- SRS-003: null
+- SRS-003: msdpq9JaMt6PSkWTlIj4OdpYt5TO0EcORmWsoIvDzSk=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 3
-test_data: VPN client configured for the organizational VPN; remote test host located outside the local network
-verification_method: T
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: hestIA is unreachable without VPN and fully functional once connected; no application changes required.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: pOn1Y1_O0ZQSlsflEar1fcdWeVk7u2l14kzTUbvMMME=
+test_data: |
+  VPN client configured for the organizational VPN; remote test host located outside the local network
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running
@@ -38,3 +38,5 @@ text: |
   1. hestIA is not reachable from outside the network without an active VPN connection.
   2. After connecting to the VPN, the hestIA web interface loads and all features are accessible.
   3. No changes to hestIA application configuration are required between steps 1 and 5.
+verification_method: T
+version: 0.1

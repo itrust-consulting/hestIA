@@ -1,0 +1,27 @@
+acceptancecriteria: |
+  Retention policy is configurable per data category; data purged on
+  expiry; manual deletion request is fulfilled and recorded in the
+  audit log.
+active: true
+comments: |
+  Specific retention periods are not defined at this level; they are to
+  be determined by each controller and configured at deployment time.
+  See also MRS-107 (MRS-level retention requirement).
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 5.1e (storage limitation); GDPR Art. 17 (right to erasure); GDPR Art. 25 (data protection by design).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall support the controller in enforcing retention limits
+  and secure deletion of personal data when no longer required.
+reviewed: null
+text: ''
+type: S
+urgency: 4
+verification: T

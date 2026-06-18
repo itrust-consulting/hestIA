@@ -1,0 +1,27 @@
+acceptancecriteria: |
+  Unauthenticated and unauthorised access is denied; all access events
+  are recorded in the audit log and attributable to an identified user.
+active: true
+comments: |
+  Access control implementation is specified in MRS-003, MRS-062, MRS-063.
+  Audit logging is specified in MRS-064. This requirement captures those
+  controls as a GDPR-derived obligation.
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 25 (data protection by design); GDPR Art. 32 (security of processing).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall ensure that access to personal data is restricted to
+  authorised users and processes acting under the controller's authority,
+  and shall ensure that such access is logged and auditable.
+reviewed: null
+text: ''
+type: S
+urgency: 4
+verification: T

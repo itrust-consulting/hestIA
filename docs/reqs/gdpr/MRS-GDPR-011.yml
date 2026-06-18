@@ -1,0 +1,31 @@
+acceptancecriteria: |
+  A DPIA information package is available covering processing activities,
+  data flows, security measures, and residual risks; package is sufficient
+  for the controller to conduct the DPIA required by the trigger
+  assessment in Annex A of the SCD.
+active: true
+comments: |
+  The DPIA is conducted by the controller, not by itrust. itrust's
+  obligation is to provide the technical and organisational information
+  the controller needs. The DPIA trigger assessment in SCD Annex A
+  determines that a DPIA is required for multi-entity deployments.
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 35 (data protection impact assessment); GDPR Art. 28.3e (processor obligation to assist controller).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall provide the controller with the technical and
+  organisational information required to conduct the DPIA determined
+  as necessary by this assessment, covering processing activities,
+  data flows, security measures, and residual risks.
+reviewed: null
+text: ''
+type: C
+urgency: 3
+verification: R

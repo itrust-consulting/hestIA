@@ -1,0 +1,29 @@
+acceptancecriteria: |
+  A compliance assessment has been conducted; applicable NIS2 measures are
+  identified and mapped to system or operational controls, or formally
+  accepted as residual risks.
+active: true
+comments: |
+  Applies to deployments for NIS2-obligated operators (e.g. municipalities).
+  The compliance assessment will determine which specific measures under
+  NIS2 Art. 21 are required; those obligations are not pre-empted here.
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: NIS2 compliance obligation for deployments serving NIS2-obligated operators.
+ref: ''
+releasephase: beta
+requirement: |
+  The system's deployment shall comply with applicable NIS2 obligations for
+  the operators it serves. A compliance assessment shall be conducted to
+  identify which NIS2 measures apply to the deployment context and map them
+  to corresponding system or operational controls.
+reviewed: null
+text: ''
+type: C
+urgency: 4
+verification: R

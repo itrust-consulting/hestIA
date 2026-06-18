@@ -1,29 +1,28 @@
 active: true
+authors: ACR
+complexity: 5
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Full corpus ingested without errors or data loss; queries return relevant results within benchmark thresholds; all services remain operational.
 header: |
   Verify ingestion, retrieval, and service stability with a documentation corpus of at least 100 GB
 level: 19.0
 links:
-- SRS-019: null
+- SRS-019: k-RF5cmuBFZ8y1ybQVvW5hCU_Iqa7yQV-OUaD3Iz0pE=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 5
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: kC7X4JeQD1u3c0sAupnAlgab-ycBR2Hih8p1wywxzIg=
 test_data: |
   A representative documentation corpus totalling at least 100 GB distributed across multiple collections;
   a benchmark query set with known relevant documents;
   response-time thresholds from T1.4 stress testing;
   system monitoring tooling (log access, service health endpoint)
-verification_method: T
-references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Full corpus ingested without errors or data loss; queries return relevant results within benchmark thresholds; all services remain operational.
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed with sufficient disk storage and memory for the 100 GB target corpus
@@ -44,3 +43,5 @@ text: |
   2. All services remain operational throughout and after ingestion.
   3. System logs contain no data-loss or corruption errors.
   4. Query response times remain within the T1.4 benchmark thresholds.
+verification_method: T
+version: 0.1

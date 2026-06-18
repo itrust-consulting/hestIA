@@ -1,0 +1,39 @@
+active: true
+authors: ACR
+complexity: 2
+derived: false
+execution_type: Manual
+expected_outcome: |
+  A single message can be deleted from a conversation without affecting other messages; ownership is enforced so users cannot delete messages from other users' conversations.
+header: |
+  Verify individual message deletion within a conversation
+level: 24.0
+links: []
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  Two authenticated user accounts (user A and user B); a conversation belonging to user A with at least three messages.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and both user accounts are authenticated
+  - User A has a conversation with at least three messages (obtainable by submitting multiple POST /chat requests with the same conversation_id)
+
+  ## Test steps
+  1. As user A, call GET /conversations/{cid} and note the message IDs.
+  2. Call DELETE /conversations/{cid}/messages/{mid} for the middle message. Confirm a 200 or 204 response.
+  3. Call GET /conversations/{cid} again. Confirm only the targeted message is absent; all other messages remain intact and in order.
+  4. As user B, attempt DELETE /conversations/{cid}/messages/{mid} on a message from user A's conversation. Confirm a 403 Forbidden or 404 Not Found response is returned.
+
+  ## Expected outcome
+  1. Message IDs are visible in the conversation history.
+  2. Deletion returns a success response.
+  3. Only the deleted message is absent; the remaining messages are unchanged.
+  4. Cross-user deletion is rejected with 403 or 404.
+verification_method: T
+version: 0.1

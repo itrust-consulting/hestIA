@@ -1,0 +1,27 @@
+acceptancecriteria: |
+  Security measures documented; system detects and records security
+  events affecting personal data.
+active: true
+comments: |
+  Detection of security events is a prerequisite for breach notification
+  (MRS-GDPR-010). Specific technical measures are defined at SRS level.
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 25 (data protection by design); GDPR Art. 32 (security of processing).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall preserve the confidentiality, integrity, and
+  availability of personal data through appropriate technical and
+  organisational measures, including the ability to detect security
+  events affecting personal data.
+reviewed: null
+text: ''
+type: S
+urgency: 4
+verification: R

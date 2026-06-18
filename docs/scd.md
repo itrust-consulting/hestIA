@@ -13,6 +13,7 @@
 ### 1.1 Context
 
 This system concept is developed in the context of work package (WP) 6 of the CyFORT project, under the codename hestIA, which is an on-premises AI assistant system for ISMS. 
+
 ---
 
 ### 1.2 Objectives
@@ -39,13 +40,13 @@ Background information on hestIA has been elaborated upon in other project artif
 ## 3. Requirements
 
 The requirements of hestIA have been produced in compliance with [2]. Along with the unique ID , each requirement has the default mandatory attributes:
-- Requirement: a description of the requirement itself. 
-- Importance: Identifies the priority level of the requirement, with 1 being the lowest and 5 the highest priority.
-- Type: Requirements vary in intent and in the kinds of properties they represent.  Use of a type of attribute aids in identifying relevant requirements and categorizing requirements into groups for analysis and allocation. 
-- Urgency: an indication of how quickly the requirement must be met.
+- **Requirement**: a description of the requirement itself. 
+- **Importance**: Identifies the priority level of the requirement, with 1 being the lowest and 5 the highest priority.
+- **Type**: Requirements vary in intent and in the kinds of properties they represent.  Use of a type of attribute aids in identifying relevant requirements and categorizing requirements into groups for analysis and allocation. 
+- **Urgency**: an indication of how quickly the requirement must be met.
 
 While acceptance criteria will be provided in future iterations in an incremental manner, for each requirement we specify the verification method.  Among the optional C5-DEC attributes we have specified:
-- Rationale: the main justification for the requirement’s existence. 
+- **Rationale**: the main justification for the requirement’s existence. 
 
 In a later stage of the requirements specification process, dealing with subsystem, modules and components, the grouping may disappear. 
 For further details and the full list of requirements we refer to [3].
@@ -274,3 +275,97 @@ LDAP/Active Directory or an OIDC provider for organisations that want to delegat
 **Audit logging** — Every request is assigned a correlation ID at the API boundary, which is propagated through all log entries for that request. Document accesses, AI interactions, and administrative actions are recorded as structured log entries and persisted in the User Store, providing a queryable audit trail for compliance and incident investigation.
 
 
+# Annex A - Data protection study
+
+The purpose of this assessment is to identify the General Data Protection Regulation (GDPR) articles that are relevant to the project and its data processing activities. This enables the derivation of system requirements that ensure the design and operation of the system are compliant with GDPR.
+
+Specifically, the assessment:
+
+- Classifies the types of data handled by the system and maps them to an inventory of processed data elements.
+- Determines whether a Data Protection Impact Assessment (DPIA) is required.
+- Determines whether cross-border data transfers are in scope.
+- Highlights applicable GDPR obligations.
+- Provides the rationale for deriving functional and non-functional requirements.
+
+## Data classification
+
+### Direct identifiers
+
+This class comprises all data elements that directly identify an individual without the need for additional information.
+
+### Indirect identifiers
+
+This class includes data elements that, while not directly identifying on their own, can be combined with other available information to identify an individual. This includes pseudonymised data, where the pseudonym–identity mapping exists elsewhere, as well as internal identifiers such as user IDs that are linked to a natural person within the system.
+
+### Aggregated data
+
+Aggregated data refers to collections of data elements contributed by multiple entities. Such collections may include both direct and indirect identifiers across contributing organisations.
+
+### High-risk data
+
+High-risk data are data elements whose compromise, unauthorised access, or misuse could severely impact the privacy, security, or rights of data subjects.
+
+### Data inventory
+
+The following table maps the data elements processed by hestIA to the classifications above and identifies their GDPR relevance.
+
+| Data element | Classification | Personal data | Notes |
+| --- | --- | --- | --- |
+| User account (username, e-mail, password hash) | Direct identifiers | Yes | Core identity data; Art. 6 lawful basis required by controller |
+| User roles and tenant memberships | Indirect identifiers | Yes | Linked to identified accounts; constitutes access-control data |
+| Conversation history (queries and responses) | Indirect identifiers / may contain direct | Yes | User-generated content may include personal references or data about third parties |
+| Audit log entries (user ID, action, timestamp, resource) | Indirect identifiers | Yes | Linked to identified users via user ID |
+| Ingested document content | Variable — may contain all classes | Conditional | Depends on document content; ISMS documents may reference named individuals |
+| Asset records — owner and contact fields | Indirect identifiers | Conditional | Asset contact fields may identify natural persons |
+| LLM inference inputs/outputs (transient, in-memory) | Indirect identifiers | Yes | Derived from conversation queries; not persisted separately from conversation history |
+
+Special-category data (Art. 9) is not processed by design. If ingested documents are found to contain special-category data, additional safeguards apply and shall be addressed in the controller’s DPIA.
+
+## DPIA trigger assessment
+
+Article 35(1) GDPR requires a Data Protection Impact Assessment prior to processing "likely to result in a high risk to the rights and freedoms of natural persons." The EDPB Guidelines on DPIA (WP248 rev.01) identify nine criteria; processing meeting two or more is recommended to trigger a DPIA.
+
+| # | Criterion | Applies | Rationale |
+| --- | --- | --- | --- |
+| 1 | Evaluation or scoring, including profiling | Partially | The compliance gap assessment feature (MRS-082, MRS-083) applies AI-based analysis to organisational documentation; it does not profile natural persons but uses automated processing to evaluate compliance posture. |
+| 2 | Automated decision-making with legal or similarly significant effect | No | All consequential actions require explicit human approval (MRS-056); no fully automated decisions affecting individuals. |
+| 3 | Systematic monitoring of individuals | No | The system does not monitor the behaviour of natural persons. |
+| 4 | Sensitive or special-category data (Art. 9) | Conditional | Not processed by design; criterion is triggered if ingested documents contain Art. 9 data. |
+| 5 | Large-scale processing | Conditional | Depends on the number of contributing municipalities and the volume of data subjects involved; to be confirmed per deployment. |
+| 6 | Matching or combining datasets from multiple sources | No | Datasets are logically separated by source (tenant). |
+| 7 | Data concerning vulnerable subjects | No | The system serves organisational users in a professional capacity. |
+| 8 | Innovative use or application of new technology | Yes | LLM-based processing of ISMS and compliance documentation constitutes a novel technology application. |
+| 9 | Processing that prevents data subjects from exercising rights or using a service | No | No such processing by design. |
+
+**Determination:** Criteria 8 applies unconditionally; criterion 1 applies partially; criterion 5 is deployment-dependent. With at minimum two criteria met, a DPIA is required under EDPB guidance before go-live in any multi-entity deployment. The DPIA shall be conducted by the controller; itrust’s obligations are captured in MRS-GDPR-011.
+
+## Cross-border data transfers
+
+hestIA operates fully on-premises with no external API calls at runtime (MRS-001, MRS-022). Personal data processed by the system does not leave the deployment environment during normal operation, and no third-country transfers within the meaning of GDPR Chapter V occur.
+
+Model weights and software components may be sourced from external repositories during initial setup, but this does not constitute a transfer of personal data. **GDPR Art. 44–49 is considered out of scope for this assessment.**
+
+## GDPR Requirements
+
+For the purposes of GDPR compliance, in the context of this project, itrust is classified as a data processor. itrust processes personal data on behalf of system users (the controllers) and does not determine the purposes or means of processing. Consequently, as a data processor itrust is primarily obligated to comply with GDPR Article 28.
+
+By virtue of Articles 28(3)(c), 28(3)(e), 28(3)(f), and 28(3)(g), and in fulfilling the processor’s obligation to assist the controller in ensuring compliance with GDPR, itrust is indirectly required to implement measures necessary to support the controller’s adherence to other relevant provisions of the Regulation.
+
+The controller retains responsibility for establishing the lawful basis under Art. 6 for each processing activity and for conducting the DPIA identified in the trigger assessment above. As processor, itrust shall maintain a record of processing activities carried out on behalf of each controller as required by Art. 30(2).
+
+In line with these obligations, the following GDPR articles are considered immediately relevant for the system.
+
+| ID | Name | Requirement | Justification |
+| --- | --- | --- | --- |
+| MRS-GDPR-001 | Lawful processing | The system shall support lawful processing of personal data in compliance with applicable GDPR obligations. This requirement is fulfilled through the combination of a Data Processing Agreement and the technical capabilities defined in MRS-GDPR-002 through MRS-GDPR-012. | GDPR Art. 5 <br> GDPR Art. 28 |
+| MRS-GDPR-002 | Data minimisation | The system shall ensure that only the data necessary for the defined processing purpose are collected, stored, and transmitted. | GDPR Art. 5.1b <br> GDPR Art. 5.1c <br> GDPR Art. 25 |
+| MRS-GDPR-003 | Data accuracy | The system shall maintain personal data in an accurate and up-to-date state in cooperation with the controller. | GDPR Art. 5.1d |
+| MRS-GDPR-004 | Data retention and deletion | The system shall support the controller in enforcing retention limits and secure deletion of personal data when no longer required. | GDPR Art. 5.1e <br> GDPR Art. 17 <br> GDPR Art. 25 |
+| MRS-GDPR-005 | Data security | The system shall preserve the confidentiality, integrity, and availability of personal data through appropriate technical and organisational measures, including the ability to detect security events affecting personal data. | GDPR Art. 5.1f <br> GDPR Art. 25 <br> GDPR Art. 32 |
+| MRS-GDPR-006 | Access control | The system shall ensure that access to personal data is restricted to authorised users and processes acting under the controller’s authority, and shall ensure that such access is logged and auditable. | GDPR Art. 5.1f <br> GDPR Art. 25 <br> GDPR Art. 32 |
+| MRS-GDPR-007 | Accountability and documentation | The system shall enable the controller to demonstrate compliance with applicable data-protection obligations through documentation and auditable records. | GDPR Art. 5.2 <br> GDPR Art. 25 <br> GDPR Art. 28.3e <br> GDPR Art. 30 |
+| MRS-GDPR-008 | Data-subject rights | The system shall support the controller in fulfilling data-subject rights, including rectification, erasure, and portability, within the processor’s scope. | GDPR Art. 16–20 <br> GDPR Art. 28.3e |
+| MRS-GDPR-009 | Availability, resilience, and restoration | The system shall maintain resilience and the capability to restore personal data and processing functions within agreed recovery objectives. | GDPR Art. 5.1f <br> GDPR Art. 32.1 |
+| MRS-GDPR-010 | Breach notification | The system shall record any personal-data breach and notify the controller without undue delay, providing sufficient information for the controller to meet its notification obligations under Art. 33.1 and Art. 34. | GDPR Art. 33.2 |
+| MRS-GDPR-011 | Data protection impact assessment | The system shall provide the controller with the technical and organisational information required to conduct the DPIA determined as necessary by this assessment, covering processing activities, data flows, security measures, and residual risks. | GDPR Art. 35 |
+| MRS-GDPR-012 | Continuous improvement | The system shall undergo periodic review, testing, and assessment of its data-protection measures to ensure ongoing effectiveness. | GDPR Art. 32.1d <br> GDPR Art. 28.3f |

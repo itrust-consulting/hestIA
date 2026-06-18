@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 2
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Citations present in all collection queries; each citation traces to a source; retrieved context accessible; plain completions produce no citations.
 header: |
   Verify that every collection-based AI response includes citations and that retrieved context is accessible
 level: 15.0
 links:
-- SRS-015: null
+- SRS-015: 4IpkFPYvBst8yhqVV1OvKsmZCYIuWYEClss4kyubFbY=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 2
-test_data: A collection with at least 3 ingested documents with known content; analyst credentials
-verification_method: I
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Citations present in all collection queries; each citation traces to a source; retrieved context accessible; plain completions produce no citations.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: SD2JbnluPs_SMzW-QjrkigSnOaPbUxYJ5Wf9xb6OZEQ=
+test_data: |
+  A collection with at least 3 ingested documents with known content; analyst credentials
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and all services are active
@@ -37,3 +37,5 @@ text: |
   2. Each citation identifies the source document and the contributing section or passage.
   3. The raw retrieved context passages are present in the response and accessible for independent inspection.
   4. A plain completion response contains an empty citations list.
+verification_method: I
+version: 0.1

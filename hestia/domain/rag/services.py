@@ -115,10 +115,10 @@ class SparseEncoder:
 
     TOKEN_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9_./-]+")
 
-    def __init__(self, corpus_dir: Path):
-        corpus_dir = Path(corpus_dir)
-        corpus_dir.mkdir(parents=True, exist_ok=True)
-        self.corpus_dir = corpus_dir
+    def __init__(self, corpus_stats: Path):
+        corpus_stats = Path(corpus_stats)
+        corpus_stats.mkdir(parents=True, exist_ok=True)
+        self.corpus_stats = corpus_stats
         self._cache: Dict[str, _CorpusStats] = {}
         self._lock = threading.Lock()
 
@@ -130,7 +130,7 @@ class SparseEncoder:
     # ------------------------------------------------------------------
 
     def _corpus_path(self, corpus_name: str) -> Path:
-        return self.corpus_dir / (corpus_name.strip().replace(" ", "_") + ".json")
+        return self.corpus_stats / (corpus_name.strip().replace(" ", "_") + ".json")
 
     def _load(self, corpus_name: str) -> _CorpusStats:
         path = self._corpus_path(corpus_name)
@@ -252,7 +252,7 @@ class SparseEncoder:
 
     def preload_all(self) -> None:
         """Load all corpus files from disk into the in-memory cache at startup."""
-        for path in sorted(self.corpus_dir.glob("*.json")):
+        for path in sorted(self.corpus_stats.glob("*.json")):
             try:
                 self._cache[path.stem] = self._load(path.stem)
                 _log.info("sparse_encoder_preloaded", extra={"corpus": path.stem})

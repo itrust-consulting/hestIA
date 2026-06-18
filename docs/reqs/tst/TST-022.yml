@@ -1,0 +1,39 @@
+active: true
+authors: ACR
+complexity: 2
+derived: false
+execution_type: Manual
+expected_outcome: |
+  Repeated failed login attempts from the same source are throttled; a 429 Too Many Requests response is returned once the rate limit is exceeded.
+header: |
+  Verify login rate limiting rejects rapid successive authentication attempts
+level: 22.0
+links:
+- SRS-004: null
+- SRS-020: null
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  A non-existent or invalid username/password pair; a tool capable of submitting rapid HTTP requests (e.g. curl in a loop, Locust, or Postman runner).
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and the login rate limiter is active
+  - The rate limit threshold and window are known (from configuration)
+
+  ## Test steps
+  1. Submit POST /login with invalid credentials. Confirm a 401 Unauthorized is returned.
+  2. Repeat the POST /login request in rapid succession (exceeding the configured threshold within the rate-limit window). Confirm that once the threshold is exceeded the response changes to 429 Too Many Requests.
+  3. Wait for the rate-limit window to expire. Submit a POST /login with valid credentials. Confirm authentication succeeds and a 200 OK with a session token is returned.
+
+  ## Expected outcome
+  1. Individual failed logins return 401.
+  2. Rapid successive failed logins return 429 after the threshold is exceeded.
+  3. After the window expires, successful login is possible again.
+verification_method: T
+version: 0.1

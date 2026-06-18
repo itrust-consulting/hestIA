@@ -1,0 +1,48 @@
+active: true
+authors: ACR
+complexity: 3
+derived: false
+execution_type: Manual
+expected_outcome: |
+  Conversations are created implicitly via chat, appear in the list (capped at 20), their messages are retrievable, they can be renamed, and deletion removes them permanently.
+header: |
+  Verify conversation lifecycle — create, list, rename, retrieve messages, and delete
+level: 23.0
+links: []
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  An authenticated user account; a collection with at least one ingested document; 21 pre-existing conversations to test the 20-item list cap.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and the user is authenticated
+  - A test collection with at least one ingested document exists and is accessible to the user
+  - The user has fewer than 20 existing conversations (clean state for part of the test)
+
+  ## Test steps
+  1. Submit a POST /chat request with save_chat=true and no existing conversation_id. Confirm a new conversation_id is returned in the response.
+  2. Call GET /conversations. Confirm the new conversation appears in the list with a title and timestamp.
+  3. Call GET /conversations/{cid} using the returned conversation_id. Confirm the message history contains the question and the assistant reply from step 1.
+  4. Submit a PATCH /conversations/{cid} request with a new title. Confirm a 200 OK is returned.
+  5. Call GET /conversations. Confirm the conversation now shows the updated title.
+  6. Ensure the user has at least 21 conversations (create more if needed). Call GET /conversations. Confirm the response contains exactly 20 items — the 20 most recent.
+  7. Call DELETE /conversations/{cid} on one conversation. Confirm a 200 or 204 response is returned.
+  8. Call GET /conversations again. Confirm the deleted conversation is no longer present.
+
+  ## Expected outcome
+  1. A new conversation_id is returned when save_chat=true.
+  2. The new conversation appears in the list with correct metadata.
+  3. Message history is retrievable and contains both the user message and the assistant reply.
+  4. Rename returns a success response.
+  5. The renamed title is reflected in the conversation list.
+  6. GET /conversations returns exactly 20 items regardless of total conversation count.
+  7. Deletion returns a success response.
+  8. Deleted conversation is absent from subsequent list calls.
+verification_method: T
+version: 0.1

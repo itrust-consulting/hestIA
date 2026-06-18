@@ -1,0 +1,53 @@
+active: true
+authors: ACR
+complexity: 3
+derived: false
+execution_type: Manual
+expected_outcome: |
+  Admins can create, update, list, retrieve, and delete help sections and images; image rename rewrites Markdown references in all sections; non-admin users can only read.
+header: |
+  Verify help system CRUD — sections and images
+level: 28.0
+links:
+- SRS-022: null
+- SRS-005: null
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  Admin account; a Markdown help section file with at least one embedded image reference; a valid image file (PNG or JPEG, under the size limit); a standard user account.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with the admin account active
+  - No pre-existing help section with the chosen slug
+
+  ## Test steps
+  1. As admin, call PUT /help/{section} with Markdown content containing an image reference (e.g. ![alt](images/test.png)). Confirm 200 or 201.
+  2. Call GET /help. Confirm the new section appears in the ordered list with correct frontmatter metadata.
+  3. Call GET /help/{section}. Confirm the correct Markdown content is returned.
+  4. As admin, call POST /help/images with the test image file. Confirm 200 or 201 and the image filename is returned.
+  5. Call GET /help/images. Confirm the uploaded image appears in the list.
+  6. Call GET /help/images/{filename}. Confirm the image content is served with the correct MIME type.
+  7. Call PATCH /help/images/{filename} with a new filename. Confirm 200 OK. Call GET /help/{section} and confirm all Markdown image references to the old filename have been updated to the new filename.
+  8. Call DELETE /help/images/{new_filename}. Confirm 200 or 204. Call GET /help/images and confirm the image is absent.
+  9. Call DELETE /help/{section}. Confirm 200 or 204. Call GET /help and confirm the section is absent.
+  10. As a standard (non-admin) user, attempt PUT /help/{section}. Confirm 403 Forbidden.
+
+  ## Expected outcome
+  1. Section is created.
+  2. Section appears in the ordered list.
+  3. Section content is retrievable.
+  4. Image is uploaded and its filename is returned.
+  5. Image appears in the image list.
+  6. Image is served with correct MIME type.
+  7. Image rename succeeds and all Markdown references in all sections are updated atomically.
+  8. Image is deleted and absent from the listing.
+  9. Section is deleted and absent from the listing.
+  10. Non-admin write operations are rejected with 403.
+verification_method: T
+version: 0.1

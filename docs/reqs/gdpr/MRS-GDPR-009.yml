@@ -1,0 +1,26 @@
+acceptancecriteria: |
+  System recovers processing functions within documented recovery
+  objectives following a failure; recovery objectives are agreed with
+  the controller and documented.
+active: true
+comments: |
+  Recovery objectives (RTO, RPO) are to be agreed between itrust and
+  each controller and documented in the DPA or a service level agreement.
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 32.1 (ability to ensure ongoing availability and resilience).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall maintain resilience and the capability to restore
+  personal data and processing functions within agreed recovery objectives.
+reviewed: null
+text: ''
+type: S
+urgency: 3
+verification: T

@@ -1,0 +1,44 @@
+active: true
+authors: ACR
+complexity: 3
+derived: false
+execution_type: Manual
+expected_outcome: |
+  POST /search returns correct results for all three query modes; permission filtering prevents access to collections the user is not granted; unpermissioned users receive 403.
+header: |
+  Verify standalone search endpoint with semantic, keyword, and hybrid modes and permission enforcement
+level: 30.0
+links: []
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  A collection with at least five ingested documents with varied content; an authenticated user A with access to the collection; an authenticated user B with no access to the collection; a query string whose answer is known to exist in the corpus.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with Qdrant and the sparse encoder active
+  - The test collection exists and is accessible to user A but not to user B
+  - Documents are ingested and indexed
+
+  ## Test steps
+  1. As user A, call POST /search with the test collection, the known query, and mode=semantic. Confirm results are returned and include the expected document.
+  2. Call POST /search with the same query and mode=keyword. Confirm results are returned using BM25 ranking.
+  3. Call POST /search with the same query and mode=hybrid. Confirm results are returned using a combination of dense and sparse scores.
+  4. Call POST /search with a query that has no relevant content in the corpus. Confirm an empty result set is returned — not an error.
+  5. As user B (no collection access), call POST /search against the same collection. Confirm a 403 Forbidden response is returned.
+  6. As user A, call POST /search with mode=semantic and a classification-restricted document in the collection. Confirm the restricted document does not appear in results if user A lacks the required classification level.
+
+  ## Expected outcome
+  1. Semantic search returns relevant results.
+  2. Keyword search returns results ranked by BM25.
+  3. Hybrid search returns results.
+  4. No matching content returns an empty result set without error.
+  5. Unpermissioned user receives 403.
+  6. Classification-restricted documents are excluded for users without the required level.
+verification_method: T
+version: 0.1

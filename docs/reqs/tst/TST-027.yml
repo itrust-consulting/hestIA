@@ -1,0 +1,43 @@
+active: true
+authors: ACR
+complexity: 2
+derived: false
+execution_type: Manual
+expected_outcome: |
+  Authenticated users can view their own profile and update password, username, and email; current-password verification is enforced; must-change-password flag is cleared after a successful change.
+header: |
+  Verify self-service account operations — view profile, change password, change username and email
+level: 27.0
+links: []
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  An authenticated user account with a known password that has the must-change-password flag set.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and the test user is authenticated
+  - The test user's account has the must-change-password flag set (achievable via admin password reset from TST-025)
+
+  ## Test steps
+  1. Call GET /account as the authenticated user. Confirm the response returns the correct username, email, and organisation membership.
+  2. Call PATCH /account/password with the current password and a new password. Confirm 200 OK and that the must-change-password flag is now cleared.
+  3. Log out and log back in using the new password. Confirm login succeeds without a forced-change prompt.
+  4. Call PATCH /account with a new username. Confirm 200 OK and that subsequent calls to GET /account return the updated username.
+  5. Call PATCH /account with a new email address. Confirm 200 OK and that GET /account returns the updated email.
+  6. Call PATCH /account/password with a wrong current password. Confirm 401 or 403 is returned and the password is not changed.
+
+  ## Expected outcome
+  1. Profile endpoint returns correct user data.
+  2. Password change succeeds and clears the must-change-password flag.
+  3. New password is valid for login and no forced-change prompt appears.
+  4. Username is updated.
+  5. Email address is updated.
+  6. Incorrect current password is rejected.
+verification_method: T
+version: 0.1

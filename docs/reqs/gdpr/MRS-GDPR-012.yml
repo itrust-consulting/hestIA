@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Periodic review is conducted at a defined cadence; findings are
+  documented and addressed or formally accepted.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 3
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 32.1d (regular testing and assessment of security measures); GDPR Art. 28.3f (processor obligation to support audits and inspections).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall undergo periodic review, testing, and assessment of
+  its data-protection measures to ensure ongoing effectiveness.
+reviewed: null
+text: ''
+type: C
+urgency: 2
+verification: R

@@ -1,0 +1,29 @@
+acceptancecriteria: |
+  All MRS-GDPR-002 through MRS-GDPR-012 are satisfied and a valid Data
+  Processing Agreement is in place for each controller deployment.
+active: true
+comments: |
+  Parent requirement. Lawful processing is achieved through two complementary
+  layers: a contractual layer and a technical layer
+  (MRS-GDPR-002 through MRS-GDPR-012). This requirement is the derivation
+  root for all GDPR-derived requirements.
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 5; GDPR Art. 28.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall support lawful processing of personal data in compliance
+  with applicable GDPR obligations. This requirement is fulfilled through
+  the combination of a Data Processing Agreement and the technical capabilities defined in MRS-GDPR-002
+  through MRS-GDPR-012.
+reviewed: null
+text: ''
+type: C
+urgency: 4
+verification: R

@@ -1,0 +1,42 @@
+active: true
+authors: ACR
+complexity: 2
+derived: false
+execution_type: Manual
+expected_outcome: |
+  Plain generate returns a direct LLM response with no retrieval; RAG generate performs retrieval and augments the prompt with corpus context; both modes respect the system prompt and generation parameters.
+header: |
+  Verify plain generate and RAG generate modes via POST /generate
+level: 34.0
+links: []
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  Authenticated user account; a collection with at least one ingested document containing content that answers the test question; a question whose answer is in the corpus; a custom system prompt; generation parameters (temperature, max_tokens).
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with the LLM and Qdrant services active
+  - The user is authenticated
+  - A test collection with a known document is available
+
+  ## Test steps
+  1. Call POST /generate with exec_type=generate, a prompt, a custom system_prompt, and no collection. Confirm the response is a direct LLM completion that follows the system_prompt without citing any documents.
+  2. Call POST /generate with exec_type=rag_generate, the same prompt, the test collection, and the same system_prompt. Confirm the response includes citations referencing the test document.
+  3. Confirm that the RAG generate response is more specific or accurate regarding corpus content than the plain generate response from step 1.
+  4. Call POST /generate with exec_type=rag_generate and a question with no relevant content in the corpus. Confirm the response acknowledges the absence of relevant content rather than fabricating an answer.
+  5. Call POST /generate with exec_type=generate and generation parameters (e.g. temperature=0.0, max_tokens=50). Confirm the response length is constrained to the specified max_tokens.
+
+  ## Expected outcome
+  1. Plain generate returns a direct LLM response with no citations.
+  2. RAG generate returns a response with at least one citation from the test collection.
+  3. RAG response demonstrates corpus grounding compared to plain generate.
+  4. RAG generate returns an honest response when no relevant context is available.
+  5. Generation parameters are respected in the output.
+verification_method: T
+version: 0.1

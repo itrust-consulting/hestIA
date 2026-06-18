@@ -1,0 +1,48 @@
+active: true
+authors: ACR
+complexity: 3
+derived: false
+execution_type: Manual
+expected_outcome: |
+  Messages sent with save_chat=true are persisted and retrievable; subsequent messages appended to the same conversation_id extend the history; image parts are stripped before storage; ownership is enforced.
+header: |
+  Verify conversation persistence via POST /chat with save_chat and conversation_id parameters
+level: 33.0
+links:
+- SRS-021: null
+- SRS-014: null
+- SRS-005: null
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  Two authenticated user accounts (user A and user B); a collection with ingested documents; a multimodal message payload containing a text part and a base64 image part.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed and both users are authenticated
+  - A test collection is accessible to user A
+
+  ## Test steps
+  1. As user A, call POST /chat with the test question, the collection, save_chat=true, and no conversation_id. Confirm a conversation_id is returned.
+  2. Call GET /conversations/{cid}. Confirm the message history contains the user message and the assistant reply. Confirm no image data is present in the stored messages.
+  3. As user A, call POST /chat again with the same conversation_id, save_chat=true, and a follow-up question. Confirm the response references the context from the first message.
+  4. Call GET /conversations/{cid} again. Confirm both exchanges are present in the history in correct order.
+  5. As user A, call POST /chat with the multimodal payload (text + image part), save_chat=true, and the same conversation_id. Confirm the response is returned.
+  6. Call GET /conversations/{cid}. Confirm the stored message contains only the text part; the image part has been stripped.
+  7. As user B, call GET /conversations/{cid} using user A's conversation_id. Confirm a 403 or 404 response.
+
+  ## Expected outcome
+  1. A conversation_id is returned on first save.
+  2. First exchange is stored; no image data in stored messages.
+  3. Follow-up uses context from the previous exchange.
+  4. Both exchanges are stored in order.
+  5. Multimodal message is processed successfully.
+  6. Stored message has image part stripped; text part is retained.
+  7. Cross-user conversation access is rejected.
+verification_method: T
+version: 0.1

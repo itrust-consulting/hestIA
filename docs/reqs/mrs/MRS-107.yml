@@ -1,0 +1,31 @@
+acceptancecriteria: |
+  A data protection assessment has been conducted; applicable GDPR obligations
+  are identified and corresponding technical and organisational measures are
+  in place or formally documented.
+active: true
+comments: |
+  The data protection assessment will determine which specific GDPR obligations
+  apply (e.g. lawful basis, retention periods, data subject rights, DPIA
+  obligation). Specific technical requirements derived from the assessment
+  are to be captured at SRS level. The anonymisation method referenced in
+  MRS-096 should also be addressed in this assessment.
+coverage: 0
+derived: false
+header: ''
+importance: 5
+level: 1.0
+links: []
+normative: true
+rationale: GDPR compliance obligation for processing of personal data.
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall comply with applicable GDPR obligations arising from its
+  processing activities. A data protection assessment shall be conducted to
+  determine which obligations apply and the required technical and
+  organisational measures.
+reviewed: null
+text: ''
+type: C
+urgency: 4
+verification: R

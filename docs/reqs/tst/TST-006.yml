@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 1
 derived: false
+execution_type: Manual
+expected_outcome: |
+  All core hestIA features are accessible through the browser without direct API interaction.
 header: |
   Verify all core features are accessible through the web interface
 level: 6.0
 links:
-- SRS-006: null
+- SRS-006: E5QID7Q8QdkxDAJ5oUmyftSIoEpdFBFbZd8C2JjxGsg=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 1
-test_data: Valid standard user credentials; moderator credentials; admin credentials; at least one collection with ingested content
-verification_method: I
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: All core hestIA features are accessible through the browser without direct API interaction.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: cKUurX0W_KX4O9HVJlHmDIo62h4DVYFuilrMG-dGPYA=
+test_data: |
+  Valid standard user credentials; moderator credentials; admin credentials; at least one collection with ingested content
 text: |
   ## Preconditions and setup actions
   - hestIA is fully deployed and all dependent SRS requirements (SRS-004 through SRS-018) are satisfied
@@ -37,3 +37,5 @@ text: |
   1. All core features (chat, document upload, admin, help) are accessible through the browser.
   2. Each feature behaves according to the role of the logged-in user.
   3. No direct API calls are needed to use any core feature.
+verification_method: I
+version: 0.1

@@ -1,0 +1,27 @@
+acceptancecriteria: |
+  Audit records are complete and exportable; controller can produce
+  evidence of compliance with applicable GDPR obligations on request.
+active: true
+comments: |
+  Supports the controller's accountability obligation (Art. 5.2) and
+  itrust's obligation to make available all information necessary to
+  demonstrate compliance (Art. 28.3e).
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: [MRS-107]
+normative: true
+rationale: GDPR Art. 5.2 (accountability); GDPR Art. 25 (data protection by design); GDPR Art. 28.3e (processor audit obligation); GDPR Art. 30 (records of processing activities).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall enable the controller to demonstrate compliance with
+  applicable data-protection obligations through documentation and
+  auditable records.
+reviewed: null
+text: ''
+type: C
+urgency: 3
+verification: R

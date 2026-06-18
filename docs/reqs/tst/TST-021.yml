@@ -1,0 +1,45 @@
+active: true
+authors: ACR
+complexity: 3
+derived: false
+execution_type: Manual
+expected_outcome: |
+  LDAP-authenticated user is admitted, org membership is derived from AD group membership, and a hestIA account is auto-provisioned on first login.
+header: |
+  Verify LDAP/Active Directory authentication and auto-provisioning
+level: 21.0
+links:
+- SRS-004: null
+- SRS-005: null
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  An LDAP/AD server (or a containerised OpenLDAP test instance) with at least one test user belonging to a group mapped to a hestIA organisation; hestIA configured with the LDAP host, bind credentials, and group-to-org mapping; the test user's LDAP credentials.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with LDAP authentication enabled
+  - The LDAP server is reachable and the bind credentials are configured
+  - A test user exists in LDAP and belongs to a group mapped to a hestIA organisation
+  - No hestIA account yet exists for the test user
+
+  ## Test steps
+  1. Submit a POST /login request with the test user's LDAP username and password. Confirm authentication succeeds and a session token is returned.
+  2. Confirm that a hestIA user account has been auto-provisioned for the LDAP user with the correct organisation membership derived from LDAP group membership.
+  3. Use the session token to call GET /account. Confirm the profile reflects the LDAP-sourced organisation and role.
+  4. Log in again with the same LDAP credentials. Confirm no duplicate account is created and the same hestIA account is returned.
+  5. Submit a POST /login request with the same username but a wrong password. Confirm the response is a 401 Unauthorized.
+
+  ## Expected outcome
+  1. Valid LDAP credentials return a session token.
+  2. A hestIA user account is auto-provisioned with org membership matching the LDAP group.
+  3. The user's profile is accessible and reflects LDAP-derived attributes.
+  4. Re-login returns the existing account — no duplicate is created.
+  5. Invalid LDAP credentials are rejected with 401.
+verification_method: T
+version: 0.1

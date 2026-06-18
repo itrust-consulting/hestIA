@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 3
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Sections produce separate chunks; tables are structurally retrievable; citation anchors identify document position; adjacent chunks are linked.
 header: |
   Verify that document sections, headings, tables, and hierarchy are parsed and retrievable as distinct structural units
 level: 11.0
 links:
-- SRS-011: null
+- SRS-011: GXtsJ3OGd2xFQ7F4BGw3XLWCjErtKPUs1FiUrxxTNq4=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 3
-test_data: A DOCX document with at least 5 distinct headed sections, nested headings (H1/H2), and one table with labelled columns; the document's structure is documented (section names, table column labels) for result verification
-verification_method: A
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Sections produce separate chunks; tables are structurally retrievable; citation anchors identify document position; adjacent chunks are linked.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: mYkgU7vhfaaQoTyZlrYhBihgqk0is0bcV7jL_-dMLMM=
+test_data: |
+  A DOCX document with at least 5 distinct headed sections, nested headings (H1/H2), and one table with labelled columns; the document's structure is documented (section names, table column labels) for result verification
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running with the ingestion service active
@@ -38,3 +38,5 @@ text: |
   2. Table content is retrieved in structured form and is identifiable by column name.
   3. Every citation includes a structural anchor (section heading or similar) locating the chunk within the document.
   4. Chunk adjacency links (prev/next) are present in the stored payload, enabling context reconstruction.
+verification_method: A
+version: 0.1

@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 2
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Metadata extracted automatically; overrides applied before upload; post-ingestion edits reflected in citations without re-ingesting.
 header: |
   Verify automatic metadata extraction and post-ingestion metadata editing
 level: 10.0
 links:
-- SRS-010: null
+- SRS-010: u6bmmZEgZaZhaWdxw2FsLl_xxzd9LQJjrwmJ_hvvEac=
 normative: true
-ref: ''
-reviewed: null
-release: beta
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 2
-test_data: A DOCX document with known embedded metadata (title, author, subject); moderator credentials
-verification_method: I
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Metadata extracted automatically; overrides applied before upload; post-ingestion edits reflected in citations without re-ingesting.
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: dpr1uSJgsHDbQzbZZevgy8mlYVjw7fvUA4MKDyEuFsk=
+test_data: |
+  A DOCX document with known embedded metadata (title, author, subject); moderator credentials
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running with the ingestion and metadata services active
@@ -40,3 +40,5 @@ text: |
   2. The classification override applied before upload takes precedence over the automatically extracted value.
   3. Post-ingestion metadata edits are applied without requiring re-ingestion.
   4. Query citations reflect the current (edited) metadata values.
+verification_method: I
+version: 0.1

@@ -1,29 +1,28 @@
 active: true
+authors: ACR
+complexity: 3
 derived: false
+execution_type: Manual
+expected_outcome: |
+  All supported formats ingested successfully; batch folder ingestion works; documents are immediately queryable; access control enforced.
 header: |
   Verify document ingestion across all supported formats and via batch folder upload
 level: 8.0
 links:
-- SRS-008: null
+- SRS-008: t5iEkbl9zzQydNgIthJQB63TyB8_hHMIAVZDArrJBxE=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 3
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: okBDyg-bjg84kPCb1iumaDuQ5GRj3xviSZ4ZdTkEb98=
 test_data: |
   Test documents in each supported format: DOCX, PDF, XLSX, XLSM, TXT, MD, CSV, JSON, PPTX;
   a test folder containing one file per format;
   one intentionally unsupported file (e.g. .exe);
   moderator credentials for the test collection's owning organization
-verification_method: T
-references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: All supported formats ingested successfully; batch folder ingestion works; documents are immediately queryable; access control enforced.
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running with the ingestion service active
@@ -45,3 +44,5 @@ text: |
   3. Ingested documents are immediately retrievable via natural-language queries.
   4. Classification level assigned at ingestion governs which users can retrieve the document's content.
   5. Upload is restricted to moderators and admin users.
+verification_method: T
+version: 0.1

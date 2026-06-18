@@ -1,0 +1,45 @@
+active: true
+authors: ACR
+complexity: 4
+derived: false
+execution_type: Manual
+expected_outcome: |
+  OIDC authorize/callback completes, new user is auto-provisioned with correct org and role mapping, session is valid, logout redirects to provider.
+header: |
+  Verify OIDC/SSO authentication flow including auto-provisioning and logout
+level: 20.0
+links: []
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  A configured OIDC provider (e.g. Keycloak) with a test realm; a test user with known org-membership and role claims; a second known-existing hestIA account for re-login test; hestIA configured with the OIDC client_id, client_secret, and redirect_uri.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with OIDC authentication enabled and configured
+  - The OIDC provider is running and reachable from the test client
+  - A test user exists in the OIDC provider with known org-membership and role claims
+  - No hestIA account yet exists for that user (to trigger auto-provisioning)
+
+  ## Test steps
+  1. Navigate to GET /auth/oidc/authorize. Confirm the response is a redirect to the OIDC provider's authorization endpoint with correct client_id, redirect_uri, and scope parameters.
+  2. Complete the login at the OIDC provider. Confirm the browser is redirected to the hestIA callback URL with an authorization code.
+  3. Confirm the callback at POST /auth/oidc/callback completes successfully, returns a session token, and that a new hestIA user account has been auto-provisioned with the correct organization membership and role derived from the OIDC claims.
+  4. Use the issued session token to call a protected endpoint (e.g. GET /account). Confirm the response returns the auto-provisioned user's profile.
+  5. Log in again as the same OIDC user. Confirm no duplicate account is created and the existing account is returned.
+  6. Call GET /auth/oidc/logout. Confirm the response redirects to the OIDC provider's end-session endpoint and the local session is invalidated.
+
+  ## Expected outcome
+  1. Authorization redirect includes required OIDC parameters.
+  2. Callback URL is reached with a valid authorization code.
+  3. A new hestIA user account is created with org membership and roles matching the OIDC claims.
+  4. Session token grants access to protected endpoints.
+  5. Re-login returns the existing account — no duplicate is created.
+  6. Logout invalidates the session and redirects to the provider.
+verification_method: T
+version: 0.1

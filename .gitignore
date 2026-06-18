@@ -1,4 +1,5 @@
-app/**
+app/data/corpus_stats/
+app/logs/
 dump/
 test_docs/
 __pycache__/

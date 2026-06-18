@@ -1,0 +1,23 @@
+acceptancecriteria: |
+  Data flows reviewed; only data necessary for the defined processing
+  purpose is collected, stored, and transmitted.
+active: true
+comments: ''
+coverage: 0
+derived: false
+header: ''
+importance: 4
+level: 1.0
+links: [MRS-007]
+normative: true
+rationale: GDPR Art. 5.1b (purpose limitation); GDPR Art. 5.1c (data minimisation); GDPR Art. 25 (data protection by design and by default).
+ref: ''
+releasephase: beta
+requirement: |
+  The system shall ensure that only the data necessary for the defined
+  processing purpose are collected, stored, and transmitted.
+reviewed: null
+text: ''
+type: S
+urgency: 3
+verification: A

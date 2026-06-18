@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 3
 derived: false
+execution_type: Manual
+expected_outcome: |
+  No outbound connections observed; all operations complete successfully with internet blocked.
 header: |
   Verify that hestIA operates fully without outbound internet connectivity
 level: 1.0
 links:
-- SRS-001: null
+- SRS-001: x0cDkdpTp2prbOGy76qy6trgLLUX2Qxr5YLx15evKpM=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 3
-test_data: One ingestion-ready DOCX or PDF test document; network monitoring tool (e.g. Wireshark, tcpdump, or ss/netstat)
-verification_method: R
+ref: ''
 references:
-  - path: ''
-    type: ''
-expected_outcome: No outbound connections observed; all operations complete successfully with internet blocked.
+- path: ''
+  type: file
+release: alpha
+reviewed: noGdgHEaAvdtZcAF3GpqhdBS0PHANH7s6Fy7ASF4FlY=
+test_data: |
+  One ingestion-ready DOCX or PDF test document; network monitoring tool (e.g. Wireshark, tcpdump, or ss/netstat)
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and all services are running (confirmed by GET /ready)
@@ -37,3 +37,5 @@ text: |
   1. hestIA responds correctly to all requests with no dependency on external connectivity.
   2. Network logs show zero outbound TCP/UDP connections to external internet addresses during ingestion or query processing.
   3. All dependent requirements pass their respective tests within the same network-blocked environment.
+verification_method: R
+version: 0.1

@@ -1,0 +1,41 @@
+active: true
+dependence:
+- SRS-008
+derived: false
+difficulty: 3
+header: ''
+importance: 4
+level: 3.1
+links:
+- MRS-004: null
+- MRS-024: null
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: null
+risk: 3
+status: implemented
+text: |
+  # Knowledge Base Content Deletion
+
+  As a moderator or administrator,
+  I want to remove individual documents or entire collections from the knowledge base,
+  so that outdated, incorrect, or sensitive content is no longer returned in query results and its storage is reclaimed.
+
+  1. Select a document within a collection and remove it.
+  2. Confirm the document is no longer returned in any query against that collection.
+  3. Delete an entire collection, removing all its documents, vector data, and associated tenant access grants.
+  4. Confirm no query, listing, or access grant for the deleted collection persists.
+
+  ### Rationale
+  Document corpora are living assets; documents are superseded, access rights are revoked, and collections are decommissioned. Without explicit deletion support, obsolete content remains retrievable and consumes storage indefinitely, which can also constitute a GDPR data-retention violation under MRS-GDPR-004.
+
+  ### Acceptance criteria
+  - Deleting a document removes its vectors from the vector store and its BM25 contribution from the sparse corpus; subsequent queries do not return that document.
+  - Deleting a collection removes all document vectors, sparse corpus data, and all tenant access grants associated with that collection.
+  - After collection deletion, neither the collection nor any of its content appears in listing, query, or access-grant responses.
+  - Only moderators (for document deletion) and administrators (for collection deletion) may perform deletion operations.
+type: F
+urgency: 4
+version: '0.1'

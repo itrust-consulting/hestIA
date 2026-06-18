@@ -1,0 +1,43 @@
+active: true
+authors: ACR
+complexity: 2
+derived: false
+execution_type: Manual
+expected_outcome: |
+  POST /encode returns correctly shaped dense embeddings and non-zero sparse vectors for both single and batch inputs; the output format is consistent with what the ingestion pipeline stores.
+header: |
+  Verify standalone encode endpoint for dense and sparse modes
+level: 29.0
+links:
+- SRS-013: null
+- SRS-007: null
+normative: true
+platform: GNU/Linux (Dockerized deployment environment)
+ref: ''
+references:
+- path: docs/reqs/tst/assets
+  type: file
+release: beta
+reviewed: null
+test_data: |
+  Authenticated user account; a short text string; a list of three short text strings for batch encoding.
+text: |
+  ## Preconditions and setup actions
+  - hestIA is deployed with both the dense embedding model and the sparse encoder active
+  - The user is authenticated
+
+  ## Test steps
+  1. Call POST /encode with type=dense and a single input text string. Confirm 200 OK, the response contains a float vector, and its length matches the configured embedding dimension.
+  2. Call POST /encode with type=dense and a list of three input strings. Confirm 200 OK and the response contains three vectors, each of the correct dimension.
+  3. Call POST /encode with type=sparse and a single input text string. Confirm 200 OK and the response contains a sparse representation with non-zero token-score pairs.
+  4. Call POST /encode with type=sparse and a list of three input strings. Confirm 200 OK and three sparse vectors are returned.
+  5. Submit an empty input string to POST /encode (both modes). Confirm the API returns a 422 Unprocessable Entity or a zero-vector result — not a 500 error.
+
+  ## Expected outcome
+  1. Dense single-text encoding returns a float vector of the correct dimensionality.
+  2. Dense batch encoding returns the correct number of vectors.
+  3. Sparse single-text encoding returns a non-empty sparse representation.
+  4. Sparse batch encoding returns the correct number of sparse vectors.
+  5. Empty input is handled gracefully without a server error.
+verification_method: T
+version: 0.1

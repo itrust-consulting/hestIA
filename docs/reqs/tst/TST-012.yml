@@ -1,25 +1,25 @@
 active: true
+authors: ACR
+complexity: 3
 derived: false
+execution_type: Manual
+expected_outcome: |
+  Default strategy chunks by section; strategy change produces a measurably different distribution; no code modification required.
 header: |
   Verify that the chunking strategy is configurable and affects chunk distribution without code changes
 level: 12.0
 links:
-- SRS-012: null
+- SRS-012: rbTRAL7QiFAI6QbO7ieYG9WEiRLhNRilskSpouCyphg=
 normative: true
-ref: ''
-reviewed: null
-release: alpha
-version: 0.1
 platform: GNU/Linux (Dockerized deployment environment)
-authors: ACR
-execution_type: Manual
-complexity: 3
-test_data: A DOCX test document with exactly 10 distinct headed sections; system administrator access to the chunking configuration
-verification_method: A
+ref: ''
 references:
-  - path: docs/reqs/tst/assets
-    type: file
-expected_outcome: Default strategy chunks by section; strategy change produces a measurably different distribution; no code modification required.
+- path: docs/reqs/tst/assets
+  type: file
+release: alpha
+reviewed: Q27pnnKMkb64v1R0pwPGayWFx6s2J8shOESMk4JiOEQ=
+test_data: |
+  A DOCX test document with exactly 10 distinct headed sections; system administrator access to the chunking configuration
 text: |
   ## Preconditions and setup actions
   - hestIA is deployed and running with the ingestion service active
@@ -37,3 +37,5 @@ text: |
   1. The default section-level strategy produces approximately 10 chunks (one per section).
   2. Changing the strategy to a different option and re-ingesting produces a measurably different chunk count or distribution.
   3. The configuration change takes effect without any modification to application source code.
+verification_method: A
+version: 0.1
