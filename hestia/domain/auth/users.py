@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import secrets
 import ssl
 import time
@@ -13,6 +14,8 @@ from ldap3.utils.conv import escape_filter_chars
 from hestia.domain.auth.models import AuthResult, CollectionPermission, Permissions, User
 from hestia.domain.exceptions import ForbiddenError, NotFoundError, ValidationError
 from hestia.infrastructure.db.user_repository import UserRepository
+
+_log = logging.getLogger("hestia.system")
 
 PBKDF2_ITERATIONS = 210_000
 SALT_BYTES = 16
@@ -422,20 +425,103 @@ class UserService:
         if row is None or uuid.UUID(bytes=row["user_id"]) != user_id:
             raise NotFoundError("Conversation not found.")
 
-    def get_conversation_messages(self, user_id: uuid.UUID, c_id: uuid.UUID) -> list[dict]:
+    def get_conversation_messages(
+        self,
+        user_id: uuid.UUID,
+        c_id: uuid.UUID,
+        limit: int = 20,
+        before_created_at: int | None = None,
+        before_rowid: int | None = None,
+    ) -> dict:
         self.assert_conversation_owner(user_id, c_id)
-        rows = self.repo.get_messages(c_id, limit=100)
-        return [
-            {
-                "id": uuid.UUID(bytes=m["id"]),
-                "role": m["role"],
-                "metadata": m["metadata"],
-                "content": m["content"],
-                "options": m["options"],
-                "created_at": m["created_at"],
-            }
-            for m in reversed(rows)
+        rows = self.repo.get_messages(
+            c_id,
+            limit=limit + 1,
+            before_created_at=before_created_at,
+            before_rowid=before_rowid,
+        )
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        ordered = list(reversed(rows))
+        boundary = ordered[0] if ordered else None
+        return {
+            "messages": [
+                {
+                    "id": uuid.UUID(bytes=m["id"]),
+                    "role": m["role"],
+                    "metadata": m["metadata"],
+                    "content": m["content"],
+                    "options": m["options"],
+                    "created_at": m["created_at"],
+                    "rowid": m["rowid"],
+                }
+                for m in ordered
+            ],
+            "has_more": has_more,
+            "next_cursor": (
+                {"created_at": boundary["created_at"], "rowid": boundary["rowid"]}
+                if has_more and boundary is not None
+                else None
+            ),
+        }
+
+    def get_conversation_context_state(self, c_id: uuid.UUID) -> dict:
+        """Read the freeform per-conversation metadata blob. Returns {} if
+        missing/invalid rather than raising — this is a best-effort read used
+        by context-budget bookkeeping, not user-facing data."""
+        row = self.repo.get_conversation_metadata(c_id)
+        if not row or not row["metadata_json"]:
+            return {}
+        try:
+            data = json.loads(row["metadata_json"])
+        except (json.JSONDecodeError, TypeError):
+            _log.warning("conversation_context_state_invalid_json", extra={"conversation_id": str(c_id)})
+            return {}
+        result = data if isinstance(data, dict) else {}
+        _log.debug("conversation_context_state_loaded", extra={
+            "conversation_id": str(c_id), "has_context_summary": "context_summary" in result,
+        })
+        return result
+
+    def update_conversation_context_summary(
+        self, c_id: uuid.UUID, *, summary: str, boundary_created_at: int, boundary_rowid: int
+    ) -> None:
+        """Persist a rolling context summary + the boundary it covers up to,
+        namespaced under 'context_summary' so it can't collide with any other
+        future use of the conversation metadata blob."""
+        meta = self.get_conversation_context_state(c_id)
+        meta["context_summary"] = {
+            "summary": summary,
+            "boundary_created_at": boundary_created_at,
+            "boundary_rowid": boundary_rowid,
+            "updated_at": now_epoch(),
+        }
+        self.repo.update_conversation_metadata(c_id=c_id, metadata_json=json.dumps(meta))
+        _log.debug("conversation_context_summary_updated", extra={
+            "conversation_id": str(c_id), "summary_len": len(summary),
+            "boundary_created_at": boundary_created_at, "boundary_rowid": boundary_rowid,
+        })
+
+    def get_messages_after_boundary(
+        self,
+        user_id: uuid.UUID,
+        c_id: uuid.UUID,
+        boundary_created_at: int | None,
+        boundary_rowid: int | None,
+    ) -> list[dict]:
+        self.assert_conversation_owner(user_id, c_id)
+        rows = self.repo.get_messages_after(
+            c_id, after_created_at=boundary_created_at, after_rowid=boundary_rowid
+        )
+        result = [
+            {"role": m["role"], "content": m["content"], "created_at": m["created_at"], "rowid": m["rowid"]}
+            for m in rows
         ]
+        _log.debug("messages_after_boundary_fetched", extra={
+            "conversation_id": str(c_id), "count": len(result),
+            "boundary_created_at": boundary_created_at, "boundary_rowid": boundary_rowid,
+        })
+        return result
 
     def append_conversation_message(
         self,

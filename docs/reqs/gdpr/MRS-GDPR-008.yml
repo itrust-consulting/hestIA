@@ -11,16 +11,18 @@ derived: false
 header: ''
 importance: 4
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 16-20 (data subject rights); GDPR Art. 28.3e (processor obligation to assist controller).
+rationale: |
+  GDPR Art. 16-20 (data subject rights); GDPR Art. 28.3e (processor obligation to assist controller).
 ref: ''
 releasephase: beta
 requirement: |
   The system shall support the controller in fulfilling data-subject
   rights, including rectification, erasure, and portability, within
   the processor's scope.
-reviewed: null
+reviewed: 9ji86IQR0t1OtNSv6kHZEb46pQOyafMmez9rUI0jKKg=
 text: ''
 type: F
 urgency: 3

@@ -14,9 +14,11 @@ derived: false
 header: ''
 importance: 4
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 35 (data protection impact assessment); GDPR Art. 28.3e (processor obligation to assist controller).
+rationale: |
+  GDPR Art. 35 (data protection impact assessment); GDPR Art. 28.3e (processor obligation to assist controller).
 ref: ''
 releasephase: beta
 requirement: |
@@ -24,7 +26,7 @@ requirement: |
   organisational information required to conduct the DPIA determined
   as necessary by this assessment, covering processing activities,
   data flows, security measures, and residual risks.
-reviewed: null
+reviewed: JzJ1-Ih0Iq3TTwIts2AsvLzq7FaPfEf5yLnL1eJGjeE=
 text: ''
 type: C
 urgency: 3

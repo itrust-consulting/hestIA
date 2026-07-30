@@ -12,15 +12,17 @@ derived: false
 header: ''
 importance: 5
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 5.1e (storage limitation); GDPR Art. 17 (right to erasure); GDPR Art. 25 (data protection by design).
+rationale: |
+  GDPR Art. 5.1e (storage limitation); GDPR Art. 17 (right to erasure); GDPR Art. 25 (data protection by design).
 ref: ''
 releasephase: beta
 requirement: |
   The system shall support the controller in enforcing retention limits
   and secure deletion of personal data when no longer required.
-reviewed: null
+reviewed: yfYA_ysOI3NSZ0Iv0DGrFXvscmsHeTgT8H-oZZJ3Qio=
 text: ''
 type: S
 urgency: 4

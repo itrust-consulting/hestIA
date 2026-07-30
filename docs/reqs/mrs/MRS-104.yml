@@ -13,14 +13,15 @@ importance: 4
 level: 1.0
 links: []
 normative: true
-rationale: ISO/IEC 42001 conformance recommendation for AI systems deployed in ISMS contexts.
+rationale: |
+  ISO/IEC 42001 conformance recommendation for AI systems deployed in ISMS contexts.
 ref: ''
 releasephase: beta
 requirement: |
   The system should be developed and operated in conformance with applicable
   ISO/IEC 42001 obligations, covering AI system documentation, risk
   assessment, and human oversight provisions.
-reviewed: null
+reviewed: OVM3mt8SIWHeNZskNVNVylbA2pU-3I5kZzmQ5ocvg_U=
 text: ''
 type: C
 urgency: 2

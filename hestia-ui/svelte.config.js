@@ -1,7 +1,5 @@
 import adapter from '@sveltejs/adapter-node';
 
-const version = 'v0.1'
-
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
@@ -20,7 +18,7 @@ const config = {
 			},
 		},
 		version: {
-			name: 'v0.2.1'
+			name: 'v0.2.3'
 		}
 	},
 };

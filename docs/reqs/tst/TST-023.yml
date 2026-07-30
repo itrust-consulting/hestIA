@@ -8,7 +8,9 @@ expected_outcome: |
 header: |
   Verify conversation lifecycle — create, list, rename, retrieve messages, and delete
 level: 23.0
-links: []
+links:
+- SRS-014: e0wtYttuzfq0GRAVYiKPCFgCitcxfC3f5oQ63KnFsn0=
+- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -16,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: 0_hPvesrxykMIu3BEdkQUGKUAEh_-1SL6Qc9EyWi8rU=
 test_data: |
   An authenticated user account; a collection with at least one ingested document; 21 pre-existing conversations to test the 20-item list cap.
 text: |
@@ -28,7 +30,7 @@ text: |
   ## Test steps
   1. Submit a POST /chat request with save_chat=true and no existing conversation_id. Confirm a new conversation_id is returned in the response.
   2. Call GET /conversations. Confirm the new conversation appears in the list with a title and timestamp.
-  3. Call GET /conversations/{cid} using the returned conversation_id. Confirm the message history contains the question and the assistant reply from step 1.
+  3. Call GET /conversations/{cid} using the returned conversation_id. Confirm the response's `messages` array contains the question and the assistant reply from step 1 (the endpoint returns an object `{messages, has_more, next_cursor}`, not a bare array).
   4. Submit a PATCH /conversations/{cid} request with a new title. Confirm a 200 OK is returned.
   5. Call GET /conversations. Confirm the conversation now shows the updated title.
   6. Ensure the user has at least 21 conversations (create more if needed). Call GET /conversations. Confirm the response contains exactly 20 items — the 20 most recent.

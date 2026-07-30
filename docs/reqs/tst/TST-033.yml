@@ -9,9 +9,9 @@ header: |
   Verify conversation persistence via POST /chat with save_chat and conversation_id parameters
 level: 33.0
 links:
-- SRS-021: null
-- SRS-014: null
-- SRS-005: null
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-014: e0wtYttuzfq0GRAVYiKPCFgCitcxfC3f5oQ63KnFsn0=
+- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -19,7 +19,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: 8ANNPbuv0p8ihu0dHER0gmqO2fPKwoe9DSeIQwBhB7A=
 test_data: |
   Two authenticated user accounts (user A and user B); a collection with ingested documents; a multimodal message payload containing a text part and a base64 image part.
 text: |
@@ -29,7 +29,7 @@ text: |
 
   ## Test steps
   1. As user A, call POST /chat with the test question, the collection, save_chat=true, and no conversation_id. Confirm a conversation_id is returned.
-  2. Call GET /conversations/{cid}. Confirm the message history contains the user message and the assistant reply. Confirm no image data is present in the stored messages.
+  2. Call GET /conversations/{cid}. Confirm the response's `messages` array contains the user message and the assistant reply (the endpoint returns an object `{messages, has_more, next_cursor}`, not a bare array). Confirm no image data is present in the stored messages.
   3. As user A, call POST /chat again with the same conversation_id, save_chat=true, and a follow-up question. Confirm the response references the context from the first message.
   4. Call GET /conversations/{cid} again. Confirm both exchanges are present in the history in correct order.
   5. As user A, call POST /chat with the multimodal payload (text + image part), save_chat=true, and the same conversation_id. Confirm the response is returned.

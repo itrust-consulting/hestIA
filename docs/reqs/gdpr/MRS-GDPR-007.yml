@@ -11,16 +11,18 @@ derived: false
 header: ''
 importance: 4
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 5.2 (accountability); GDPR Art. 25 (data protection by design); GDPR Art. 28.3e (processor audit obligation); GDPR Art. 30 (records of processing activities).
+rationale: |
+  GDPR Art. 5.2 (accountability); GDPR Art. 25 (data protection by design); GDPR Art. 28.3e (processor audit obligation); GDPR Art. 30 (records of processing activities).
 ref: ''
 releasephase: beta
 requirement: |
   The system shall enable the controller to demonstrate compliance with
   applicable data-protection obligations through documentation and
   auditable records.
-reviewed: null
+reviewed: rX24wHVxw7LsjPEbA7hWDa20prUwSJDym5pO6DKfdc8=
 text: ''
 type: C
 urgency: 3

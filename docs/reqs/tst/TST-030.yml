@@ -8,7 +8,10 @@ expected_outcome: |
 header: |
   Verify standalone search endpoint with semantic, keyword, and hybrid modes and permission enforcement
 level: 30.0
-links: []
+links:
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-014: e0wtYttuzfq0GRAVYiKPCFgCitcxfC3f5oQ63KnFsn0=
+- SRS-024: ZvliTquyI7t6698GACekmrXpc03LA7D7WdF6Wn8QpQg=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -16,7 +19,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: JlqT8nKMqNJ2hDm5Hcq-IBiZmqS00hIwKDTgwbyE7RM=
 test_data: |
   A collection with at least five ingested documents with varied content; an authenticated user A with access to the collection; an authenticated user B with no access to the collection; a query string whose answer is known to exist in the corpus.
 text: |

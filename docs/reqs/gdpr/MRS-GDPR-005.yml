@@ -10,9 +10,11 @@ derived: false
 header: ''
 importance: 5
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 25 (data protection by design); GDPR Art. 32 (security of processing).
+rationale: |
+  GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 25 (data protection by design); GDPR Art. 32 (security of processing).
 ref: ''
 releasephase: beta
 requirement: |
@@ -20,7 +22,7 @@ requirement: |
   availability of personal data through appropriate technical and
   organisational measures, including the ability to detect security
   events affecting personal data.
-reviewed: null
+reviewed: hh_kbI_VK7lSo0DDgX6ilxaN9JTvrwZ5SSonr1u5tD8=
 text: ''
 type: S
 urgency: 4

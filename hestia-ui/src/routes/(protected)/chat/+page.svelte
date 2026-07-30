@@ -1,27 +1,31 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { page } from '$app/stores';
+  import { VList } from 'virtua/svelte';
+  import type { VListHandle } from 'virtua/svelte';
 
-  import { messages } from '$lib/stores/chat';
+  import { messages, isMutatingFront } from '$lib/stores/chat';
   import { sendMessage, copyMessage, deleteMessage, retryMessage, sending, stop, type ParsedAttachment, type ImageAttachment } from '$lib/chat/actions';
-  import { loadConversations, openConversation } from '$lib/stores/conversations';
-  import { renderWithCitations, stripThinkingPreamble } from '$lib/render/renderChatContent';
+  import {
+    loadConversations, openConversation,
+    hasMoreBefore, isLoadingOlder, loadOlderMessages,
+    reportScrollPosition,
+  } from '$lib/stores/conversations';
+  import { scrollToBottomRequested } from '$lib/stores/chatScroll';
 
   import SideBar from '$lib/components/SideBar.svelte';
   import CitationsSidebar from '$lib/components/CitationsSidebar.svelte';
   import CitationPopover from '$lib/components/CitationPopover.svelte';
-  import type { Citation } from '$lib/types';
+  import MessageRow from '$lib/components/MessageRow.svelte';
+  import type { ChatMessage, Citation } from '$lib/types';
   import { isIsmsActive, activeCorpusName } from '$lib/stores/isms';
 
   import { addToast } from '$lib/stores/toast';
-  import Clipboard from '$lib/components/icons/clipboard.svelte';
   import Paperclip from '$lib/components/icons/paperclipIcon.svelte';
   import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
   import ArrowUpIcon from '$lib/components/icons/arrowUpIcon.svelte';
   import SquareFilledIcon from '$lib/components/icons/squareFilledIcon.svelte';
-  import BinIcon from '$lib/components/icons/binIcon.svelte';
-  import Retry from '$lib/components/icons/retry.svelte';
   import AttachmentPreviewModal from '$lib/components/modals/AttachmentPreviewModal.svelte';
 
   onMount(() => {
@@ -51,13 +55,36 @@
   });
   
 
-  // auto-scroll to bottom when messages change
+  let vlist: VListHandle | undefined;
+  let isNearBottom = true;
+
+  function handleVListScroll(offset: number) {
+    if (!vlist) return;
+    const distanceFromBottom = vlist.getScrollSize() - offset - vlist.getViewportSize();
+    isNearBottom = distanceFromBottom < 80;
+    if (offset < 200 && get(hasMoreBefore) && !get(isLoadingOlder)) {
+      loadOlderMessages();
+    }
+    reportScrollPosition(vlist.findItemIndex(offset));
+  }
+
+  // auto-scroll to bottom when messages change, but not while mutating the
+  // front of the list (prepending older history, or evicting the head)
+  // and not if the user has scrolled up to read earlier messages
   messages.subscribe(() => {
-    queueMicrotask(() => container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' }));
+    if (get(isMutatingFront)) return;
+    if (isNearBottom) {
+      // no smooth behavior here: this fires on every streaming token, and
+      // restarting a smooth-scroll animation that often makes it look stuck
+      tick().then(() => vlist?.scrollToIndex(get(messages).length - 1, { align: 'end' }));
+    }
+  });
+
+  scrollToBottomRequested.subscribe(() => {
+    tick().then(() => vlist?.scrollToIndex(get(messages).length - 1, { align: 'end' }));
   });
 
   let input = '';
-  let container: HTMLDivElement | null = null;
   let inputBarEl: HTMLDivElement | null = null;
 
   let attachments: ParsedAttachment[] = [];
@@ -98,9 +125,10 @@
     }
   }
 
-  function thinkingLabel(msgId: string): string {
-    const start = thinkingStart[msgId];
-    const end = thinkingEnd[msgId];
+  function thinkingLabel(m: ChatMessage): string {
+    if (m.compacting && !m.thinking && !m.content) return 'Compacting…';
+    const start = thinkingStart[m.id];
+    const end = thinkingEnd[m.id];
     if (start && end) {
       const secs = Math.round((end - start) / 1000);
       return `Thought for ${secs}s`;
@@ -260,13 +288,6 @@
     target.value = '';
   }
 
-  function formatSize(bytes?: number): string {
-    if (!bytes) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
   function send(){
     if (!input.trim() && !attachments.length && !images.length) return;
     if (activeCitations !== null) { activeCitations = []; trackLatestCitations = true; }
@@ -307,126 +328,31 @@
   <!-- Messages -->
     <main class="chat-interface">
     
-      <div
-        bind:this={container}
-        class="chatbox"
-      >
-
-        {#each $messages as m (m.id)}
-            <div class="flex flex-col {m.role === 'user' ? 'items-end' : 'items-start'}">
-              <!-- Thinking block: outside the bubble, above it -->
-              {#if m.role === 'assistant' && (m.thinking || ($sending && m === $messages[$messages.length - 1] && !m.content))}
-                {@const isOpen = thinkingExpanded[m.id] ?? false}
-                <div class="thinking-block">
-                  <button
-                    class="thinking-summary"
-                    on:click={() => thinkingExpanded[m.id] = !isOpen}
-                  >
-                    {thinkingLabel(m.id)} <span class="thinking-arrow" class:open={isOpen}>›</span>
-                  </button>
-                  {#if isOpen}
-                    <div class="thinking-body">
-                      {#if m.thinking}
-                        {@html renderWithCitations(stripThinkingPreamble(m.thinking))}
-                      {:else}
-                        <span class="thinking-dots">…</span>
-                      {/if}
-                    </div>
-                  {/if}
-                </div>
-              {/if}
-
-              <div class="relative group max-w-[95%]">
-                <!-- Bubble -->
-                {#if m.role === 'user'}
-                  {#if m.images?.length}
-                    <div class="message-images">
-                      {#each m.images as src}
-                        <a href={src} target="_blank" rel="noopener noreferrer">
-                          <img {src} alt="attached image" class="message-image-thumb" />
-                        </a>
-                      {/each}
-                    </div>
-                  {/if}
-                  {#if m.attachments?.length}
-                    <div class="message-attachments">
-                      {#each m.attachments as a}
-                        <button
-                          class="message-attachment-card"
-                          class:clickable={!!a.markdown}
-                          on:click={() => a.markdown && openAttachmentPreview(a.name, a.markdown)}
-                          title={a.markdown ? 'Click to preview' : undefined}
-                        >
-                          <Paperclip />
-                          <span class="attachment-filename">{a.name}</span>
-                          {#if a.size}<span class="attachment-size">{formatSize(a.size)}</span>{/if}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
-                  <div class="chat-message user prose prose-invert">
-                    {@html renderWithCitations(m.content)}
-                  </div>
-                {:else}
-                  <div class="chat-message assistant prose dark:prose-invert">
-                    {@html renderWithCitations(m.content, m.citations)}
-                    {#if m.citations?.length}
-                      <button
-                        class="sources-btn"
-                        on:click={() => { trackLatestCitations = false; activeCitations = m.citations ?? null; }}
-                        title="View sources"
-                      >
-                        {m.citations.length} source{m.citations.length !== 1 ? 's' : ''}
-                      </button>
-                    {/if}
-                  </div>
-                {/if}
-
-                <!-- Hover tools -->
-                <div
-                  class="
-                    absolute -bottom-2 {m.role === 'user' ? 'right-0' : 'left-0'}
-                    flex items-center gap-1 opacity-0 group-hover:opacity-100
-                    transition-opacity
-                  "
-                >
-                  <!-- Copy -->
-                  <button
-                    class="chat-hover-button"
-                    aria-label="Copy message"
-                    on:click={() => copyMessage(m.content)}
-                    title="Copy"
-                  >
-                  <Clipboard />
-                  </button>
-
-                  <!-- Delete -->
-                  <button
-                    class="chat-hover-button"
-                    aria-label="Delete message"
-                    on:click={() => deleteMessage(m.id)}
-                    title="Delete"
-                  >
-                    <BinIcon />
-                  </button>
-
-                  <!-- Retry (only for assistant messages) -->
-                  {#if m.role === 'assistant'}
-                    <button
-                      class="chat-hover-button"
-                      aria-label="Retry answer"
-                      on:click={() => { if (activeCitations !== null) { activeCitations = []; trackLatestCitations = true; } retryMessage(m.id); }}
-                      title="Retry"
-                    >
-                      <Retry />
-                    </button>
-                  {/if}
-                </div>
-              </div>
-
-            </div>
-        {/each}
-
+      <div class="chatbox">
+        <VList
+          bind:this={vlist}
+          data={$messages}
+          getKey={(m) => m.id}
+          shift={$isMutatingFront}
+          style="height: 100%; width: 100%;"
+          onscroll={handleVListScroll}
+        >
+          {#snippet children(m, index)}
+            <MessageRow
+              message={m}
+              isLast={index === $messages.length - 1}
+              sending={$sending}
+              thinkingOpen={thinkingExpanded[m.id] ?? false}
+              thinkingLabelText={thinkingLabel(m)}
+              onToggleThinking={() => (thinkingExpanded[m.id] = !(thinkingExpanded[m.id] ?? false))}
+              onCopy={() => copyMessage(m.content)}
+              onDelete={() => deleteMessage(m.id)}
+              onRetry={() => { if (activeCitations !== null) { activeCitations = []; trackLatestCitations = true; } retryMessage(m.id); }}
+              onOpenAttachment={openAttachmentPreview}
+              onViewSources={(citations) => { trackLatestCitations = false; activeCitations = citations; }}
+            />
+          {/snippet}
+        </VList>
       </div>
     </main>
     <div
@@ -563,49 +489,11 @@
 
   .chatbox{
       flex: 1 1 auto;
-      overflow-y: auto;
       margin-top: calc(var(--spacing) * 4) /* 1rem = 16px */;
       padding-right: calc(var(--spacing) * 6) /* 0.75rem = 12px */;
       padding-left: calc(var(--spacing) * 2);
       width: 100%;
       height: calc(100vh - var(--header-height));
-  }
-
-  .chat-message{
-      display: flex;
-      flex-direction: column;
-      margin-bottom: calc(var(--spacing) * 4);
-      border-radius: var(--radius-2xl);
-      padding-inline: calc(var(--spacing) * 4);
-      padding-block: calc(var(--spacing) * 2);
-  }
-
-  .chat-message.user{
-      font-size: var(--text-md) /* 0.875rem = 14px */;
-      line-height: var(--tw-leading, var(--text-sm--line-height) /* calc(1.25 / 0.875) ≈ 1.428571 */);
-      color: var(--color-white);
-      background-color: var(--color-blue-600);
-  }
-
-  .message-images {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-bottom: 0.3rem;
-    justify-content: flex-end;
-  }
-
-  .message-image-thumb {
-    max-height: 120px;
-    max-width: 200px;
-    border-radius: 0.5rem;
-    object-fit: cover;
-    cursor: pointer;
-    transition: opacity 0.12s;
-  }
-
-  .message-image-thumb:hover {
-    opacity: 0.85;
   }
 
   .image-chip-compose {
@@ -619,57 +507,6 @@
     border-radius: 0.25rem;
     object-fit: cover;
     flex-shrink: 0;
-  }
-
-  .message-attachments {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    margin-bottom: 0.25rem;
-    align-items: flex-end;
-  }
-
-  .message-attachment-card {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    color: var(--color-neutral-500);
-    font-size: 0.75rem;
-    max-width: 18rem;
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: default;
-  }
-
-  .message-attachment-card.clickable {
-    cursor: pointer;
-  }
-
-  .message-attachment-card.clickable:hover .attachment-filename {
-    text-decoration: underline;
-    color: var(--color-blue-600);
-  }
-
-  .attachment-filename {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--color-neutral-700);
-    font-weight: 500;
-  }
-
-  .attachment-size {
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .chat-message.assistant{
-      font-size: var(--text-md) /* 0.875rem = 14px */;
-      line-height: var(--tw-leading, var(--text-sm--line-height) /* calc(1.25 / 0.875) ≈ 1.428571 */);
-      color: var(--color-black);
-      background-color: var(--color-neutral-100);
-      max-width: none;
   }
 
   .input-bar {
@@ -690,18 +527,6 @@
 
       border-top: 1px solid var(--color-neutral-200);
   }
-
-  .chat-hover-button{
-      border-radius: 0.25rem;
-      background-color: color-mix(in oklab, var(--color-black) /* #000 = #000000 */ 60%, transparent);
-      color: var(--color-white); 
-      padding: calc(var(--spacing) * 1);
-  }
-
-  .chat-hover-button:hover{
-      background-color: color-mix(in oklab, var(--color-black) /* #000 = #000000 */ 80%, transparent);
-  }
-
 
   .input-action {
     position: absolute;
@@ -838,97 +663,4 @@
     color: var(--color-blue-800);
   }
 
-  :global(.cite-chip) {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2rem;
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    background: var(--color-blue-50);
-    color: var(--color-blue-700);
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    position: relative;
-    cursor: pointer;
-    vertical-align: baseline;
-    user-select: none;
-  }
-
-  :global(.cite-chip:hover) {
-    background: var(--color-blue-100);
-  }
-
-  .sources-btn {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    gap: 0.3rem;
-    margin-top: 0.6rem;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-    background: var(--color-blue-50);
-    color: var(--color-blue-600);
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 600;
-    border: 1px solid var(--color-blue-200);
-    cursor: pointer;
-    transition: background 0.12s;
-  }
-
-  .sources-btn:hover {
-    background: var(--color-blue-100);
-  }
-
-  .thinking-block {
-    max-width: 95%;
-    margin-bottom: 0.4rem;
-  }
-
-  .thinking-summary {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    background: none;
-    border: none;
-    padding: 0;
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 600;
-    color: var(--color-neutral-400);
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .thinking-summary:hover {
-    color: var(--color-neutral-600);
-  }
-
-  .thinking-arrow {
-    display: inline-block;
-    font-size: 0.85rem;
-    line-height: 1;
-    transition: transform 0.15s;
-  }
-
-  .thinking-arrow.open {
-    transform: rotate(90deg);
-  }
-
-  .thinking-body {
-    margin-top: 0.4rem;
-    font-size: var(--text-sm, 0.875rem);
-    color: var(--color-neutral-400);
-    line-height: 1.55;
-  }
-
-  .thinking-dots {
-    display: inline-block;
-    animation: blink 1.2s step-start infinite;
-    letter-spacing: 0.1em;
-  }
-
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.2; }
-  }
 </style>

@@ -11,16 +11,18 @@ derived: false
 header: ''
 importance: 5
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 25 (data protection by design); GDPR Art. 32 (security of processing).
+rationale: |
+  GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 25 (data protection by design); GDPR Art. 32 (security of processing).
 ref: ''
 releasephase: beta
 requirement: |
   The system shall ensure that access to personal data is restricted to
   authorised users and processes acting under the controller's authority,
   and shall ensure that such access is logged and auditable.
-reviewed: null
+reviewed: V6S16jpvdtkDNzmO8g8q2wYG8ECgdDoNqyb558O0Y_Y=
 text: ''
 type: S
 urgency: 4

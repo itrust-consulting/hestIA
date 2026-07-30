@@ -13,7 +13,7 @@ WORKDIR /var/lib/itrust/
 
 COPY hestia/ ./hestia/
 
-RUN mkdir -p ./app/data/corpus_dir
+RUN mkdir -p ./app/data/corpus_stats
 
 RUN chown -R user:user /var/lib/itrust
 

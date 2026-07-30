@@ -7,7 +7,7 @@ import {
   buildAPIMessages,
 } from '$lib/stores/chat';
 
-import { activeConversationId, loadConversations } from '$lib/stores/conversations';
+import { activeConversationId, loadConversations, forceEvictStaleHeadNow } from '$lib/stores/conversations';
 import { activeCorpusName } from '$lib/stores/isms';
 import { api } from '$lib/api/client';
 import type { ContentPart } from '$lib/types';
@@ -35,6 +35,9 @@ export async function sendMessage(
   if ((!text.trim() && !attachments.length && !images.length) || get(sending)) return;
 
   sending.set(true);
+
+  // a new turn is starting — don't hang on to abandoned scrollback history
+  forceEvictStaleHeadNow();
 
   const userTempId = tempId();
 
@@ -171,6 +174,8 @@ export async function streamFromHistoryInto(
                 : msg
             )
           );
+        } else if (obj.status === 'compacting') {
+          updateMessage(assistantTempId, { compacting: true });
         }
       }
 
@@ -219,6 +224,9 @@ export async function deleteMessage(id: string) {
 export async function retryMessage(assistantId: string) {
   if (get(sending)) return;
 
+  // see sendMessage: a new turn is starting
+  forceEvictStaleHeadNow();
+
   const all = get(messages);
   const cid = get(activeConversationId);
 
@@ -239,8 +247,11 @@ export async function retryMessage(assistantId: string) {
   const userMsg = all[userIdx];
 
   if (cid) {
-    deleteMessage(userMsg.id);
-    deleteMessage(assistantId);
+    // awaited: the server reconstructs history from the DB for context-budget
+    // purposes, so the old turn must actually be gone before the retry's
+    // request reaches it — otherwise it could still see (and fold) stale
+    // messages that are about to be deleted anyway.
+    await Promise.all([deleteMessage(userMsg.id), deleteMessage(assistantId)]);
   }
 
   const newUserTempId = tempId();

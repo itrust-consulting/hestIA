@@ -22,7 +22,7 @@ requirement: |
   The system's audit logs shall be tamper-evident and shall support extraction
   of a complete structured audit record scoped by time window, principal, or
   resource by an authorised administrator.
-reviewed: null
+reviewed: sG8zBFkv3SwIkhbgE4emAjZkpxxPwWGiahPSxBK6JHQ=
 text: ''
 type: S
 urgency: 3

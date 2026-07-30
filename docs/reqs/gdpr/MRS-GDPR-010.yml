@@ -12,9 +12,11 @@ derived: false
 header: ''
 importance: 4
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 33.2 (processor obligation to notify controller of personal data breach without undue delay).
+rationale: |
+  GDPR Art. 33.2 (processor obligation to notify controller of personal data breach without undue delay).
 ref: ''
 releasephase: beta
 requirement: |
@@ -22,7 +24,7 @@ requirement: |
   controller without undue delay, providing sufficient information for
   the controller to meet its notification obligations under Art. 33.1
   and Art. 34.
-reviewed: null
+reviewed: OJBXg9iBHkfuPgQuBqEVTsINw8hWk5VrOPInSfLEZzs=
 text: ''
 type: S
 urgency: 3

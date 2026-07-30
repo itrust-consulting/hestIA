@@ -1,18 +1,24 @@
 from __future__ import annotations
 
-import json
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
-import requests
 
 from hestia.domain.exceptions import ProviderError
 from hestia.infrastructure.http.client import HttpClient
 
 
-def _client(mock_session, api_key=None):
-    """Build an HttpClient with a pre-injected mock session."""
-    return HttpClient(base_url="http://localhost", api_key=api_key, session=mock_session)
+def _client(mock_async_client, api_key=None):
+    """Build an HttpClient with a mocked httpx.AsyncClient injected."""
+    client = HttpClient(base_url="http://localhost", api_key=api_key)
+    client._client = mock_async_client
+    return client
+
+
+async def _collect(agen):
+    return [item async for item in agen]
 
 
 # ---------------------------------------------------------------------------
@@ -44,32 +50,33 @@ class TestAuthHeaders:
 class TestPost:
 
     def test_returns_response(self):
-        session = MagicMock()
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
-        session.post.return_value = mock_resp
-        result = _client(session).post("/endpoint", {"key": "val"})
+        async_client = MagicMock()
+        async_client.post = AsyncMock(return_value=mock_resp)
+        result = asyncio.run(_client(async_client).post("/endpoint", {"key": "val"}))
         assert result is mock_resp
 
     def test_raises_provider_error_on_timeout(self):
-        session = MagicMock()
-        session.post.side_effect = requests.exceptions.Timeout()
+        async_client = MagicMock()
+        async_client.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
         with pytest.raises(ProviderError, match="timed out"):
-            _client(session).post("/endpoint", {})
+            asyncio.run(_client(async_client).post("/endpoint", {}))
 
     def test_raises_provider_error_on_connection_error(self):
-        session = MagicMock()
-        session.post.side_effect = requests.exceptions.ConnectionError()
+        async_client = MagicMock()
+        async_client.post = AsyncMock(side_effect=httpx.ConnectError("boom"))
         with pytest.raises(ProviderError, match="connect"):
-            _client(session).post("/endpoint", {})
+            asyncio.run(_client(async_client).post("/endpoint", {}))
 
     def test_raises_provider_error_on_http_error(self):
-        session = MagicMock()
-        mock_exc = requests.exceptions.HTTPError()
-        mock_exc.response = MagicMock(status_code=503)
-        session.post.side_effect = mock_exc
+        mock_response = MagicMock(status_code=503)
+        async_client = MagicMock()
+        async_client.post = AsyncMock(
+            side_effect=httpx.HTTPStatusError("error", request=MagicMock(), response=mock_response)
+        )
         with pytest.raises(ProviderError, match="503"):
-            _client(session).post("/endpoint", {})
+            asyncio.run(_client(async_client).post("/endpoint", {}))
 
 
 # ---------------------------------------------------------------------------
@@ -79,18 +86,18 @@ class TestPost:
 class TestGet:
 
     def test_returns_response(self):
-        session = MagicMock()
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
-        session.get.return_value = mock_resp
-        result = _client(session).get("/endpoint")
+        async_client = MagicMock()
+        async_client.get = AsyncMock(return_value=mock_resp)
+        result = asyncio.run(_client(async_client).get("/endpoint"))
         assert result is mock_resp
 
     def test_raises_provider_error_on_timeout(self):
-        session = MagicMock()
-        session.get.side_effect = requests.exceptions.Timeout()
+        async_client = MagicMock()
+        async_client.get = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
         with pytest.raises(ProviderError, match="timed out"):
-            _client(session).get("/endpoint")
+            asyncio.run(_client(async_client).get("/endpoint"))
 
 
 # ---------------------------------------------------------------------------
@@ -99,25 +106,29 @@ class TestGet:
 
 class TestIterNdjson:
 
-    def test_yields_parsed_objects(self):
+    def _resp(self, lines):
         resp = MagicMock()
-        resp.iter_lines.return_value = [
-            '{"a": 1}',
-            '{"b": 2}',
-        ]
-        result = list(HttpClient.iter_ndjson(resp))
+
+        async def _aiter_lines():
+            for line in lines:
+                yield line
+
+        resp.aiter_lines = _aiter_lines
+        return resp
+
+    def test_yields_parsed_objects(self):
+        resp = self._resp(['{"a": 1}', '{"b": 2}'])
+        result = asyncio.run(_collect(HttpClient.iter_ndjson(resp)))
         assert result == [{"a": 1}, {"b": 2}]
 
     def test_skips_empty_lines(self):
-        resp = MagicMock()
-        resp.iter_lines.return_value = ["", '{"ok": true}', ""]
-        result = list(HttpClient.iter_ndjson(resp))
+        resp = self._resp(["", '{"ok": true}', ""])
+        result = asyncio.run(_collect(HttpClient.iter_ndjson(resp)))
         assert len(result) == 1
 
     def test_skips_malformed_json(self):
-        resp = MagicMock()
-        resp.iter_lines.return_value = ["{bad json}", '{"ok": true}']
-        result = list(HttpClient.iter_ndjson(resp))
+        resp = self._resp(["{bad json}", '{"ok": true}'])
+        result = asyncio.run(_collect(HttpClient.iter_ndjson(resp)))
         assert len(result) == 1
         assert result[0] == {"ok": True}
 
@@ -128,30 +139,37 @@ class TestIterNdjson:
 
 class TestIterSseJson:
 
-    def test_yields_parsed_events(self):
+    def _resp(self, lines):
         resp = MagicMock()
-        resp.iter_lines.return_value = [
+
+        async def _aiter_lines():
+            for line in lines:
+                yield line
+
+        resp.aiter_lines = _aiter_lines
+        return resp
+
+    def test_yields_parsed_events(self):
+        resp = self._resp([
             'data: {"token": "hello"}',
             'data: {"token": "world"}',
-        ]
-        result = list(HttpClient.iter_sse_json(resp))
+        ])
+        result = asyncio.run(_collect(HttpClient.iter_sse_json(resp)))
         assert result == [{"token": "hello"}, {"token": "world"}]
 
     def test_stops_on_done_sentinel(self):
-        resp = MagicMock()
-        resp.iter_lines.return_value = [
+        resp = self._resp([
             'data: {"token": "a"}',
             "data: [DONE]",
             'data: {"token": "b"}',
-        ]
-        result = list(HttpClient.iter_sse_json(resp))
+        ])
+        result = asyncio.run(_collect(HttpClient.iter_sse_json(resp)))
         assert len(result) == 1
 
     def test_skips_non_data_lines(self):
-        resp = MagicMock()
-        resp.iter_lines.return_value = [
+        resp = self._resp([
             "event: message",
             'data: {"ok": true}',
-        ]
-        result = list(HttpClient.iter_sse_json(resp))
+        ])
+        result = asyncio.run(_collect(HttpClient.iter_sse_json(resp)))
         assert len(result) == 1

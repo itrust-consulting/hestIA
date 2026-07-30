@@ -8,7 +8,9 @@ expected_outcome: |
 header: |
   Verify OIDC/SSO authentication flow including auto-provisioning and logout
 level: 20.0
-links: []
+links:
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -16,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: IEbeApkJbj5tLhi8V8g7yH7ddA3T7pGniqQyEsTp-UY=
 test_data: |
   A configured OIDC provider (e.g. Keycloak) with a test realm; a test user with known org-membership and role claims; a second known-existing hestIA account for re-login test; hestIA configured with the OIDC client_id, client_secret, and redirect_uri.
 text: |

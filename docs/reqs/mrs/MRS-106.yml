@@ -16,9 +16,8 @@ importance: 5
 level: 1.0
 links: []
 normative: true
-rationale: >
-  GDPR Article 32 and NIS2 Article 21 encryption obligation; replaces the
-  infrastructure delegation implicit in rejected MRS-065.
+rationale: |
+  GDPR Article 32 and NIS2 Article 21 encryption obligation; replaces the infrastructure delegation implicit in rejected MRS-065.
 ref: ''
 releasephase: beta
 requirement: |
@@ -26,7 +25,7 @@ requirement: |
   databases and encrypted transport between components, and shall specify
   the minimum required controls. Operator confirmation of compliance shall
   be a prerequisite for production deployment.
-reviewed: null
+reviewed: ltH6mh4HR3hbZuMothftpgBzJULM0CInNFhgPDNu2wo=
 text: ''
 type: S
 urgency: 4

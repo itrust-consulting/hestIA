@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -23,7 +23,7 @@ class TestChatRouter:
 
     def test_extracts_last_user_message(self):
         handler = MagicMock()
-        handler.resolve.return_value = "response"
+        handler.resolve = AsyncMock(return_value="response")
 
         client = TestClient(_app(handler=handler))
         resp = client.post("/chat", json={
@@ -39,7 +39,7 @@ class TestChatRouter:
 
     def test_exec_type_is_rag_chat_when_collection_given(self):
         handler = MagicMock()
-        handler.resolve.return_value = "response"
+        handler.resolve = AsyncMock(return_value="response")
 
         client = TestClient(_app(handler=handler))
         resp = client.post("/chat", json={
@@ -52,7 +52,7 @@ class TestChatRouter:
 
     def test_exec_type_is_chat_without_collection(self):
         handler = MagicMock()
-        handler.resolve.return_value = "response"
+        handler.resolve = AsyncMock(return_value="response")
 
         client = TestClient(_app(handler=handler))
         resp = client.post("/chat", json={
@@ -64,7 +64,7 @@ class TestChatRouter:
 
     def test_history_excludes_last_message(self):
         handler = MagicMock()
-        handler.resolve.return_value = "response"
+        handler.resolve = AsyncMock(return_value="response")
 
         messages = [
             {"role": "user", "content": "msg1"},
@@ -83,7 +83,7 @@ class TestChatRouter:
             yield b'{"content":" world"}\n'
 
         handler = MagicMock()
-        handler.resolve.return_value = _stream_gen()
+        handler.resolve = AsyncMock(return_value=_stream_gen())
 
         client = TestClient(_app(handler=handler))
         resp = client.post("/chat", json={

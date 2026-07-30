@@ -8,7 +8,8 @@ derived: false
 header: ''
 importance: 3
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
 rationale: GDPR Art. 5.1d (accuracy principle).
 ref: ''
@@ -16,7 +17,7 @@ releasephase: beta
 requirement: |
   The system shall maintain personal data in an accurate and up-to-date
   state in cooperation with the controller.
-reviewed: null
+reviewed: a8cYXiMZyIRHf_1971ORFsdktDXM-onp09I5g8rSF3M=
 text: ''
 type: S
 urgency: 2

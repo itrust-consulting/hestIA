@@ -7,12 +7,15 @@ import time
 import uuid
 
 from hestia.domain.auth.users import now_epoch
+from hestia.domain.chat.context_budget import BudgetCheck, check_context_budget, run_compaction
 from hestia.domain.exceptions import ConfigurationError, ForbiddenError
 from hestia.domain.policies.guard import ExecutionPolicy, PolicyDecision, PolicyGuard, PolicyResult
 from hestia.domain.rag.graph import ExecutionRequest
 from hestia.domain.rag.templater import TemplateRepository, TemplatePlanBuilder
 from hestia.domain.rag.types import HybridQuery
 from hestia.infrastructure.logging.audit import audit
+
+CONTEXT_BUDGET_EXEC_TYPES = ("chat", "rag_chat")
 
 _log = logging.getLogger("hestia.system")
 
@@ -362,6 +365,45 @@ class RequestHandler:
         self.builder.preload(list(self.TEMPLATE_MAP.values()))
         self.runner = Runner(container)
 
+    def _context_budget_inputs(self, req: ExecutionRequest):
+        """Fetch (prior_summary, tail) for context-budget bookkeeping. Sync —
+        the repo/service layer underneath is plain sqlite3, no I/O to await."""
+        users = self.container.services.get("users")
+        conversation_id = uuid.UUID(req.conversation_id)
+        _log.debug("context_budget_inputs_fetch", extra={"conversation_id": str(conversation_id)})
+        state = users.get_conversation_context_state(conversation_id)
+        ctx = state.get("context_summary")
+        prior_summary = ctx["summary"] if ctx else None
+        boundary_created_at = ctx["boundary_created_at"] if ctx else None
+        boundary_rowid = ctx["boundary_rowid"] if ctx else None
+        tail = users.get_messages_after_boundary(
+            req.user.id, conversation_id, boundary_created_at, boundary_rowid
+        )
+        return users, conversation_id, prior_summary, tail
+
+    def _needs_context_budget(self, req: ExecutionRequest) -> bool:
+        return bool(req.conversation_id) and req.exec_type in CONTEXT_BUDGET_EXEC_TYPES
+
+    async def _apply_context_budget_sync(self, req: ExecutionRequest) -> None:
+        """Non-streaming path: no stream to show a notice through, so this
+        just runs the check + compaction (if needed) and mutates req.history
+        in place. Fails open — a bug here must never break the endpoint."""
+        _log.debug("context_budget_sync_start", extra={"conversation_id": req.conversation_id})
+        try:
+            users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
+            check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
+            if check.needs_compaction:
+                generator = self.container.services.get("generate")
+                req.history = await run_compaction(
+                    generator, self.container.settings, users, conversation_id,
+                    prior_summary, check.fold, check.keep,
+                )
+            else:
+                req.history = check.history
+        except Exception:
+            _log.warning("context_budget_failed_fallback", extra={"conversation_id": req.conversation_id})
+            # req.history stays whatever the client sent — never break this endpoint over it
+
     async def resolve(self, req: ExecutionRequest, stream: bool = False):
         result: PolicyResult = self.policy.check(req)
 
@@ -373,7 +415,6 @@ class RequestHandler:
             req.query_kwargs["filters"] = result.filters
 
         template = self.TEMPLATE_MAP[req.exec_type]
-        graph = self.builder.build(req, template)
 
         prompt_len = len(req.prompt or "") + len(req.last_user_message or "")
         user_id = str(req.user.id)
@@ -392,11 +433,14 @@ class RequestHandler:
                    "model": req.model, "collection": req.collection, "stream": stream},
         )
 
-        runner = PersistChat(self.runner, req) if req.save_chat else self.runner
-
         if stream:
-            gen, _ = await runner.run(graph, stream=True)
-            return gen
+            return self._stream_with_budget_notice(req, template)
+
+        if self._needs_context_budget(req):
+            await self._apply_context_budget_sync(req)
+
+        graph = self.builder.build(req, template)
+        runner = PersistChat(self.runner, req) if req.save_chat else self.runner
 
         t0 = time.perf_counter()
         response, _ = await runner.run(graph, stream=False)
@@ -411,3 +455,34 @@ class RequestHandler:
         _log.info("ai_request_done", extra={"user_id": user_id, "exec_type": req.exec_type,
                                             "latency_ms": latency_ms})
         return response
+
+    async def _stream_with_budget_notice(self, req: ExecutionRequest, template: str):
+        """Streaming path: runs the context-budget check before building the
+        graph. If compaction is needed, emits a {"status": "compacting"}
+        frame — a distinct key from {"thinking"/"content"}, so the frontend
+        can flip the existing "Thinking" placeholder's label to "Compacting…"
+        without any literal status text ever being written into the message
+        body. Fails open on any error, same as the sync path."""
+        if self._needs_context_budget(req):
+            _log.debug("context_budget_stream_start", extra={"conversation_id": req.conversation_id})
+            try:
+                users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
+                check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
+                if check.needs_compaction:
+                    yield (json.dumps({"status": "compacting"}) + "\n").encode("utf-8")
+                    generator = self.container.services.get("generate")
+                    req.history = await run_compaction(
+                        generator, self.container.settings, users, conversation_id,
+                        prior_summary, check.fold, check.keep,
+                    )
+                else:
+                    req.history = check.history
+            except Exception:
+                _log.warning("context_budget_failed_fallback", extra={"conversation_id": req.conversation_id})
+                # req.history stays whatever the client sent — never break the stream over this
+
+        graph = self.builder.build(req, template)
+        runner = PersistChat(self.runner, req) if req.save_chat else self.runner
+        gen, _ = await runner.run(graph, stream=True)
+        async for chunk in gen:
+            yield chunk

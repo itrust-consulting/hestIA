@@ -436,6 +436,17 @@ class UserRepository:
     def update_conversation_updated_at(self, conn, *, c_id: uuid.UUID, ts: int):
         conn.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (ts, c_id.bytes))
 
+    def get_conversation_metadata(self, c_id: uuid.UUID) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT metadata_json FROM conversations WHERE id = ?",
+            (c_id.bytes,),
+        ).fetchone()
+
+    @with_txn
+    def update_conversation_metadata(self, conn, *, c_id: uuid.UUID, metadata_json: str):
+        conn.execute("UPDATE conversations SET metadata_json = ? WHERE id = ?",
+                     (metadata_json, c_id.bytes))
+
     @with_txn
     def delete_conversation(self, conn, *, user_id: uuid.UUID, c_id: uuid.UUID):
         conn.execute("DELETE FROM conversations WHERE id = ? AND user_id = ?",
@@ -452,11 +463,45 @@ class UserRepository:
             (msg_id.bytes, c_id.bytes, role, metadata, content, options, ts),
         )
 
-    def get_messages(self, c_id: uuid.UUID, limit: int) -> list[sqlite3.Row]:
+    def get_messages(
+        self,
+        c_id: uuid.UUID,
+        limit: int,
+        before_created_at: int | None = None,
+        before_rowid: int | None = None,
+    ) -> list[sqlite3.Row]:
+        if before_created_at is not None:
+            return self._get_conn().execute(
+                "SELECT id, role, metadata, content, options, created_at, rowid FROM messages "
+                "WHERE c_id = ? AND (created_at < ? OR (created_at = ? AND rowid < ?)) "
+                "ORDER BY created_at DESC, rowid DESC LIMIT ?",
+                (c_id.bytes, before_created_at, before_created_at, before_rowid, limit),
+            ).fetchall()
         return self._get_conn().execute(
-            "SELECT id, role, metadata, content, options, created_at FROM messages "
+            "SELECT id, role, metadata, content, options, created_at, rowid FROM messages "
             "WHERE c_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?",
             (c_id.bytes, limit),
+        ).fetchall()
+
+    def get_messages_after(
+        self,
+        c_id: uuid.UUID,
+        after_created_at: int | None = None,
+        after_rowid: int | None = None,
+    ) -> list[sqlite3.Row]:
+        """Ascending, unpaginated (no limit) — used for reconstructing full
+        server-side history for LLM context, not for UI pagination."""
+        if after_created_at is not None:
+            return self._get_conn().execute(
+                "SELECT id, role, metadata, content, options, created_at, rowid FROM messages "
+                "WHERE c_id = ? AND (created_at > ? OR (created_at = ? AND rowid > ?)) "
+                "ORDER BY created_at ASC, rowid ASC",
+                (c_id.bytes, after_created_at, after_created_at, after_rowid),
+            ).fetchall()
+        return self._get_conn().execute(
+            "SELECT id, role, metadata, content, options, created_at, rowid FROM messages "
+            "WHERE c_id = ? ORDER BY created_at ASC, rowid ASC",
+            (c_id.bytes,),
         ).fetchall()
 
     @with_txn

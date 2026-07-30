@@ -9,7 +9,7 @@ header: |
   Verify organisation lifecycle and tenant-collection management
 level: 26.0
 links:
-- SRS-005: null
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -17,7 +17,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: X2qeNgZ-afXVVBFz8EuY6bR1iCJbDvSdTyS1FbD_D9k=
 test_data: |
   An admin account; two test user accounts (user A and user B); an existing collection.
 text: |

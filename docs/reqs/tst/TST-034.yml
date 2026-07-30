@@ -8,7 +8,10 @@ expected_outcome: |
 header: |
   Verify plain generate and RAG generate modes via POST /generate
 level: 34.0
-links: []
+links:
+- SRS-014: e0wtYttuzfq0GRAVYiKPCFgCitcxfC3f5oQ63KnFsn0=
+- SRS-015: 4IpkFPYvBst8yhqVV1OvKsmZCYIuWYEClss4kyubFbY=
+- SRS-016: A-b-0n5buxq3IBDM2Bb1nN4kw1VAcKOpHcr6cm2rCIs=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -16,7 +19,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: mpyeB0yipKMxtnYSGyfrk8vAI2hv560mabtQawC4HD8=
 test_data: |
   Authenticated user account; a collection with at least one ingested document containing content that answers the test question; a question whose answer is in the corpus; a custom system prompt; generation parameters (temperature, max_tokens).
 text: |

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -25,7 +25,7 @@ class TestEncodeRouter:
     def test_dense_encode_returns_vector(self):
         container = MagicMock()
         mock_encoder = MagicMock()
-        mock_encoder.encode.return_value = DenseVector(vector=[0.1, 0.2, 0.3])
+        mock_encoder.encode = AsyncMock(return_value=DenseVector(vector=[0.1, 0.2, 0.3]))
         mock_encoder.default_model = "emb-model"
         container.services = {"encDense": mock_encoder}
 

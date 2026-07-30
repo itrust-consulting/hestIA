@@ -9,8 +9,8 @@ header: |
   Verify LDAP/Active Directory authentication and auto-provisioning
 level: 21.0
 links:
-- SRS-004: null
-- SRS-005: null
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -18,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: 7-pt2R5pqXsdF6mgUgCQ-f6me3-MuTT018EynBoQmVA=
 test_data: |
   An LDAP/AD server (or a containerised OpenLDAP test instance) with at least one test user belonging to a group mapped to a hestIA organisation; hestIA configured with the LDAP host, bind credentials, and group-to-org mapping; the test user's LDAP credentials.
 text: |

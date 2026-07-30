@@ -1,9 +1,9 @@
 import type { RequestHandler } from './$types';
 import { backendFetch, proxyResponse } from '$lib/server/backend';
 
-export const GET: RequestHandler = async ({ params, cookies }) => {
+export const GET: RequestHandler = async ({ params, url, cookies }) => {
   const token = cookies.get('token');
-  const res = await backendFetch(`/conversations/${params.id}`, token);
+  const res = await backendFetch(`/conversations/${params.id}${url.search}`, token);
   return proxyResponse(res);
 };
 

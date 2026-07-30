@@ -40,7 +40,16 @@ export type ChatMessage = {
   attachments?: { name: string; size?: number; markdown?: string }[];
   citations?: Citation[];
   thinking?: string;
+  /** True while the server is compacting conversation context before this
+   *  turn's real generation begins; drives the "Compacting…" label instead
+   *  of the generic "Thinking" placeholder. Stops mattering once thinking or
+   *  content starts arriving, never explicitly cleared. */
+  compacting?: boolean;
   createdAt: number;
+  /** Set only for messages loaded from the server; absent for messages pushed
+   *  live this session (not yet round-tripped through a fetch). Used to build
+   *  resume cursors for sliding-window eviction — never evict a message without one. */
+  rowid?: number;
 };
 export type APIMessage = { role: Role; content: string | ContentPart[] };
 export type ChatAPIMessages = APIMessage[];

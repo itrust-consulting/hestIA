@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -25,26 +26,26 @@ class TestGenerator:
 
     def test_uses_default_model_when_none_given(self):
         provider = MagicMock()
-        provider.generate.return_value = "response"
+        provider.generate = AsyncMock(return_value="response")
         gen = Generator(provider=provider, model="default-model")
-        gen.generate("hello")
+        asyncio.run(gen.generate("hello"))
         provider.generate.assert_called_once()
         _, kwargs = provider.generate.call_args
         assert kwargs["model"] == "default-model"
 
     def test_explicit_model_overrides_default(self):
         provider = MagicMock()
-        provider.generate.return_value = "r"
+        provider.generate = AsyncMock(return_value="r")
         gen = Generator(provider=provider, model="default")
-        gen.generate("hi", model="override")
+        asyncio.run(gen.generate("hi", model="override"))
         _, kwargs = provider.generate.call_args
         assert kwargs["model"] == "override"
 
     def test_chat_uses_default_model(self):
         provider = MagicMock()
-        provider.chat.return_value = "msg"
+        provider.chat = AsyncMock(return_value="msg")
         gen = Generator(provider=provider, model="chat-model")
-        gen.chat([{"role": "user", "content": "hi"}])
+        asyncio.run(gen.chat([{"role": "user", "content": "hi"}]))
         _, kwargs = provider.chat.call_args
         assert kwargs["model"] == "chat-model"
 
@@ -57,19 +58,20 @@ class TestDenseEncoder:
 
     def _provider(self, vectors=None):
         p = MagicMock()
-        p.embed.return_value = vectors or [[0.1, 0.2, 0.3]]
+        p.embed = AsyncMock(return_value=vectors or [[0.1, 0.2, 0.3]])
+        p.embed_blocking.return_value = vectors or [[0.1, 0.2, 0.3]]
         return p
 
     def test_encode_single_string_returns_dense_vector(self):
         enc = DenseEncoder(provider=self._provider(), model="emb")
-        vec = enc.encode("hello world")
+        vec = asyncio.run(enc.encode("hello world"))
         assert isinstance(vec, DenseVector)
         assert vec.vector == [0.1, 0.2, 0.3]
 
     def test_encode_normalizes_str_to_list(self):
         p = self._provider()
         enc = DenseEncoder(provider=p, model="emb")
-        enc.encode("single")
+        asyncio.run(enc.encode("single"))
         call_args = p.embed.call_args[0][0]
         assert isinstance(call_args, list)
 
@@ -88,11 +90,11 @@ class TestDenseEncoder:
 class TestSparseEncoderCacheKey:
 
     def test_strips_whitespace(self, tmp_path):
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         assert enc._cache_key(" my corpus ") == "my_corpus"
 
     def test_replaces_spaces_with_underscores(self, tmp_path):
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         assert enc._cache_key("my corpus name") == "my_corpus_name"
 
 
@@ -100,7 +102,7 @@ class TestSparseEncoderTokenize:
 
     @pytest.fixture
     def enc(self, tmp_path):
-        return SparseEncoder(corpus_dir=tmp_path)
+        return SparseEncoder(corpus_stats=tmp_path)
 
     def test_builds_vocabulary(self, enc):
         ids, vocab = enc._tokenize(["hello world"])
@@ -124,7 +126,7 @@ class TestSparseEncoderTokenizeExtend:
 
     @pytest.fixture
     def enc(self, tmp_path):
-        return SparseEncoder(corpus_dir=tmp_path)
+        return SparseEncoder(corpus_stats=tmp_path)
 
     def test_extends_existing_vocab(self, enc):
         import Stemmer
@@ -144,7 +146,7 @@ class TestSparseEncoderTokenizeExtend:
 class TestSparseEncoderLoadOrEmpty:
 
     def test_returns_empty_stats_when_no_file(self, tmp_path):
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         stats = enc._load_or_empty("nonexistent")
         assert stats.N == 0
         assert stats.total_tokens == 0
@@ -155,7 +157,7 @@ class TestSparseEncoderBuildQueryVector:
 
     def test_returns_sparse_vector(self, tmp_path):
         import Stemmer
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         stemmer = Stemmer.Stemmer("english")
         stats = _CorpusStats(vocab={"hello": 0, "world": 1}, N=10, total_tokens=100,
                              df={0: 3, 1: 5})
@@ -166,7 +168,7 @@ class TestSparseEncoderBuildQueryVector:
 
     def test_unknown_tokens_excluded(self, tmp_path):
         import Stemmer
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         stemmer = Stemmer.Stemmer("english")
         stats = _CorpusStats(vocab={}, N=10, total_tokens=100, df={})
         vec = enc._build_query_vector("unknown token", stats, stemmer)
@@ -177,7 +179,7 @@ class TestSparseEncoderBuildQueryVector:
 class TestSparseEncoderEncodeDocuments:
 
     def test_round_trip_encode_decode(self, tmp_path):
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         vecs = enc.encode_documents(
             ["hello world", "foo bar baz"],
             corpus_name="test_col",
@@ -189,7 +191,7 @@ class TestSparseEncoderEncodeDocuments:
         assert (tmp_path / "test_col.json").exists()
 
     def test_updates_corpus_stats(self, tmp_path):
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         enc.encode_documents(["hello world"], corpus_name="test_col", source_uri="doc.pdf")
         stats = enc._load("test_col")
         assert stats.N == 1
@@ -199,14 +201,14 @@ class TestSparseEncoderEncodeDocuments:
 class TestSparseEncoderRemoveDocument:
 
     def test_remove_reduces_chunk_count(self, tmp_path):
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         enc.encode_documents(["hello world"], corpus_name="col", source_uri="doc.pdf")
         enc.remove_document("doc.pdf", "col")
         stats = enc._load("col")
         assert stats.N == 0
 
     def test_remove_nonexistent_doc_is_noop(self, tmp_path):
-        enc = SparseEncoder(corpus_dir=tmp_path)
+        enc = SparseEncoder(corpus_stats=tmp_path)
         enc.encode_documents(["hello"], corpus_name="col", source_uri="real.pdf")
         # Should not raise
         enc.remove_document("missing.pdf", "col")
@@ -225,6 +227,6 @@ class TestRetriever:
         provider.search.return_value = mock_result
 
         retriever = Retriever(provider=provider)
-        result = retriever.retrieve("my-col", MagicMock())
+        result = asyncio.run(retriever.retrieve("my-col", MagicMock()))
         provider.search.assert_called_once()
         assert result is mock_result

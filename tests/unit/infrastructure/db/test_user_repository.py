@@ -363,3 +363,124 @@ class TestMessages:
                             metadata="{}", content="to delete", options="{}", ts=1)
         repo.delete_message(c_id=c_id, msg_id=m_id)
         assert repo.get_messages(c_id, limit=10) == []
+
+    def test_get_messages_cursor_pagination_walks_full_history(self, repo):
+        uid = _insert_user(repo, username="pg", email="pg@x.com")
+        c_id = _uid()
+        repo.insert_conversation(conv_id=c_id, user_id=uid, title="C",
+                                 metadata_json="{}", ts=0)
+        for i in range(5):
+            repo.insert_message(msg_id=_uid(), c_id=c_id, role="user",
+                                metadata="{}", content=f"msg{i}", options="{}", ts=i)
+
+        seen = []
+        before_created_at = None
+        before_rowid = None
+        for _ in range(5):
+            page = repo.get_messages(c_id, limit=1,
+                                     before_created_at=before_created_at,
+                                     before_rowid=before_rowid)
+            assert len(page) == 1
+            seen.append(page[0]["content"])
+            before_created_at = page[0]["created_at"]
+            before_rowid = page[0]["rowid"]
+
+        assert seen == ["msg4", "msg3", "msg2", "msg1", "msg0"]
+        # one more page past the end of history returns nothing
+        assert repo.get_messages(c_id, limit=1,
+                                 before_created_at=before_created_at,
+                                 before_rowid=before_rowid) == []
+
+    def test_get_messages_cursor_tie_break_on_rowid(self, repo):
+        uid = _insert_user(repo, username="tie", email="tie@x.com")
+        c_id = _uid()
+        repo.insert_conversation(conv_id=c_id, user_id=uid, title="C",
+                                 metadata_json="{}", ts=0)
+        repo.insert_message(msg_id=_uid(), c_id=c_id, role="user",
+                            metadata="{}", content="first", options="{}", ts=100)
+        repo.insert_message(msg_id=_uid(), c_id=c_id, role="assistant",
+                            metadata="{}", content="second", options="{}", ts=100)
+
+        newest = repo.get_messages(c_id, limit=1)
+        assert newest[0]["content"] == "second"
+
+        older = repo.get_messages(c_id, limit=1,
+                                  before_created_at=newest[0]["created_at"],
+                                  before_rowid=newest[0]["rowid"])
+        assert len(older) == 1
+        assert older[0]["content"] == "first"
+
+
+class TestGetMessagesAfter:
+
+    def test_no_boundary_returns_full_ascending_order(self, repo):
+        uid = _insert_user(repo, username="asc", email="asc@x.com")
+        c_id = _uid()
+        repo.insert_conversation(conv_id=c_id, user_id=uid, title="C",
+                                 metadata_json="{}", ts=0)
+        for i in range(3):
+            repo.insert_message(msg_id=_uid(), c_id=c_id, role="user",
+                                metadata="{}", content=f"msg{i}", options="{}", ts=i)
+
+        rows = repo.get_messages_after(c_id)
+        assert [r["content"] for r in rows] == ["msg0", "msg1", "msg2"]
+
+    def test_boundary_excludes_messages_at_or_before_it(self, repo):
+        uid = _insert_user(repo, username="bnd", email="bnd@x.com")
+        c_id = _uid()
+        repo.insert_conversation(conv_id=c_id, user_id=uid, title="C",
+                                 metadata_json="{}", ts=0)
+        for i in range(5):
+            repo.insert_message(msg_id=_uid(), c_id=c_id, role="user",
+                                metadata="{}", content=f"msg{i}", options="{}", ts=i)
+
+        boundary = repo.get_messages_after(c_id)[1]  # msg1
+        rows = repo.get_messages_after(c_id, after_created_at=boundary["created_at"],
+                                      after_rowid=boundary["rowid"])
+        assert [r["content"] for r in rows] == ["msg2", "msg3", "msg4"]
+
+    def test_rowid_tie_break(self, repo):
+        uid = _insert_user(repo, username="atie", email="atie@x.com")
+        c_id = _uid()
+        repo.insert_conversation(conv_id=c_id, user_id=uid, title="C",
+                                 metadata_json="{}", ts=0)
+        repo.insert_message(msg_id=_uid(), c_id=c_id, role="user",
+                            metadata="{}", content="first", options="{}", ts=100)
+        repo.insert_message(msg_id=_uid(), c_id=c_id, role="assistant",
+                            metadata="{}", content="second", options="{}", ts=100)
+
+        oldest = repo.get_messages_after(c_id)[0]
+        assert oldest["content"] == "first"
+
+        newer = repo.get_messages_after(c_id, after_created_at=oldest["created_at"],
+                                        after_rowid=oldest["rowid"])
+        assert len(newer) == 1
+        assert newer[0]["content"] == "second"
+
+    def test_no_messages_left_past_the_newest(self, repo):
+        uid = _insert_user(repo, username="past", email="past@x.com")
+        c_id = _uid()
+        repo.insert_conversation(conv_id=c_id, user_id=uid, title="C",
+                                 metadata_json="{}", ts=0)
+        repo.insert_message(msg_id=_uid(), c_id=c_id, role="user",
+                            metadata="{}", content="only", options="{}", ts=1)
+        newest = repo.get_messages_after(c_id)[0]
+        assert repo.get_messages_after(c_id, after_created_at=newest["created_at"],
+                                       after_rowid=newest["rowid"]) == []
+
+
+class TestConversationMetadata:
+
+    def test_round_trip_get_update(self, repo):
+        uid = _insert_user(repo, username="meta", email="meta@x.com")
+        c_id = _uid()
+        repo.insert_conversation(conv_id=c_id, user_id=uid, title="C",
+                                 metadata_json="{}", ts=0)
+
+        assert repo.get_conversation_metadata(c_id)["metadata_json"] == "{}"
+
+        repo.update_conversation_metadata(c_id=c_id, metadata_json='{"foo": "bar"}')
+        assert repo.get_conversation_metadata(c_id)["metadata_json"] == '{"foo": "bar"}'
+
+    def test_missing_conversation_returns_none(self, repo):
+        assert repo.get_conversation_metadata(_uid()) is None

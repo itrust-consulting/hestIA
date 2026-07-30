@@ -11,15 +11,17 @@ derived: false
 header: ''
 importance: 3
 level: 1.0
-links: [MRS-107]
+links:
+- MRS-107: Ms8vXTl9UIV40KJo2LWIV-Cj2dEigZSlHhxkyB9aW6w=
 normative: true
-rationale: GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 32.1 (ability to ensure ongoing availability and resilience).
+rationale: |
+  GDPR Art. 5.1f (integrity and confidentiality); GDPR Art. 32.1 (ability to ensure ongoing availability and resilience).
 ref: ''
 releasephase: beta
 requirement: |
   The system shall maintain resilience and the capability to restore
   personal data and processing functions within agreed recovery objectives.
-reviewed: null
+reviewed: NChKEGmsT-ruaf5_ZbkA4pkLe6lSKg_duGuLRF-iaZE=
 text: ''
 type: S
 urgency: 3

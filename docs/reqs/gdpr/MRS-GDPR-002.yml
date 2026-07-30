@@ -8,15 +8,17 @@ derived: false
 header: ''
 importance: 4
 level: 1.0
-links: [MRS-007]
+links:
+- MRS-007: HsQc5b69taVsJQsaEALuHFfRb7R_uyBFXKd156nFPjQ=
 normative: true
-rationale: GDPR Art. 5.1b (purpose limitation); GDPR Art. 5.1c (data minimisation); GDPR Art. 25 (data protection by design and by default).
+rationale: |
+  GDPR Art. 5.1b (purpose limitation); GDPR Art. 5.1c (data minimisation); GDPR Art. 25 (data protection by design and by default).
 ref: ''
 releasephase: beta
 requirement: |
   The system shall ensure that only the data necessary for the defined
   processing purpose are collected, stored, and transmitted.
-reviewed: null
+reviewed: 5wX3uKYDzm7dcK-HlpfZ_BSLxri41t2upYd0MSwfHTQ=
 text: ''
 type: S
 urgency: 3

@@ -1,4 +1,5 @@
 app/data/corpus_stats/
+*.db
 app/logs/
 dump/
 test_docs/

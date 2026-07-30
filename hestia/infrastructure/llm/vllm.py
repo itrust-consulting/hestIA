@@ -79,9 +79,13 @@ class vLLMProvider(LLMProvider):
         _log.debug("vllm_generate", extra={"model": _m, "prompt_len": len(prompt), "stream": stream})
         payload = {"prompt": prompt, "options": options, "stream": stream}
         if stream:
-            return self._stream("/v1/completions", payload, extract=lambda x: x.get("response"))
+            return self._stream(
+                "/v1/completions", payload,
+                extract=lambda x: (x.get("choices", [{}])[0].get("text")),
+            )
         j = await self.http_chat.post("/v1/completions", payload)
-        resp = (j.json().get("response") or "").strip()
+        choices = j.json().get("choices") or []
+        resp = ((choices[0].get("text") if choices else "") or "").strip()
         _log.debug("vllm_generate_done", extra={"model": _m, "response_len": len(resp)})
         return resp
 
@@ -102,8 +106,9 @@ class vLLMProvider(LLMProvider):
                 extract_thinking=lambda obj: (obj.get("choices", [{}])[0].get("delta", {}).get("reasoning")),
             )
         j = await self.http_chat.post("/v1/chat/completions", payload)
-        msg = (j.json().get("message") or {}).get("content", "")
-        resp = (msg or "").strip()
+        choices = j.json().get("choices") or []
+        msg = (choices[0].get("message") or {}) if choices else {}
+        resp = (msg.get("content") or "").strip()
         _log.debug("vllm_chat_done", extra={"model": _m, "response_len": len(resp)})
         return resp
 

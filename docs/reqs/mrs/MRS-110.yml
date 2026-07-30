@@ -16,9 +16,8 @@ importance: 3
 level: 1.0
 links: []
 normative: true
-rationale: >
-  NIS2 Article 21(1)(e) vulnerability management; good practice for a system
-  handling sensitive ISMS and compliance documentation for public-sector operators.
+rationale: |
+  NIS2 Article 21(1)(e) vulnerability management; good practice for a system handling sensitive ISMS and compliance documentation for public-sector operators.
 ref: ''
 releasephase: beta
 requirement: |
@@ -27,7 +26,7 @@ requirement: |
   and input validation of all external-facing endpoints. A review report
   shall be produced and open findings resolved or formally accepted before
   release.
-reviewed: null
+reviewed: nUYQhp6Ms6Xi9WUwqIgRBCroWFco-hsgIy2gPVlHm_8=
 text: ''
 type: Q
 urgency: 3

@@ -14,7 +14,8 @@ importance: 5
 level: 1.0
 links: []
 normative: true
-rationale: NIS2 compliance obligation for deployments serving NIS2-obligated operators.
+rationale: |
+  NIS2 compliance obligation for deployments serving NIS2-obligated operators.
 ref: ''
 releasephase: beta
 requirement: |
@@ -22,7 +23,7 @@ requirement: |
   the operators it serves. A compliance assessment shall be conducted to
   identify which NIS2 measures apply to the deployment context and map them
   to corresponding system or operational controls.
-reviewed: null
+reviewed: lbUXJVGiGBdXC_KO1HdUEGquW8L4OHM6IoQN3QNMAhE=
 text: ''
 type: C
 urgency: 4

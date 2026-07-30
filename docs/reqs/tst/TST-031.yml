@@ -8,7 +8,9 @@ expected_outcome: |
 header: |
   Verify document and collection deletion including vector store and sparse corpus cleanup
 level: 31.0
-links: []
+links:
+- SRS-008: t5iEkbl9zzQydNgIthJQB63TyB8_hHMIAVZDArrJBxE=
+- SRS-025: zY3zWH23WHtpJk7ThxSKeDOMp9GjczF8Ttwc38JiRdg=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -16,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: sYz-VENrbhYnk8xX62de1DYjT9QmmCfCqr9bAvN6NEU=
 test_data: |
   Moderator account; admin account; a named test collection with at least two ingested documents with distinct, query-identifiable content; a tenant organisation with a collection grant.
 text: |

@@ -9,8 +9,8 @@ header: |
   Verify login rate limiting rejects rapid successive authentication attempts
 level: 22.0
 links:
-- SRS-004: null
-- SRS-020: null
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
+- SRS-020: VXgLxT_Apdm4JHtgqfnNR1ce9EXVhs_L8_v1kMUHcLs=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -18,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: P7Hzsos2bNvaRZae_cM4NWtD-KUOF3d9bFPr6pzhTLw=
 test_data: |
   A non-existent or invalid username/password pair; a tool capable of submitting rapid HTTP requests (e.g. curl in a loop, Locust, or Postman runner).
 text: |

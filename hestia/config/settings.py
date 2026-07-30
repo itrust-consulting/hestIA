@@ -60,7 +60,7 @@ class Settings(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     # --- app ---
-    version: str = "alpha_v0.2.2"
+    version: str = "alpha_v0.2.3"
     port: int = 5556
 
     # --- backends ---
@@ -100,8 +100,12 @@ class Settings(BaseModel):
 
     # --- limits ---
     pbkdf2_iterations: int = 210_000
-    max_history_pairs: int = 10
     request_timeout: tuple[float, float] = (10.0, 800.0)
+
+    # --- context budget ---
+    max_context_tokens: int = 32000
+    summary_target_tokens: int = 6000
+    summary_model: str | None = None   # falls back to default_gen_model if unset
 
     classification_labels: list[str] = [
         "public", "public (pu)",
@@ -126,6 +130,11 @@ class Settings(BaseModel):
         app_data = project_root / (os.getenv("HESTIA_DATA_DIR") or "app/data")
 
         enable_auth = os.getenv("ENABLE_AUTH", "false").lower() == "true"
+
+        max_context_tokens = int(os.getenv("MAX_CONTEXT_TOKENS", "32000"))
+        summary_target_tokens = int(os.getenv("SUMMARY_TARGET_TOKENS", "6000"))
+        if summary_target_tokens >= max_context_tokens:
+            raise ConfigurationError("SUMMARY_TARGET_TOKENS must be less than MAX_CONTEXT_TOKENS")
 
         auth: AuthSettings | None = None
         ldap: LDAPSettings | None = None
@@ -161,6 +170,9 @@ class Settings(BaseModel):
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             log_dir=app_data.parent / (os.getenv("LOG_DIR") or "logs"),
             log_to_console=os.getenv("LOG_TO_CONSOLE", "true").lower() == "true",
+            max_context_tokens=max_context_tokens,
+            summary_target_tokens=summary_target_tokens,
+            summary_model=os.getenv("SUMMARY_MODEL") or None,
         )
 
 

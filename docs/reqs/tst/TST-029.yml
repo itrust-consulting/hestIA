@@ -9,8 +9,8 @@ header: |
   Verify standalone encode endpoint for dense and sparse modes
 level: 29.0
 links:
-- SRS-013: null
-- SRS-007: null
+- SRS-007: HKbdS7odJV_kzLZIHn2V8equd3eHtjGEHVI0cxKq1hU=
+- SRS-013: qd00gjVuUOE8l0Lz608MfPnW5GVn8bPpE_uQA_mVtKs=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -18,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: mODgnbh3aYRE9B8zZXCTpsGBcx4URwdB2ZL18fSXgVM=
 test_data: |
   Authenticated user account; a short text string; a list of three short text strings for batch encoding.
 text: |

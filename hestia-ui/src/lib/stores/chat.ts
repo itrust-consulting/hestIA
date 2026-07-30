@@ -4,6 +4,12 @@ import type { ChatMessage, ChatAPIMessages } from '$lib/types';
 
 export const messages = writable<ChatMessage[]>([]);
 export const conversationId = writable<string | null>(null);
+/** True while the messages array is being mutated at the FRONT (prepending
+ *  older history, or evicting the head to enforce the sliding-window cap) so
+ *  <VList>'s `shift` prop can be toggled to keep the visible scroll position
+ *  stable. Must stay false for end-of-list mutations (new sends, streaming,
+ *  eviction from the tail). */
+export const isMutatingFront = writable<boolean>(false);
 
 export function pushMessage(role: ChatMessage['role'], content: string) {
   const msg_id = crypto.randomUUID().replace(/-/g, "");

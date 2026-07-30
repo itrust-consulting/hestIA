@@ -9,8 +9,8 @@ header: |
   Verify help system CRUD — sections and images
 level: 28.0
 links:
-- SRS-022: null
-- SRS-005: null
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-022: oXkJA7K3EHuLow2s9PzRi8NiH67ADcSGWbsXQYbCBbk=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -18,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: 6_Ku_XWY08YHmwIWXCzn7sXasSsByTBTbwYOSbHAlW4=
 test_data: |
   Admin account; a Markdown help section file with at least one embedded image reference; a valid image file (PNG or JPEG, under the size limit); a standard user account.
 text: |

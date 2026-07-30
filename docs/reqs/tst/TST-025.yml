@@ -8,7 +8,9 @@ expected_outcome: |
 header: |
   Verify admin user management — create, list, update, reset password, deactivate, and delete
 level: 25.0
-links: []
+links:
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -16,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: 9ySh6W28Wl6qfvf5ourWh7JuonCKQIygzSAA21JGhzk=
 test_data: |
   An admin account with known credentials; a moderator account for scope-restricted listing verification.
 text: |

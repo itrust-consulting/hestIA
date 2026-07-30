@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from hestia.handler import (
+    PersistChat,
+    RequestHandler,
     Runner,
     _build_prompt,
     _extract_used_citekeys,
     _format_citations,
     _normalize_citekey,
 )
+from hestia.domain.exceptions import ConfigurationError, ForbiddenError
+from hestia.domain.policies.guard import PolicyDecision, PolicyResult
 from hestia.domain.rag.graph import ExecutionGraph, ExecutionRequest, Node
+from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 from tests.unit.conftest import _make_user
 
 
@@ -207,15 +214,367 @@ class TestRunnerNextOf:
 
 
 # ---------------------------------------------------------------------------
+# Runner.run — node orchestration
+# ---------------------------------------------------------------------------
+
+class TestRunnerRun:
+
+    def _graph(self, node_ids, edges=None):
+        nodes = [Node(id=nid, type=nid, inputs={}, outputs={}) for nid in node_ids]
+        if edges is None and len(node_ids) > 1:
+            edges = [(node_ids[i], node_ids[i + 1]) for i in range(len(node_ids) - 1)]
+        elif edges is None:
+            edges = []
+        return ExecutionGraph(nodes=nodes, edges=edges, entrypoint=node_ids[0], exitpoints=[node_ids[-1]])
+
+    def test_calls_all_but_last_node_with_stream_false(self):
+        runner = Runner(container=MagicMock())
+        graph = self._graph(["A", "B", "C"])
+        handler_a, handler_b, handler_c = AsyncMock(), AsyncMock(), AsyncMock()
+        runner.node_handlers = {"A": handler_a, "B": handler_b, "C": handler_c}
+
+        asyncio.run(runner.run(graph, stream=True))
+
+        assert handler_a.call_args.kwargs["stream"] is False
+        assert handler_b.call_args.kwargs["stream"] is False
+
+    def test_returns_slot_final_when_not_streaming(self):
+        runner = Runner(container=MagicMock())
+        graph = self._graph(["A"])
+
+        async def _set_final(node, slot, stream):
+            slot["final"] = "answer"
+
+        runner.node_handlers = {"A": _set_final}
+
+        result, slot = asyncio.run(runner.run(graph, stream=False))
+        assert result == "answer"
+        assert slot["final"] == "answer"
+
+    def test_streaming_returns_final_handler_result_directly(self):
+        runner = Runner(container=MagicMock())
+        graph = self._graph(["A"])
+        sentinel = object()
+        handler_a = AsyncMock(return_value=sentinel)
+        runner.node_handlers = {"A": handler_a}
+
+        result, _ = asyncio.run(runner.run(graph, stream=True))
+        assert result is sentinel
+        assert handler_a.call_args.kwargs["stream"] is True
+
+    def test_raises_configuration_error_for_unknown_middle_node_type(self):
+        runner = Runner(container=MagicMock())
+        graph = self._graph(["A", "B"])
+        runner.node_handlers = {"B": AsyncMock()}  # "A" (middle) missing
+        with pytest.raises(ConfigurationError):
+            asyncio.run(runner.run(graph, stream=False))
+
+    def test_raises_configuration_error_for_unknown_final_node_type(self):
+        runner = Runner(container=MagicMock())
+        graph = self._graph(["A", "B"])
+        runner.node_handlers = {"A": AsyncMock()}  # "B" (final) missing
+        with pytest.raises(ConfigurationError):
+            asyncio.run(runner.run(graph, stream=False))
+
+
+# ---------------------------------------------------------------------------
+# Runner._run_encode_dense / _run_encode_sparse
+# ---------------------------------------------------------------------------
+
+class TestRunEncodeDense:
+
+    def _runner(self, svc):
+        container = MagicMock()
+        container.services = {"encDense": svc}
+        return Runner(container=container)
+
+    def test_writes_result_to_default_output_key(self):
+        svc = MagicMock()
+        svc.encode = AsyncMock(return_value=DenseVector(vector=[0.1]))
+        runner = self._runner(svc)
+        node = Node(id="n1", type="EncodeDense", inputs={"data": "hello"}, outputs={})
+        slot = {}
+
+        asyncio.run(runner._run_encode_dense(node, slot, stream=False))
+
+        assert slot["vector"] == DenseVector(vector=[0.1])
+        svc.encode.assert_awaited_once_with("hello")
+
+    def test_writes_result_to_custom_output_key(self):
+        svc = MagicMock()
+        svc.encode = AsyncMock(return_value=DenseVector(vector=[0.2]))
+        runner = self._runner(svc)
+        node = Node(id="n1", type="EncodeDense", inputs={"data": "hi"}, outputs={"vector": "dense_out"})
+        slot = {}
+
+        asyncio.run(runner._run_encode_dense(node, slot, stream=False))
+
+        assert slot["dense_out"] == DenseVector(vector=[0.2])
+
+    def test_resolves_slot_reference_input(self):
+        svc = MagicMock()
+        svc.encode = AsyncMock(return_value=DenseVector(vector=[0.3]))
+        runner = self._runner(svc)
+        node = Node(id="n1", type="EncodeDense", inputs={"data": "?raw"}, outputs={})
+        slot = {"raw": "resolved text"}
+
+        asyncio.run(runner._run_encode_dense(node, slot, stream=False))
+
+        svc.encode.assert_awaited_once_with("resolved text")
+
+
+class TestRunEncodeSparse:
+
+    def test_passes_data_and_collection_and_writes_result(self):
+        svc = MagicMock()
+        svc.encode.return_value = SparseVector(indices=[0, 1], values=[0.5, 0.3])
+        container = MagicMock()
+        container.services = {"encSparse": svc}
+        runner = Runner(container=container)
+        node = Node(id="n1", type="EncodeSparse", inputs={"data": "hello", "collection": "col"}, outputs={})
+        slot = {}
+
+        asyncio.run(runner._run_encode_sparse(node, slot, stream=False))
+
+        svc.encode.assert_called_once_with("hello", "col")
+        assert slot["vector"] == SparseVector(indices=[0, 1], values=[0.5, 0.3])
+
+    def test_writes_result_to_custom_output_key(self):
+        svc = MagicMock()
+        svc.encode.return_value = SparseVector(indices=[], values=[])
+        container = MagicMock()
+        container.services = {"encSparse": svc}
+        runner = Runner(container=container)
+        node = Node(id="n1", type="EncodeSparse", inputs={"data": "hi", "collection": "col"}, outputs={"vector": "sparse_out"})
+        slot = {}
+
+        asyncio.run(runner._run_encode_sparse(node, slot, stream=False))
+
+        assert slot["sparse_out"] == SparseVector(indices=[], values=[])
+
+
+# ---------------------------------------------------------------------------
+# Runner._run_retrieve
+# ---------------------------------------------------------------------------
+
+class TestRunRetrieve:
+
+    def _runner(self, svc):
+        container = MagicMock()
+        container.services = {"search": svc}
+        return Runner(container=container)
+
+    def _mock_result(self, points):
+        result = MagicMock()
+        result.points = points
+        return result
+
+    def test_dense_only_query(self):
+        svc = MagicMock()
+        points = [MagicMock()]
+        svc.retrieve = AsyncMock(return_value=self._mock_result(points))
+        runner = self._runner(svc)
+        dense = DenseVector(vector=[0.1])
+        node = Node(id="n1", type="Retrieve", inputs={"dense": dense, "collection": "col"}, outputs={})
+        slot = {}
+
+        asyncio.run(runner._run_retrieve(node, slot, stream=False))
+
+        args, _ = svc.retrieve.call_args
+        assert args[0] == "col"
+        assert args[1] == dense
+        assert slot["hits"] == points
+
+    def test_sparse_only_query(self):
+        svc = MagicMock()
+        svc.retrieve = AsyncMock(return_value=self._mock_result([]))
+        runner = self._runner(svc)
+        sparse = SparseVector(indices=[0], values=[1.0])
+        node = Node(id="n1", type="Retrieve", inputs={"sparse": sparse, "collection": "col"}, outputs={})
+        slot = {}
+
+        asyncio.run(runner._run_retrieve(node, slot, stream=False))
+
+        args, _ = svc.retrieve.call_args
+        assert args[1] == sparse
+
+    def test_hybrid_query_when_both_present(self):
+        svc = MagicMock()
+        svc.retrieve = AsyncMock(return_value=self._mock_result([]))
+        runner = self._runner(svc)
+        dense = DenseVector(vector=[0.1])
+        sparse = SparseVector(indices=[0], values=[1.0])
+        node = Node(id="n1", type="Retrieve", inputs={"dense": dense, "sparse": sparse, "collection": "col"}, outputs={})
+        slot = {}
+
+        asyncio.run(runner._run_retrieve(node, slot, stream=False))
+
+        args, _ = svc.retrieve.call_args
+        assert isinstance(args[1], HybridQuery)
+        assert args[1].dense == dense
+        assert args[1].sparse == sparse
+
+    def test_raises_configuration_error_when_no_query_vector(self):
+        svc = MagicMock()
+        runner = self._runner(svc)
+        node = Node(id="n1", type="Retrieve", inputs={"collection": "col"}, outputs={})
+
+        with pytest.raises(ConfigurationError):
+            asyncio.run(runner._run_retrieve(node, {}, stream=False))
+
+    def test_hits_points_written_to_custom_output_key(self):
+        svc = MagicMock()
+        points = [MagicMock(), MagicMock()]
+        svc.retrieve = AsyncMock(return_value=self._mock_result(points))
+        runner = self._runner(svc)
+        dense = DenseVector(vector=[0.1])
+        node = Node(id="n1", type="Retrieve", inputs={"dense": dense}, outputs={"hits": "results"})
+        slot = {}
+
+        asyncio.run(runner._run_retrieve(node, slot, stream=False))
+
+        assert slot["results"] == points
+
+
+# ---------------------------------------------------------------------------
+# Runner._run_augment
+# ---------------------------------------------------------------------------
+
+class TestRunAugment:
+
+    def test_no_hits_leaves_prompt_unchanged_and_no_aug_prompt_key(self):
+        runner = Runner(container=MagicMock())
+        node = Node(id="n1", type="Augment", inputs={"prompt": "hello", "hits": []}, outputs={})
+        slot = {}
+
+        asyncio.run(runner._run_augment(node, slot, stream=False))
+
+        assert slot["prompt"] == "hello"
+        assert "_aug_prompt" not in slot
+        assert slot["_cite_list"] == []
+
+    def test_with_hits_sets_aug_prompt_and_cite_list(self):
+        runner = Runner(container=MagicMock())
+        point = MagicMock()
+        point.payload = {"source": "docA", "content": "chunk text", "doc_info": {}, "info": {}}
+        node = Node(id="n1", type="Augment", inputs={"prompt": "question", "hits": [point]}, outputs={})
+        slot = {}
+
+        asyncio.run(runner._run_augment(node, slot, stream=False))
+
+        assert "question" in slot["prompt"]
+        assert "chunk text" in slot["prompt"]
+        assert slot["_aug_prompt"] == slot["prompt"]
+        assert len(slot["_cite_list"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Runner._run_generate / _run_chat
+# ---------------------------------------------------------------------------
+
+class TestRunGenerate:
+
+    def _runner(self, svc):
+        container = MagicMock()
+        container.services = {"generate": svc}
+        return Runner(container=container)
+
+    def test_non_streaming_writes_response_and_final(self):
+        svc = MagicMock()
+        svc.generate = AsyncMock(return_value="answer")
+        runner = self._runner(svc)
+        node = Node(id="n1", type="Generate", inputs={"prompt": "hi"}, outputs={}, model="m1", options={"temp": 0.1})
+        slot = {}
+
+        asyncio.run(runner._run_generate(node, slot, stream=False))
+
+        assert slot["response"] == "answer"
+        assert slot["final"] == "answer"
+        svc.generate.assert_awaited_once_with(prompt="hi", model="m1", options={"temp": 0.1}, stream=False)
+
+    def test_streaming_returns_handler_result_without_touching_slot(self):
+        svc = MagicMock()
+        sentinel = object()
+        svc.generate = AsyncMock(return_value=sentinel)
+        runner = self._runner(svc)
+        node = Node(id="n1", type="Generate", inputs={"prompt": "hi"}, outputs={})
+        slot = {}
+
+        result = asyncio.run(runner._run_generate(node, slot, stream=True))
+
+        assert result is sentinel
+        assert "final" not in slot
+        assert "response" not in slot
+        svc.generate.assert_awaited_once_with(prompt="hi", model=None, options=None, stream=True)
+
+
+class TestRunChat:
+
+    def _runner(self, svc):
+        container = MagicMock()
+        container.services = {"generate": svc}
+        return Runner(container=container)
+
+    def test_builds_messages_from_history_and_last_message(self):
+        svc = MagicMock()
+        svc.chat = AsyncMock(return_value="reply")
+        runner = self._runner(svc)
+        node = Node(id="n1", type="Chat", inputs={"history": "?hist", "last_user_message": "?last"}, outputs={})
+        slot = {"hist": [{"role": "user", "content": "prev"}], "last": "current question"}
+
+        asyncio.run(runner._run_chat(node, slot, stream=False))
+
+        svc.chat.assert_awaited_once_with(
+            messages=[{"role": "user", "content": "prev"}, {"role": "user", "content": "current question"}],
+            model=None, options=None, stream=False,
+        )
+        assert slot["response"] == "reply"
+        assert slot["final"] == "reply"
+
+    def test_streaming_returns_handler_result_directly(self):
+        svc = MagicMock()
+        sentinel = object()
+        svc.chat = AsyncMock(return_value=sentinel)
+        runner = self._runner(svc)
+        node = Node(id="n1", type="Chat", inputs={"last_user_message": "hi"}, outputs={})
+        slot = {}
+
+        result = asyncio.run(runner._run_chat(node, slot, stream=True))
+
+        assert result is sentinel
+        assert "final" not in slot
+
+
+# ---------------------------------------------------------------------------
+# Runner._svc
+# ---------------------------------------------------------------------------
+
+class TestSvc:
+
+    def test_returns_registered_service(self):
+        svc = MagicMock()
+        container = MagicMock()
+        container.services = {"generate": svc}
+        runner = Runner(container=container)
+        assert runner._svc("generate") is svc
+
+    def test_raises_configuration_error_when_service_missing(self):
+        container = MagicMock()
+        container.services = {}
+        runner = Runner(container=container)
+        with pytest.raises(ConfigurationError):
+            runner._svc("generate")
+
+
+# ---------------------------------------------------------------------------
 # PersistChat._wrap_stream — <think> tag stripping
 # ---------------------------------------------------------------------------
 
 class TestWrapStream:
 
-    def _make_persist_chat(self, cite_list=None):
+    def _make_persist_chat(self):
         from hestia.handler import PersistChat
         runner = MagicMock()
-        runner.last_slot = {"_cite_list": cite_list or []}
         req = MagicMock()
         req.user.id = uuid.uuid4()
         req.conversation_id = None
@@ -234,11 +593,17 @@ class TestWrapStream:
         pc.users = users_svc
         return pc, req
 
+    async def _aiter(self, items):
+        for item in items:
+            yield item
+
+    async def _collect(self, agen):
+        return [chunk async for chunk in agen]
+
     def test_content_outside_think_tags_yields_content(self):
-        from hestia.handler import PersistChat
         pc, req = self._make_persist_chat()
         chunks = ["Hello ", "world"]
-        output = list(pc._wrap_stream(iter(chunks), req))
+        output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
         # Check that content events were yielded
         import json
         contents = []
@@ -249,11 +614,10 @@ class TestWrapStream:
         assert "Hello " in contents or any("Hello" in c for c in contents)
 
     def test_think_tags_routed_to_thinking_stream(self):
-        from hestia.handler import PersistChat
         import json
         pc, req = self._make_persist_chat()
         chunks = ["<think>internal reasoning</think>answer"]
-        output = list(pc._wrap_stream(iter(chunks), req))
+        output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
         thinking_chunks = []
         for chunk in output[:-1]:
             data = json.loads(chunk.decode())
@@ -262,11 +626,10 @@ class TestWrapStream:
         assert any("internal reasoning" in t for t in thinking_chunks)
 
     def test_last_chunk_contains_conversation_id(self):
-        from hestia.handler import PersistChat
         import json
         pc, req = self._make_persist_chat()
         chunks = ["hello"]
-        output = list(pc._wrap_stream(iter(chunks), req))
+        output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
         last = json.loads(output[-1].decode())
         assert "conversation_id" in last
 
@@ -302,22 +665,74 @@ class TestPersistChatPersist:
 
     def test_creates_new_conversation_when_no_id(self):
         pc, req, users_svc, new_cid = self._make()
-        c_id, _, _ = pc._persist(req, "assistant reply")
+        c_id, _, _ = pc._persist(req, "assistant reply", {})
         users_svc.create_user_conversation.assert_called_once()
         assert c_id == new_cid
 
     def test_appends_user_and_assistant_messages(self):
         pc, req, users_svc, _ = self._make()
-        pc._persist(req, "assistant reply")
+        pc._persist(req, "assistant reply", {})
         assert users_svc.append_conversation_message.call_count == 2
 
     def test_uses_existing_conversation_id(self):
         pc, req, users_svc, _ = self._make()
         existing_cid = uuid.uuid4()
         req.conversation_id = str(existing_cid)
-        c_id, _, _ = pc._persist(req, "reply")
+        c_id, _, _ = pc._persist(req, "reply", {})
         users_svc.create_user_conversation.assert_not_called()
         assert c_id == existing_cid
+
+
+# ---------------------------------------------------------------------------
+# PersistChat.run
+# ---------------------------------------------------------------------------
+
+class TestPersistChatRun:
+
+    def _make_persist_chat(self):
+        runner = MagicMock()
+        req = MagicMock()
+        req.user.id = uuid.uuid4()
+        req.conversation_id = None
+        req.last_user_message = "hi"
+        req.last_user_display_content = None
+        req.last_user_attachments = None
+        req.conversation_title = None
+        req.model_kwargs = {}
+
+        users_svc = MagicMock()
+        users_svc.create_user_conversation.return_value = uuid.uuid4()
+        users_svc.append_conversation_message.return_value = uuid.uuid4()
+        runner.container.services.get.return_value = users_svc
+
+        pc = PersistChat(runner=runner, req=req)
+        pc.users = users_svc
+        return pc, runner, req, users_svc
+
+    def test_non_streaming_calls_runner_then_persists(self):
+        pc, runner, req, users_svc = self._make_persist_chat()
+        runner.run = AsyncMock(return_value=("assistant reply", {}))
+
+        result, slot = asyncio.run(pc.run("plan", stream=False))
+
+        assert result == "assistant reply"
+        runner.run.assert_awaited_once_with("plan", stream=False)
+        assert users_svc.append_conversation_message.call_count == 2
+
+    def test_streaming_wraps_generator_without_persisting_yet(self):
+        pc, runner, req, users_svc = self._make_persist_chat()
+
+        async def _agen():
+            yield "chunk"
+
+        runner.run = AsyncMock(return_value=(_agen(), {}))
+
+        result, slot = asyncio.run(pc.run("plan", stream=True))
+
+        # _wrap_stream returns an async generator — persistence happens lazily
+        # inside it once consumed (already covered by TestWrapStream), not here.
+        assert hasattr(result, "__anext__")
+        users_svc.append_conversation_message.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -327,10 +742,6 @@ class TestPersistChatPersist:
 class TestRequestHandlerResolve:
 
     def test_raises_forbidden_when_policy_denies(self):
-        from hestia.handler import RequestHandler
-        from hestia.domain.policies.guard import PolicyDecision, PolicyResult
-        from hestia.domain.exceptions import ForbiddenError
-
         policy = MagicMock()
         policy.check.return_value = PolicyResult(decision=PolicyDecision.DENY, msg="No access.")
 
@@ -342,4 +753,259 @@ class TestRequestHandlerResolve:
         req.exec_type = "rag_chat"
 
         with pytest.raises(ForbiddenError):
-            handler.resolve(req)
+            asyncio.run(handler.resolve(req))
+
+    # -----------------------------------------------------------------
+    # resolve — happy path (build graph -> run -> return response),
+    # save_chat branching, and the non-streaming context-budget check.
+    # -----------------------------------------------------------------
+
+    def _handler(self, users=None, generator=None):
+        settings = MagicMock()
+        settings.max_context_tokens = 2000
+        settings.summary_target_tokens = 100
+        settings.summary_model = None
+        settings.default_gen_model = "test-model"
+
+        container = MagicMock()
+        container.settings = settings
+        container.services.get.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
+
+        policy = MagicMock()
+        policy.check.return_value = PolicyResult(decision=PolicyDecision.ALLOW)
+
+        h = RequestHandler.__new__(RequestHandler)
+        h.policy = policy
+        h.container = container
+        h.builder = MagicMock()
+        h.builder.build.return_value = "graph"
+        h.runner = MagicMock()
+        h.runner.run = AsyncMock(return_value=("final answer", {}))
+        return h
+
+    def _req(self, exec_type="generate", save_chat=False, conversation_id=None):
+        req = MagicMock()
+        req.exec_type = exec_type
+        req.model = "m"
+        req.collection = None
+        req.prompt = "hi"
+        req.last_user_message = None
+        req.user.id = uuid.uuid4()
+        req.save_chat = save_chat
+        req.conversation_id = conversation_id
+        return req
+
+    def test_returns_response_on_success(self):
+        h = self._handler()
+        req = self._req(exec_type="generate")
+
+        result = asyncio.run(h.resolve(req, stream=False))
+
+        assert result == "final answer"
+        h.builder.build.assert_called_once_with(req, RequestHandler.TEMPLATE_MAP["generate"])
+        h.runner.run.assert_awaited_once_with("graph", stream=False)
+
+    def test_sets_query_filters_when_policy_decision_is_filter(self):
+        h = self._handler()
+        h.policy.check.return_value = PolicyResult(
+            decision=PolicyDecision.FILTER, filters={"max_classification": 2},
+        )
+        req = self._req(exec_type="generate")
+        req.query_kwargs = None
+
+        asyncio.run(h.resolve(req, stream=False))
+
+        assert req.query_kwargs == {"filters": {"max_classification": 2}}
+
+    def test_stream_true_delegates_to_stream_with_budget_notice(self):
+        h = self._handler()
+        sentinel = object()
+        h._stream_with_budget_notice = MagicMock(return_value=sentinel)
+        req = self._req(exec_type="generate")
+
+        result = asyncio.run(h.resolve(req, stream=True))
+
+        assert result is sentinel
+        h._stream_with_budget_notice.assert_called_once_with(req, RequestHandler.TEMPLATE_MAP["generate"])
+        h.runner.run.assert_not_awaited()
+
+    def test_uses_runner_directly_when_save_chat_false(self):
+        h = self._handler()
+        req = self._req(save_chat=False)
+
+        asyncio.run(h.resolve(req, stream=False))
+
+        h.runner.run.assert_awaited_once_with("graph", stream=False)
+
+    def test_wraps_runner_in_persist_chat_when_save_chat_true(self):
+        h = self._handler()
+        req = self._req(save_chat=True)
+
+        with patch("hestia.handler.PersistChat") as MockPersistChat:
+            instance = MockPersistChat.return_value
+            instance.run = AsyncMock(return_value=("wrapped answer", {}))
+            result = asyncio.run(h.resolve(req, stream=False))
+
+        MockPersistChat.assert_called_once_with(h.runner, req)
+        assert result == "wrapped answer"
+
+    def test_skips_context_budget_for_generate_exec_type(self):
+        users = MagicMock()
+        h = self._handler(users=users, generator=MagicMock())
+        req = self._req(exec_type="generate", conversation_id=str(uuid.uuid4()))
+
+        asyncio.run(h.resolve(req, stream=False))
+
+        users.get_conversation_context_state.assert_not_called()
+
+    def test_applies_context_budget_for_chat_with_conversation_id(self):
+        users = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        big_tail = [
+            {"role": "user" if i % 2 == 0 else "assistant", "content": "word " * 100,
+             "created_at": i, "rowid": i}
+            for i in range(20)
+        ]
+        users.get_messages_after_boundary.return_value = big_tail
+        generator = MagicMock()
+        generator.generate = AsyncMock(return_value="a summary")
+
+        h = self._handler(users=users, generator=generator)
+        req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
+
+        result = asyncio.run(h.resolve(req, stream=False))
+
+        assert result == "final answer"
+        generator.generate.assert_awaited_once()
+        users.update_conversation_context_summary.assert_called_once()
+        assert req.history is not None
+        assert req.history[0]["role"] == "system"
+
+    def test_no_compaction_needed_under_budget(self):
+        users = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        users.get_messages_after_boundary.return_value = [
+            {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
+        ]
+        generator = MagicMock()
+        generator.generate = AsyncMock()
+
+        h = self._handler(users=users, generator=generator)
+        req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
+
+        result = asyncio.run(h.resolve(req, stream=False))
+
+        assert result == "final answer"
+        generator.generate.assert_not_awaited()
+        users.update_conversation_context_summary.assert_not_called()
+
+    def test_context_budget_failure_fails_open(self):
+        users = MagicMock()
+        users.get_conversation_context_state.side_effect = RuntimeError("boom")
+        h = self._handler(users=users, generator=MagicMock())
+        req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
+
+        result = asyncio.run(h.resolve(req, stream=False))
+
+        assert result == "final answer"
+
+
+# ---------------------------------------------------------------------------
+# RequestHandler._stream_with_budget_notice — context budget check runs
+# before streaming; a {"status": "compacting"} frame (distinct from
+# "thinking"/"content") is emitted when compaction is needed, so the frontend
+# can swap the existing "Thinking" placeholder's label to "Compacting…"
+# without ever writing literal status text into the message body.
+# ---------------------------------------------------------------------------
+
+class TestStreamWithBudgetNotice:
+
+    def _handler(self, users, generator):
+        from hestia.handler import RequestHandler
+
+        settings = MagicMock()
+        settings.max_context_tokens = 2000
+        settings.summary_target_tokens = 100
+        settings.summary_model = None
+        settings.default_gen_model = "test-model"
+
+        container = MagicMock()
+        container.settings = settings
+        container.services.get.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
+
+        h = RequestHandler.__new__(RequestHandler)
+        h.container = container
+        h.builder = MagicMock()
+        h.builder.build.return_value = "graph"
+        h.runner = MagicMock()
+        h.runner.container = container
+
+        async def fake_stream():
+            yield b'{"content": "hi"}\n'
+
+        h.runner.run = AsyncMock(return_value=(fake_stream(), {}))
+        return h
+
+    def _req(self, save_chat=False):
+        req = MagicMock()
+        req.conversation_id = str(uuid.uuid4())
+        req.exec_type = "chat"
+        req.save_chat = save_chat
+        req.user.id = uuid.uuid4()
+        return req
+
+    async def _collect(self, agen):
+        return [chunk async for chunk in agen]
+
+    def test_yields_compacting_status_frame_when_compaction_needed(self):
+        users = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        big_tail = [
+            {"role": "user" if i % 2 == 0 else "assistant", "content": "word " * 100,
+             "created_at": i, "rowid": i}
+            for i in range(20)
+        ]
+        users.get_messages_after_boundary.return_value = big_tail
+        generator = MagicMock()
+        generator.generate = AsyncMock(return_value="a summary")
+
+        h = self._handler(users, generator)
+        req = self._req()
+
+        chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        first = json.loads(chunks[0])
+        assert first == {"status": "compacting"}
+        assert chunks[1:] == [b'{"content": "hi"}\n']
+        generator.generate.assert_awaited_once()
+        users.update_conversation_context_summary.assert_called_once()
+        assert req.history is not None
+        assert req.history[0]["role"] == "system"
+
+    def test_no_status_frame_when_under_budget(self):
+        users = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        users.get_messages_after_boundary.return_value = [
+            {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
+        ]
+        generator = MagicMock()
+        generator.generate = AsyncMock()
+
+        h = self._handler(users, generator)
+        req = self._req()
+
+        chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        generator.generate.assert_not_awaited()
+        assert chunks == [b'{"content": "hi"}\n']
+
+    def test_non_chat_exec_type_skips_budget_check_entirely(self):
+        users = MagicMock()
+        generator = MagicMock()
+        h = self._handler(users, generator)
+        req = self._req()
+        req.exec_type = "generate"  # not in CONTEXT_BUDGET_EXEC_TYPES
+
+        asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        users.get_conversation_context_state.assert_not_called()

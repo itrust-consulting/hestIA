@@ -8,7 +8,9 @@ expected_outcome: |
 header: |
   Verify streaming and non-streaming response modes for chat and generate endpoints
 level: 32.0
-links: []
+links:
+- SRS-014: e0wtYttuzfq0GRAVYiKPCFgCitcxfC3f5oQ63KnFsn0=
+- SRS-023: ep7-O9kjClvOWabVsf1b0C5CcwzthR8LcBKqx_kkJCc=
 normative: true
 platform: GNU/Linux (Dockerized deployment environment)
 ref: ''
@@ -16,7 +18,7 @@ references:
 - path: docs/reqs/tst/assets
   type: file
 release: beta
-reviewed: null
+reviewed: _npCVVlb_-GSfC7TNz6_bzEIpEVOYzpnu5EhgVXzOks=
 test_data: |
   Authenticated user account; a test collection with at least one ingested document; a question whose answer is in the corpus.
 text: |
