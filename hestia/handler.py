@@ -7,8 +7,10 @@ import time
 import uuid
 
 from hestia.domain.auth.users import now_epoch
-from hestia.domain.chat.context_budget import BudgetCheck, check_context_budget, run_compaction
-from hestia.domain.exceptions import ConfigurationError, ForbiddenError
+from hestia.domain.chat.context_budget import (
+    BudgetCheck, check_context_budget, fetch_budget_inputs, run_compaction,
+)
+from hestia.domain.exceptions import ConfigurationError, ForbiddenError, HestiaError
 from hestia.domain.policies.guard import ExecutionPolicy, PolicyDecision, PolicyGuard, PolicyResult
 from hestia.domain.rag.graph import ExecutionRequest
 from hestia.domain.rag.templater import TemplateRepository, TemplatePlanBuilder
@@ -306,9 +308,27 @@ class PersistChat:
                 "assistant_message_id": str(assistant_msg_id),
                 "citations": citations,
                 "thinking": thinking_text or None,
+                **self._usage_fields(req, c_id),
             }) + "\n").encode("utf-8")
 
         return generator()
+
+    def _usage_fields(self, req: ExecutionRequest, c_id: uuid.UUID) -> dict:
+        """Fresh (post-persist) context-usage snapshot for the final stream
+        frame. Fail-open — a usage-display glitch must never break the chat
+        stream, same reasoning as RequestHandler's budget-check try/except."""
+        try:
+            settings = self.runner.container.settings
+            prior_summary, tail = fetch_budget_inputs(self.users, req.user.id, c_id)
+            check = check_context_budget(prior_summary, tail, settings)
+            return {
+                "used_tokens": check.tokens,
+                "max_tokens": settings.max_context_tokens,
+                "needs_compaction": check.needs_compaction,
+            }
+        except Exception:
+            _log.warning("context_usage_fields_failed", extra={"conversation_id": str(c_id)})
+            return {}
 
     def _persist(self, req: ExecutionRequest, assistant_reply: str, slot: dict, citations: list | None = None, thinking: str | None = None):
         user_id = req.user.id
@@ -371,14 +391,7 @@ class RequestHandler:
         users = self.container.services.get("users")
         conversation_id = uuid.UUID(req.conversation_id)
         _log.debug("context_budget_inputs_fetch", extra={"conversation_id": str(conversation_id)})
-        state = users.get_conversation_context_state(conversation_id)
-        ctx = state.get("context_summary")
-        prior_summary = ctx["summary"] if ctx else None
-        boundary_created_at = ctx["boundary_created_at"] if ctx else None
-        boundary_rowid = ctx["boundary_rowid"] if ctx else None
-        tail = users.get_messages_after_boundary(
-            req.user.id, conversation_id, boundary_created_at, boundary_rowid
-        )
+        prior_summary, tail = fetch_budget_inputs(users, req.user.id, conversation_id)
         return users, conversation_id, prior_summary, tail
 
     def _needs_context_budget(self, req: ExecutionRequest) -> bool:
@@ -484,5 +497,13 @@ class RequestHandler:
         graph = self.builder.build(req, template)
         runner = PersistChat(self.runner, req) if req.save_chat else self.runner
         gen, _ = await runner.run(graph, stream=True)
-        async for chunk in gen:
-            yield chunk
+        try:
+            async for chunk in gen:
+                yield chunk
+        except HestiaError as e:
+            # Once inside a StreamingResponse body iterator, headers are
+            # already sent -- raising here can't produce a clean error
+            # response (Starlette's handler hits "response already started").
+            # Surface the failure as a normal in-band content frame instead.
+            _log.warning("chat_stream_failed", extra={"conversation_id": req.conversation_id})
+            yield (json.dumps({"content": f"\n\n⚠️ {e.message}"}) + "\n").encode("utf-8")

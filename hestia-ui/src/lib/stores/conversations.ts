@@ -7,6 +7,7 @@ import type { Conversation } from '$lib/types';
 import { messages, isMutatingFront } from '$lib/stores/chat';
 import { requestScrollToBottom } from '$lib/stores/chatScroll';
 import { api } from '$lib/api/client';
+import { contextBudget, setContextBudget } from '$lib/stores/contextBudget';
 
 const PAGE_SIZE = 20;
 // Always keep at least this many loaded messages above the current viewport
@@ -137,11 +138,12 @@ export async function openConversation(id: string) {
   const res = await api.get(`/api/conversations/${id}?limit=${PAGE_SIZE}`);
   if (!res.ok) throw new Error('Failed to load messages');
 
-  const { messages: raw, has_more, next_cursor } = await res.json();
+  const { messages: raw, has_more, next_cursor, used_tokens, max_tokens, needs_compaction } = await res.json();
   messages.set(mapRawMessages(raw));
   hasMoreBefore.set(has_more);
   beforeCursor = next_cursor;
   isLoadingMessages.set(false);
+  setContextBudget(used_tokens, max_tokens, needs_compaction);
 
   requestScrollToBottom();
 }
@@ -183,6 +185,7 @@ export function startNewChat() {
   hasMoreBefore.set(false);
   staleHeadCount = 0;
   staleSince = null;
+  contextBudget.set(null);
   if (browser) replaceState('/chat', {});
 }
 

@@ -633,6 +633,36 @@ class TestWrapStream:
         last = json.loads(output[-1].decode())
         assert "conversation_id" in last
 
+    def test_last_chunk_carries_usage_fields_when_computable(self):
+        import json
+        pc, req = self._make_persist_chat()
+        pc.users.assert_conversation_owner = MagicMock()
+        pc.users.get_conversation_context_state.return_value = {}
+        pc.users.get_messages_after_boundary.return_value = [
+            {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
+        ]
+        pc.runner.container.settings.max_context_tokens = 32000
+        pc.runner.container.settings.summary_target_tokens = 6000
+
+        chunks = ["hello"]
+        output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
+        last = json.loads(output[-1].decode())
+
+        assert last["used_tokens"] > 0
+        assert last["max_tokens"] == 32000
+        assert last["needs_compaction"] is False
+
+    def test_usage_fields_absent_but_stream_survives_when_computation_fails(self):
+        # pc.users.assert_conversation_owner is left unstubbed here, which
+        # raises inside a bare MagicMock (see fail-open comment in handler.py)
+        # -- the stream must still complete and yield its final frame.
+        import json
+        pc, req = self._make_persist_chat()
+        chunks = ["hello"]
+        output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
+        last = json.loads(output[-1].decode())
+        assert "used_tokens" not in last
+
 
 # ---------------------------------------------------------------------------
 # PersistChat._persist
@@ -761,6 +791,11 @@ class TestRequestHandlerResolve:
     # -----------------------------------------------------------------
 
     def _handler(self, users=None, generator=None):
+        if users is not None:
+            # MagicMock special-cases any "assert_*" attribute (typo protection
+            # for assert_called_with etc.), so a bare MagicMock() raises
+            # AttributeError on this real method name unless stubbed explicitly.
+            users.assert_conversation_owner = MagicMock()
         settings = MagicMock()
         settings.max_context_tokens = 2000
         settings.summary_target_tokens = 100
@@ -868,7 +903,7 @@ class TestRequestHandlerResolve:
         ]
         users.get_messages_after_boundary.return_value = big_tail
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="a summary")
+        generator.chat = AsyncMock(return_value="a summary")
 
         h = self._handler(users=users, generator=generator)
         req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
@@ -876,7 +911,7 @@ class TestRequestHandlerResolve:
         result = asyncio.run(h.resolve(req, stream=False))
 
         assert result == "final answer"
-        generator.generate.assert_awaited_once()
+        generator.chat.assert_awaited_once()
         users.update_conversation_context_summary.assert_called_once()
         assert req.history is not None
         assert req.history[0]["role"] == "system"
@@ -888,7 +923,7 @@ class TestRequestHandlerResolve:
             {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
         ]
         generator = MagicMock()
-        generator.generate = AsyncMock()
+        generator.chat = AsyncMock()
 
         h = self._handler(users=users, generator=generator)
         req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
@@ -896,7 +931,7 @@ class TestRequestHandlerResolve:
         result = asyncio.run(h.resolve(req, stream=False))
 
         assert result == "final answer"
-        generator.generate.assert_not_awaited()
+        generator.chat.assert_not_awaited()
         users.update_conversation_context_summary.assert_not_called()
 
     def test_context_budget_failure_fails_open(self):
@@ -923,6 +958,7 @@ class TestStreamWithBudgetNotice:
     def _handler(self, users, generator):
         from hestia.handler import RequestHandler
 
+        users.assert_conversation_owner = MagicMock()
         settings = MagicMock()
         settings.max_context_tokens = 2000
         settings.summary_target_tokens = 100
@@ -967,7 +1003,7 @@ class TestStreamWithBudgetNotice:
         ]
         users.get_messages_after_boundary.return_value = big_tail
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="a summary")
+        generator.chat = AsyncMock(return_value="a summary")
 
         h = self._handler(users, generator)
         req = self._req()
@@ -977,7 +1013,7 @@ class TestStreamWithBudgetNotice:
         first = json.loads(chunks[0])
         assert first == {"status": "compacting"}
         assert chunks[1:] == [b'{"content": "hi"}\n']
-        generator.generate.assert_awaited_once()
+        generator.chat.assert_awaited_once()
         users.update_conversation_context_summary.assert_called_once()
         assert req.history is not None
         assert req.history[0]["role"] == "system"
@@ -989,14 +1025,14 @@ class TestStreamWithBudgetNotice:
             {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
         ]
         generator = MagicMock()
-        generator.generate = AsyncMock()
+        generator.chat = AsyncMock()
 
         h = self._handler(users, generator)
         req = self._req()
 
         chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
 
-        generator.generate.assert_not_awaited()
+        generator.chat.assert_not_awaited()
         assert chunks == [b'{"content": "hi"}\n']
 
     def test_non_chat_exec_type_skips_budget_check_entirely(self):

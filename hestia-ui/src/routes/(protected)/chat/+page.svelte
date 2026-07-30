@@ -18,6 +18,7 @@
   import CitationsSidebar from '$lib/components/CitationsSidebar.svelte';
   import CitationPopover from '$lib/components/CitationPopover.svelte';
   import MessageRow from '$lib/components/MessageRow.svelte';
+  import ContextUsageRing from '$lib/components/ContextUsageRing.svelte';
   import type { ChatMessage, Citation } from '$lib/types';
   import { isIsmsActive, activeCorpusName } from '$lib/stores/isms';
 
@@ -86,6 +87,15 @@
 
   let input = '';
   let inputBarEl: HTMLDivElement | null = null;
+  let textareaEl: HTMLTextAreaElement | undefined;
+
+  const MAX_TEXTAREA_HEIGHT = 200; // px
+
+  function resizeTextarea() {
+    if (!textareaEl) return;
+    textareaEl.style.height = 'auto';
+    textareaEl.style.height = Math.min(textareaEl.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px';
+  }
 
   let attachments: ParsedAttachment[] = [];
   let images: ImageAttachment[] = [];
@@ -111,29 +121,11 @@
   let activeCitations: Citation[] | null = null;
   let trackLatestCitations = false;
   let thinkingExpanded: Record<string, boolean> = {};
-  let thinkingStart: Record<string, number> = {};
-  let thinkingEnd: Record<string, number> = {};
 
-  $: for (const m of $messages) {
-    if (m.role === 'assistant' && m.thinking) {
-      if (!thinkingStart[m.id]) {
-        thinkingStart = { ...thinkingStart, [m.id]: Date.now() };
-      }
-      if ((m.content || !$sending) && !thinkingEnd[m.id]) {
-        thinkingEnd = { ...thinkingEnd, [m.id]: Date.now() };
-      }
-    }
-  }
-
-  function thinkingLabel(m: ChatMessage): string {
+  function thinkingLabel(m: ChatMessage, isActive: boolean): string {
     if (m.compacting && !m.thinking && !m.content) return 'Compacting…';
-    const start = thinkingStart[m.id];
-    const end = thinkingEnd[m.id];
-    if (start && end) {
-      const secs = Math.round((end - start) / 1000);
-      return `Thought for ${secs}s`;
-    }
-    return 'Thinking';
+    if (m.thinkingSecs != null) return `Thought for ${m.thinkingSecs}s`;
+    return isActive ? 'Thinking' : 'Thought';
   }
 
   // When tracking is on, keep sidebar in sync with the latest assistant message's citations.
@@ -295,6 +287,7 @@
     input = '';
     attachments = [];
     images = [];
+    tick().then(resizeTextarea);
   }
 
   function onKey(e: KeyboardEvent) {
@@ -343,7 +336,7 @@
               isLast={index === $messages.length - 1}
               sending={$sending}
               thinkingOpen={thinkingExpanded[m.id] ?? false}
-              thinkingLabelText={thinkingLabel(m)}
+              thinkingLabelText={thinkingLabel(m, index === $messages.length - 1 && $sending)}
               onToggleThinking={() => (thinkingExpanded[m.id] = !(thinkingExpanded[m.id] ?? false))}
               onCopy={() => copyMessage(m.content)}
               onDelete={() => deleteMessage(m.id)}
@@ -367,60 +360,68 @@
         <div class="drop-overlay">Drop files here</div>
       {/if}
 
-      <div class="textarea-wrapper">
-        {#if attachments.length || images.length || parsing}
-          <div class="attachment-chips">
-            {#each images as img}
-              <span class="attachment-chip image-chip-compose">
-                <img src={img.dataUrl} alt={img.name} class="compose-thumb" />
-                <button class="chip-remove" on:click={() => removeImage(img.name)} aria-label="Remove {img.name}">×</button>
-              </span>
-            {/each}
-            {#each attachments as a}
-              <span class="attachment-chip">
-                <Paperclip />{a.name}
-                <button class="chip-remove" on:click={() => removeAttachment(a.name)} aria-label="Remove {a.name}">×</button>
-              </span>
-            {/each}
-            {#if parsing}
-              <span class="attachment-chip parsing">Parsing…</span>
-            {/if}
-          </div>
-        {/if}
+      <div class="composer">
+        <div class="textarea-wrapper">
+          {#if attachments.length || images.length || parsing}
+            <div class="attachment-chips">
+              {#each images as img}
+                <span class="attachment-chip image-chip-compose">
+                  <img src={img.dataUrl} alt={img.name} class="compose-thumb" />
+                  <button class="chip-remove" on:click={() => removeImage(img.name)} aria-label="Remove {img.name}">×</button>
+                </span>
+              {/each}
+              {#each attachments as a}
+                <span class="attachment-chip">
+                  <Paperclip />{a.name}
+                  <button class="chip-remove" on:click={() => removeAttachment(a.name)} aria-label="Remove {a.name}">×</button>
+                </span>
+              {/each}
+              {#if parsing}
+                <span class="attachment-chip parsing">Parsing…</span>
+              {/if}
+            </div>
+          {/if}
 
-        <textarea
-          bind:value={input}
-          class="min-h-30 w-full resize-none rounded-3xl px-3 py-2 focus:ring-black"
-          style="padding-left: 3rem;{(attachments.length || images.length || parsing) ? ' padding-top: 2.25rem;' : ''}"
-          placeholder="Ask me anything…"
-          rows="2"
-          on:keydown={onKey}
-          on:paste={onPaste}
-        ></textarea>
+          <textarea
+            bind:this={textareaEl}
+            bind:value={input}
+            class="composer-textarea min-h-15 w-full resize-none px-1 py-1"
+            style={(attachments.length || images.length || parsing) ? 'padding-top: 2.25rem;' : ''}
+            placeholder="Ask me anything…"
+            rows="2"
+            on:keydown={onKey}
+            on:paste={onPaste}
+            on:input={resizeTextarea}
+          ></textarea>
+        </div>
+
+        <input
+          bind:this={fileInputEl}
+          type="file"
+          accept=".docx,.pdf,.xlsx,.xlsm,.json,.csv,.txt,.md,.markdown,.pptx,.jpg,.jpeg,.png,.gif,.webp"
+          multiple
+          style="display:none"
+          on:change={onFileInput}
+        />
+
+        <div class="action-row">
+          <button class="input-action attach" on:click={pickFile} aria-label="Attach file" disabled={parsing}>
+            <PlusLgIcon />
+          </button>
+
+          <ContextUsageRing />
+
+          {#if $sending}
+            <button class="input-action stop" on:click={stop} aria-label="Stop">
+              <SquareFilledIcon />
+            </button>
+          {:else}
+            <button class="input-action send" on:click={send} aria-label="Send">
+              <ArrowUpIcon />
+            </button>
+          {/if}
+        </div>
       </div>
-
-      <input
-        bind:this={fileInputEl}
-        type="file"
-        accept=".docx,.pdf,.xlsx,.xlsm,.json,.csv,.txt,.md,.markdown,.pptx,.jpg,.jpeg,.png,.gif,.webp"
-        multiple
-        style="display:none"
-        on:change={onFileInput}
-      />
-
-      <button class="input-action attach" on:click={pickFile} aria-label="Attach file" disabled={parsing}>
-        <PlusLgIcon />
-      </button>
-
-      {#if $sending}
-        <button class="input-action stop" on:click={stop} aria-label="Stop">
-          <SquareFilledIcon />
-        </button>
-      {:else}
-        <button class="input-action send" on:click={send} aria-label="Send">
-          <ArrowUpIcon />
-        </button>
-      {/if}
     </div>
   </div>
 
@@ -521,21 +522,41 @@
       padding-block: calc(var(--spacing) * 3);
       padding-inline: calc(var(--spacing) * 4);
 
-      display: flex;
-      gap: calc(var(--spacing) * 2);
-      align-items: center;
-
       border-top: 1px solid var(--color-neutral-200);
   }
 
-  .input-action {
-    position: absolute;
-    right: 1.5rem;   /* distance from right inside textarea */
-    bottom: 1.5rem;  /* distance from bottom inside textarea */
+  /* The single visible input "box" -- previously the <textarea> itself drew
+     the rounded border (via rounded-3xl + the forms plugin's default ring).
+     Now the box is this wrapper, split into two rows: text on top, buttons
+     below, both inside the same border/rounding instead of buttons floating
+     on top of the text. */
+  .composer {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    border: 1px solid var(--color-neutral-300);
+    border-radius: 1.5rem;
+    background: var(--color-white);
+    padding: calc(var(--spacing) * 3);
+    transition: border-color 120ms ease;
+  }
+  .composer:focus-within {
+    border-color: var(--color-neutral-500);
+  }
 
+  .action-row {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    padding-top: calc(var(--spacing) * 2);
+    border-top: 1px solid var(--color-neutral-200);
+  }
+
+  .input-action {
     width: 34px;
     height: 34px;
     border-radius: 9999px;
+    flex-shrink: 0;
 
     display: flex;
     align-items: center;
@@ -551,8 +572,6 @@
 
   /* attach state */
   .input-action.attach {
-    right: auto;
-    left: 1.5rem;
     background: transparent;
     color: var(--color-neutral-400);
     border: 1.5px solid var(--color-neutral-300);
@@ -567,8 +586,9 @@
     cursor: default;
   }
 
-  /* send state */
+  /* send state -- pushed to the far right of the action row */
   .input-action.send {
+    margin-left: auto;
     background: var(--color-blue-600);
   }
   .input-action.send:hover {
@@ -576,8 +596,9 @@
     transform: scale(1.1);
   }
 
-  /* stop state */
+  /* stop state -- pushed to the far right of the action row */
   .input-action.stop {
+    margin-left: auto;
     background: var(--color-blue-600);
   }
   .input-action.stop:hover {
@@ -610,6 +631,26 @@
     position: relative;
     flex: 1;
     min-width: 0;
+  }
+
+  /* @tailwindcss/forms gives every textarea a default border + focus ring
+     (box-shadow) -- .composer is the visible box now, so strip both here.
+     max-height matches MAX_TEXTAREA_HEIGHT in the script -- resizeTextarea()
+     grows .style.height up to that cap as the user types, then this
+     overflow rule takes over so it scrolls internally instead of growing
+     further. */
+  .composer-textarea {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .composer-textarea:focus {
+    border: none;
+    box-shadow: none;
+    outline: none;
   }
 
   .attachment-chips {

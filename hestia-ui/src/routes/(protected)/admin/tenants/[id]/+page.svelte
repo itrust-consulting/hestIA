@@ -341,7 +341,7 @@
               <td class="muted">
                   <span class="abbr-chip-sm">{tenant.name}</span>
               </td>
-              <td class="muted">{col.documents.length}</td>
+              <td class="muted">{col.documentCount}</td>
               <td><span class="status-dot" class:green={col.status === 'green'}></span></td>
               <td class="muted">
                 {#if col.access.length > 0}
@@ -390,7 +390,7 @@
                   <span class="no-access">No owner assigned</span>
                 {/if}
               </td>
-              <td class="muted">{col.documents.length}</td>
+              <td class="muted">{col.documentCount}</td>
               <td><span class="status-dot" class:green={col.status === 'green'}></span></td>
             </tr>
           {/each}

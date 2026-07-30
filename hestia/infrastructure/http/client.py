@@ -54,6 +54,12 @@ class HttpClient:
         except httpx.ConnectError:
             _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
             raise ProviderError(f"Could not connect to provider: {self.base_url}")
+        except httpx.ReadError:
+            # a pooled keep-alive connection can be closed by the peer at any
+            # time without notice -- httpx only discovers this when it tries
+            # to reuse that connection for the next request
+            _log.warning("http_read_error", extra={"url": url, "method": "POST"})
+            raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
         except httpx.HTTPStatusError as e:
             _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
             raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")
@@ -72,6 +78,9 @@ class HttpClient:
         except httpx.ConnectError:
             _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
             raise ProviderError(f"Could not connect to provider: {self.base_url}")
+        except httpx.ReadError:
+            _log.warning("http_read_error", extra={"url": url, "method": "POST"})
+            raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
         except httpx.HTTPStatusError as e:
             _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
             raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")
@@ -88,6 +97,9 @@ class HttpClient:
         except httpx.ConnectError:
             _log.warning("http_connection_error", extra={"url": url, "method": "GET"})
             raise ProviderError(f"Could not connect to provider: {self.base_url}")
+        except httpx.ReadError:
+            _log.warning("http_read_error", extra={"url": url, "method": "GET"})
+            raise ProviderError(f"Connection to provider was lost: GET {endpoint}")
         except httpx.HTTPStatusError as e:
             _log.warning("http_error_response", extra={"url": url, "method": "GET", "status_code": e.response.status_code})
             raise ProviderError(f"Provider returned {e.response.status_code}: GET {endpoint}")
@@ -135,6 +147,9 @@ class HttpClient:
         except httpx.ConnectError:
             _log.warning("http_connection_error", extra={"url": url, "method": "GET"})
             raise ProviderError(f"Could not connect to provider: {self.base_url}")
+        except httpx.ReadError:
+            _log.warning("http_read_error", extra={"url": url, "method": "GET"})
+            raise ProviderError(f"Connection to provider was lost: GET {endpoint}")
         except httpx.HTTPStatusError as e:
             _log.warning("http_error_response", extra={"url": url, "method": "GET", "status_code": e.response.status_code})
             raise ProviderError(f"Provider returned {e.response.status_code}: GET {endpoint}")
@@ -151,6 +166,9 @@ class HttpClient:
         except httpx.ConnectError:
             _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
             raise ProviderError(f"Could not connect to provider: {self.base_url}")
+        except httpx.ReadError:
+            _log.warning("http_read_error", extra={"url": url, "method": "POST"})
+            raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
         except httpx.HTTPStatusError as e:
             _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
             raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")

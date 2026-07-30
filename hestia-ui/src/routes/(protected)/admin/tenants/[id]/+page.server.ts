@@ -11,12 +11,13 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
     error(403, 'Forbidden');
   }
 
-  const [tenantRes, membersRes, usersRes, tenantColsRes, collectionsRes] = await Promise.all([
+  const [tenantRes, membersRes, usersRes, tenantColsRes, collectionsRes, countsRes] = await Promise.all([
     fetch('/api/admin/tenants'),
     fetch(`/api/admin/tenants/${params.id}/members`),
     fetch('/api/admin/users'),
     fetch(`/api/admin/tenants/${params.id}/collections`),
     fetch('/api/collections'),
+    fetch('/api/admin/collections/document-counts'),
   ]);
 
   if (!tenantRes.ok) error(tenantRes.status, 'Could not load tenants.');
@@ -36,17 +37,7 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
     accessibleRaw = colData.accessible ?? [];
   }
 
-  // Fetch documents for all collections in one parallel batch
-  const allColIds = [...new Set([...ownedRaw.map((c: any) => c.id), ...accessibleRaw.map((c: any) => c.id)])];
-  const detailResults = await Promise.all(
-    allColIds.map(async (id: string) => {
-      const res = await fetch(`/api/admin/collections/${encodeURIComponent(id)}`);
-      if (!res.ok) return { id, documents: [] };
-      const data = await res.json();
-      return { id, documents: data.documents ?? [] };
-    })
-  );
-  const documentsMap = new Map(detailResults.map(d => [d.id, d.documents]));
+  const counts: Record<string, number> = countsRes.ok ? (await countsRes.json()).counts ?? {} : {};
 
   const ownerTenant: Org = { id: tenant.id, name: tenant.name, abbreviation: tenant.abbreviation };
 
@@ -56,7 +47,8 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
     status: col.status ?? 'unknown',
     ownerTenant,
     access: col.access ?? [],
-    documents: documentsMap.get(col.id) ?? [],
+    documents: [],
+    documentCount: counts[col.id] ?? 0,
   }));
 
   const accessibleCollections: Collection[] = accessibleRaw.map((col: any) => ({
@@ -65,7 +57,8 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
     status: col.status ?? 'unknown',
     ownerTenant: col.owner ?? null,
     access: [],
-    documents: documentsMap.get(col.id) ?? [],
+    documents: [],
+    documentCount: counts[col.id] ?? 0,
   }));
 
   const uploadOrganizations = isAdmin

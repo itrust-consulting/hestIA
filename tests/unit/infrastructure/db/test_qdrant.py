@@ -3,8 +3,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch, call
 
 import pytest
+from qdrant_client.http.exceptions import UnexpectedResponse
 
-from hestia.infrastructure.db.qdrant import QdrantDB
+from hestia.infrastructure.db.qdrant import QdrantDB, _retry_on_rate_limit
 from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 
 
@@ -189,3 +190,76 @@ class TestGetCollection:
         assert len(result["documents"]) == 2
         uris = {d["source_uri"] for d in result["documents"]}
         assert uris == {"a.pdf", "b.pdf"}
+
+
+# ---------------------------------------------------------------------------
+# document_counts
+# ---------------------------------------------------------------------------
+
+def _collection_desc(name):
+    m = MagicMock()
+    m.name = name
+    return m
+
+
+def _point(source_uri):
+    p = MagicMock()
+    p.payload = {"source": "doc", "source_uri": source_uri, "doc_info": {}}
+    return p
+
+
+class TestDocumentCounts:
+
+    def test_aggregates_counts_across_collections(self, db, mock_client):
+        mock_client.get_collections.return_value = MagicMock(
+            collections=[_collection_desc("col-a"), _collection_desc("col-b")]
+        )
+        mock_client.scroll.side_effect = [
+            ([_point("a1"), _point("a2")], None),  # col-a: 2 distinct docs
+            ([_point("b1")], None),                 # col-b: 1 distinct doc
+        ]
+        result = db.document_counts()
+        assert result == {"col-a": 2, "col-b": 1}
+
+    def test_scrolls_once_per_collection_sequentially(self, db, mock_client):
+        mock_client.get_collections.return_value = MagicMock(
+            collections=[_collection_desc("x"), _collection_desc("y"), _collection_desc("z")]
+        )
+        mock_client.scroll.return_value = ([], None)
+        db.document_counts()
+        # one scroll call per collection -- no internal fan-out/concurrency
+        assert mock_client.scroll.call_count == 3
+
+
+# ---------------------------------------------------------------------------
+# _retry_on_rate_limit
+# ---------------------------------------------------------------------------
+
+class TestRetryOnRateLimit:
+
+    def test_returns_result_on_success(self):
+        fn = MagicMock(return_value="ok")
+        assert _retry_on_rate_limit(fn) == "ok"
+        fn.assert_called_once()
+
+    def test_raises_immediately_on_non_429(self):
+        err = UnexpectedResponse(status_code=500, reason_phrase="Error", content=b"", headers={})
+        fn = MagicMock(side_effect=err)
+        with pytest.raises(UnexpectedResponse):
+            _retry_on_rate_limit(fn)
+        fn.assert_called_once()
+
+    def test_retries_then_succeeds_on_429(self, monkeypatch):
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        err = UnexpectedResponse(status_code=429, reason_phrase="Too Many Requests", content=b"", headers={})
+        fn = MagicMock(side_effect=[err, "ok"])
+        assert _retry_on_rate_limit(fn) == "ok"
+        assert fn.call_count == 2
+
+    def test_raises_after_exhausting_attempts(self, monkeypatch):
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        err = UnexpectedResponse(status_code=429, reason_phrase="Too Many Requests", content=b"", headers={})
+        fn = MagicMock(side_effect=err)
+        with pytest.raises(UnexpectedResponse):
+            _retry_on_rate_limit(fn, max_attempts=3)
+        assert fn.call_count == 3

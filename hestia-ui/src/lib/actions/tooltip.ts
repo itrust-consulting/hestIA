@@ -4,7 +4,7 @@ export function tooltip(node: HTMLElement, html: string) {
   let tip: HTMLDivElement | null = null;
 
   function show() {
-    if (!html?.trim()) return;
+    if (!html?.trim() || tip) return;
     tip = document.createElement('div');
     tip.className = 'tooltip-portal';
     tip.innerHTML = DOMPurify.sanitize(html);

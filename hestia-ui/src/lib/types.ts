@@ -16,6 +16,11 @@ export type Collection = {
   ownerTenant: Org | null;
   access: AccessGrant[];
   documents: CollectionDocument[];
+  /** Document count for list views that don't need the full `documents`
+   *  array (avoids fetching/scrolling every collection's full point list
+   *  just to render a count). Only `documents.length` is populated
+   *  instead on the detail page, which needs the real array. */
+  documentCount?: number;
 };
 
 export type Citation = {
@@ -40,6 +45,11 @@ export type ChatMessage = {
   attachments?: { name: string; size?: number; markdown?: string }[];
   citations?: Citation[];
   thinking?: string;
+  /** Elapsed thinking time in seconds, frozen once real content starts
+   *  arriving (or the stream ends). Computed client-side from wall-clock
+   *  timestamps in actions.ts — set once and never recomputed, so it
+   *  survives the id swap from a local temp id to the persisted message id. */
+  thinkingSecs?: number;
   /** True while the server is compacting conversation context before this
    *  turn's real generation begins; drives the "Compacting…" label instead
    *  of the generic "Thinking" placeholder. Stops mattering once thinking or

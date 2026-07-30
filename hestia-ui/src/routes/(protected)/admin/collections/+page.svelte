@@ -60,7 +60,7 @@
                   <span class="muted">—</span>
                 {/if}
               </td>
-              <td class="muted">{col.documents.length}</td>
+              <td class="muted">{col.documentCount}</td>
               <td>
                 <span class="status-badge" class:green={col.status === 'green'}>{col.status}</span>
               </td>

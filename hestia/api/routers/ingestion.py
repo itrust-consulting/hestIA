@@ -192,6 +192,25 @@ def list_collections(
     return {"collections": [c for c in all_collections if c["name"] in permitted]}
 
 
+@router.get("/collections/document-counts")
+def get_document_counts(
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    counts = h.container.providers["db"].document_counts()
+
+    perms = user.permissions
+    if perms.is_admin:
+        return {"counts": counts}
+
+    allowed = perms.allowed_collections
+    if "*" in allowed and allowed["*"].access:
+        return {"counts": counts}
+
+    permitted = {name for name, perm in allowed.items() if perm.access}
+    return {"counts": {name: c for name, c in counts.items() if name in permitted}}
+
+
 @router.get("/collections/{name}")
 def get_collection(
     name: str,

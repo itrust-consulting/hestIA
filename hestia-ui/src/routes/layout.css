@@ -272,3 +272,28 @@ html.dark {
   pointer-events: none;
   white-space: normal;
 }
+
+.tooltip-portal .ctx-tip {
+  text-align: center;
+  padding: 0.1rem 0.15rem;
+}
+.tooltip-portal .ctx-tip-pct {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.tooltip-portal .ctx-tip-pct.level-low  { color: var(--color-blue-400); }
+.tooltip-portal .ctx-tip-pct.level-mid  { color: var(--color-yellow-400); }
+.tooltip-portal .ctx-tip-pct.level-high { color: var(--color-red-400); }
+.tooltip-portal .ctx-tip-label {
+  font-size: var(--text-xs);
+  color: var(--color-neutral-400);
+  margin-top: 0.05rem;
+}
+.tooltip-portal .ctx-tip-action {
+  font-size: var(--text-xs);
+  color: var(--color-neutral-300);
+  margin-top: 0.4rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--color-neutral-700);
+}

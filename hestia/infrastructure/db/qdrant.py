@@ -1,14 +1,30 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+import time
+from typing import Any, Callable, Dict
 
 from qdrant_client import QdrantClient, models
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from hestia.domain.rag.types import DenseVector, HybridQuery, Query, SparseVector
 from hestia.infrastructure.db.protocol import DBProvider
 
 _log = logging.getLogger("hestia.system")
+
+
+def _retry_on_rate_limit(fn: Callable, *args, max_attempts: int = 4, base_delay: float = 0.5, **kwargs):
+    """Qdrant returns 429 under load; this is an expected, recoverable
+    condition (unlike other 4xx responses), so retry with backoff instead
+    of failing the request outright."""
+    for attempt in range(max_attempts):
+        try:
+            return fn(*args, **kwargs)
+        except UnexpectedResponse as e:
+            if e.status_code != 429 or attempt == max_attempts - 1:
+                raise
+            _log.warning("qdrant_rate_limited_retry", extra={"attempt": attempt})
+            time.sleep(base_delay * (2 ** attempt))
 
 
 class QdrantDB(DBProvider):
@@ -178,10 +194,10 @@ class QdrantDB(DBProvider):
 
     @property
     def collections(self) -> dict:
-        descs = self.client.get_collections().collections
+        descs = _retry_on_rate_limit(self.client.get_collections).collections
         result = []
         for c in descs:
-            info = self.client.get_collection(collection_name=c.name)
+            info = _retry_on_rate_limit(self.client.get_collection, collection_name=c.name)
             result.append({
                 "id": c.name,
                 "name": c.name,
@@ -207,21 +223,19 @@ class QdrantDB(DBProvider):
         )
         _log.info("qdrant_delete_document", extra={"collection": collection, "source_uri": source_uri})
 
-    def get_collection(self, collection: str) -> dict | None:
-        if not self.client.collection_exists(collection_name=collection):
-            return None
-        info = self.client.get_collection(collection_name=collection)
-
-        # Scroll through all points, deduplicate by source_uri to build the document list.
-        # Fetch the full payload to avoid partial-selector quirks and to support points
-        # ingested before the top-level uploaded_by/uploaded_at fields were introduced
-        # (those values live in doc_info for older chunks).
+    def _scroll_documents(self, collection: str) -> dict[str, dict]:
+        """Scroll through all points, deduplicate by source_uri to build the
+        document list. Fetch the full payload to avoid partial-selector
+        quirks and to support points ingested before the top-level
+        uploaded_by/uploaded_at fields were introduced (those values live in
+        doc_info for older chunks)."""
         docs: dict[str, dict] = {}
         offset = None
         while True:
-            results, next_offset = self.client.scroll(
+            results, next_offset = _retry_on_rate_limit(
+                self.client.scroll,
                 collection_name=collection,
-                limit=256,
+                limit=1000,
                 offset=offset,
                 with_payload=True,
                 with_vectors=False,
@@ -257,10 +271,23 @@ class QdrantDB(DBProvider):
             if next_offset is None:
                 break
             offset = next_offset
+        return docs
 
+    def get_collection(self, collection: str) -> dict | None:
+        if not self.client.collection_exists(collection_name=collection):
+            return None
+        info = self.client.get_collection(collection_name=collection)
+        docs = self._scroll_documents(collection)
         return {
             "name": collection,
             "points_count": info.points_count or 0,
             "status": info.status.value if hasattr(info.status, "value") else str(info.status),
             "documents": list(docs.values()),
         }
+
+    def document_counts(self) -> dict[str, int]:
+        """Document counts for every collection, computed sequentially (not
+        in parallel) so this single call never itself becomes a burst of
+        concurrent scroll requests against Qdrant."""
+        descs = _retry_on_rate_limit(self.client.get_collections).collections
+        return {c.name: len(self._scroll_documents(c.name)) for c in descs}

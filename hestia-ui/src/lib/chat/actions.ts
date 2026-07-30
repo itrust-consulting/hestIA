@@ -8,6 +8,7 @@ import {
 } from '$lib/stores/chat';
 
 import { activeConversationId, loadConversations, forceEvictStaleHeadNow } from '$lib/stores/conversations';
+import { setContextBudget } from '$lib/stores/contextBudget';
 import { activeCorpusName } from '$lib/stores/isms';
 import { api } from '$lib/api/client';
 import type { ContentPart } from '$lib/types';
@@ -121,6 +122,14 @@ export async function streamFromHistoryInto(
       let pending = '';
       let raf = 0;
       let lineBuffer = '';
+      let thinkingStartedAt: number | null = null;
+      let thinkingSecs: number | null = null;
+
+      function freezeThinkingSecs() {
+        if (thinkingStartedAt == null || thinkingSecs != null) return;
+        thinkingSecs = Math.max(0, Math.round((Date.now() - thinkingStartedAt) / 1000));
+        updateMessage(assistantTempId, { thinkingSecs });
+      }
 
       function flushPending() {
         const chunk = pending;
@@ -141,15 +150,18 @@ export async function streamFromHistoryInto(
         let obj: any;
         try { obj = JSON.parse(line); } catch { return; }
         if (typeof obj.content === 'string') {
+          freezeThinkingSecs();
           pending += obj.content;
           if (!raf) raf = requestAnimationFrame(flushPending);
         } else if (obj.conversation_id != null || obj.assistant_message_id != null) {
           // Final metadata frame — must be checked before thinking to avoid
           // the metadata frame (which also carries the full thinking text)
           // being mistaken for a streaming thinking chunk.
+          freezeThinkingSecs();
           if (obj.conversation_id) {
             activeConversationId.set(obj.conversation_id);
             await loadConversations();
+            setContextBudget(obj.used_tokens, obj.max_tokens, obj.needs_compaction);
           }
           if (obj.user_message_id) {
             updateMessage(userTempId, { id: obj.user_message_id });
@@ -167,6 +179,7 @@ export async function streamFromHistoryInto(
             });
           }
         } else if (typeof obj.thinking === 'string') {
+          if (thinkingStartedAt == null) thinkingStartedAt = Date.now();
           messages.update(m =>
             m.map(msg =>
               msg.id === assistantTempId

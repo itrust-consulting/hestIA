@@ -22,8 +22,9 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
   // Mods only see collections owned by their moderated tenants
   const visibleOrgs = isAdmin ? allOrgs : allOrgs.filter((o: any) => moderated.includes(o.id));
 
-  // Fetch SQL grants (owner + access) and individual collection details (documents) in parallel
-  const [orgCollections, collectionDetails] = await Promise.all([
+  // Fetch SQL grants (owner + access) and document counts for all collections
+  // in one batched call each (not one request per collection).
+  const [orgCollections, countsRes] = await Promise.all([
     Promise.all(
       visibleOrgs.map(async (org: any) => {
         const res = await fetch(`/api/admin/tenants/${org.id}/collections`);
@@ -32,15 +33,9 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
         return { org, owned: data.owned ?? [] };
       })
     ),
-    Promise.all(
-      allQdrant.map(async (qc: any) => {
-        const res = await fetch(`/api/admin/collections/${encodeURIComponent(qc.name)}`);
-        if (!res.ok) return { name: qc.name, documents: [] };
-        const data = await res.json();
-        return { name: qc.name, documents: data.documents ?? [] };
-      })
-    ),
+    fetch('/api/admin/collections/document-counts'),
   ]);
+  const counts: Record<string, number> = countsRes.ok ? (await countsRes.json()).counts ?? {} : {};
 
   // Build collection → {ownerTenant, access} map from SQL grants
   const grantMap = new Map<string, { ownerTenant: any; access: any[] }>();
@@ -52,8 +47,6 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
       });
     }
   }
-
-  const documentsMap = new Map(collectionDetails.map(d => [d.name, d.documents]));
 
   // ownerOrgs: scoped to moderated tenants for moderators (can only own on behalf of their org)
   const ownerOrgs = (isAdmin ? allOrgs : visibleOrgs).map((o: any) => ({
@@ -79,7 +72,8 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
       status: qc.status ?? 'unknown',
       ownerTenant: grants.ownerTenant,
       access: grants.access,
-      documents: documentsMap.get(qc.name) ?? [],
+      documents: [],
+      documentCount: counts[qc.name] ?? 0,
     };
   });
 

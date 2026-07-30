@@ -51,6 +51,7 @@ class BudgetCheck:
     needs_compaction: bool = False
     fold: list[dict] | None = None       # oldest messages to fold in, only set if needs_compaction
     keep: list[dict] | None = None       # newest messages to keep verbatim
+    tokens: int = 0                      # candidate_tokens, always set regardless of the branch taken
 
 
 def _framed_summary(summary: str) -> dict:
@@ -59,6 +60,24 @@ def _framed_summary(summary: str) -> dict:
 
 def _as_chat_message(m: dict) -> dict:
     return {"role": m["role"], "content": m["content"]}
+
+
+def fetch_budget_inputs(users, user_id: uuid.UUID, conversation_id: uuid.UUID) -> tuple[str | None, list[dict]]:
+    """Fetch (prior_summary, tail) for context-budget bookkeeping for a given
+    conversation. Decoupled from ExecutionRequest so RequestHandler, the
+    streaming persist path, and conversation-scoped API routes can all share
+    this without duplicating it. Ownership is checked explicitly and first —
+    get_conversation_context_state does not check it on its own."""
+    users.assert_conversation_owner(user_id, conversation_id)
+    state = users.get_conversation_context_state(conversation_id)
+    ctx = state.get("context_summary")
+    prior_summary = ctx["summary"] if ctx else None
+    boundary_created_at = ctx["boundary_created_at"] if ctx else None
+    boundary_rowid = ctx["boundary_rowid"] if ctx else None
+    tail = users.get_messages_after_boundary(
+        user_id, conversation_id, boundary_created_at, boundary_rowid
+    )
+    return prior_summary, tail
 
 
 def check_context_budget(prior_summary: str | None, tail: list[dict], settings) -> BudgetCheck:
@@ -82,42 +101,47 @@ def check_context_budget(prior_summary: str | None, tail: list[dict], settings) 
     _log.debug("context_budget_check", extra={
         "tail_len": len(tail),
         "has_prior_summary": prior_summary is not None,
+        "prior_summary_tokens": count_tokens(prior_summary) if prior_summary else 0,
         "candidate_tokens": candidate_tokens,
         "effective_budget": effective_budget,
     })
 
     if not tail or candidate_tokens <= effective_budget:
-        return BudgetCheck(history=candidate, needs_compaction=False)
+        return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
 
     keep_budget = max(effective_budget - settings.summary_target_tokens - RESERVE_FOR_NEW_TURN, 0)
-    fold, keep = _split_oldest_to_fold(tail, keep_budget)
+    fold, keep = _split_oldest_to_fold(tail, keep_budget, effective_budget)
     if not fold:
         # Nothing productive to fold (e.g. a single message alone exceeds
         # budget) — compaction can't help here. Pass through rather than
         # calling run_compaction with an empty fold.
         _log.debug("context_budget_cannot_fold", extra={"tail_len": len(tail), "keep_budget": keep_budget})
-        return BudgetCheck(history=candidate, needs_compaction=False)
+        return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
 
     _log.info("context_budget_compaction_needed", extra={
         "tail_len": len(tail), "fold_len": len(fold), "keep_len": len(keep),
         "candidate_tokens": candidate_tokens, "effective_budget": effective_budget,
     })
-    return BudgetCheck(needs_compaction=True, fold=fold, keep=keep)
+    return BudgetCheck(needs_compaction=True, fold=fold, keep=keep, tokens=candidate_tokens)
 
 
-def _split_oldest_to_fold(tail: list[dict], keep_budget: int) -> tuple[list[dict], list[dict]]:
+def _split_oldest_to_fold(
+    tail: list[dict], keep_budget: int, effective_budget: int
+) -> tuple[list[dict], list[dict]]:
     """Walk the tail backwards from the newest message, accumulating tokens,
     until the next-older message would exceed keep_budget. Snap the cut to a
     'user' role boundary so the kept tail never starts mid-exchange with an
     orphaned assistant reply. Always folds at least one message (forward
     progress) if the tail has more than one message and is over budget at all.
-    Never lets the token-budget calculation alone fold away the most recent
-    MIN_KEEP_MESSAGES messages -- recency takes priority over strict budget
-    adherence. This floor applies before the forced-progress/user-boundary
-    steps below, so it never blocks folding at least one message when the
-    tail itself is smaller than the floor (e.g. shrinking an oversized prior
-    summary), nor does it block the user-boundary snap from running past it
-    when there's no user-role message within the floor to land on.
+
+    Tries to keep at least MIN_KEEP_MESSAGES messages regardless of the
+    token-budget walk above -- recency takes priority over strict budget
+    adherence for normal-sized messages. But this floor never pulls in a
+    message that alone exceeds effective_budget (e.g. a giant RAG-augmented
+    prompt or a large pasted block): such a message can never coexist with a
+    summary + new turn no matter how recent it is, so protecting it here
+    would just guarantee compaction re-triggers on every subsequent turn
+    without ever making progress.
     """
     n = len(tail)
     running = 0
@@ -129,7 +153,12 @@ def _split_oldest_to_fold(tail: list[dict], keep_budget: int) -> tuple[list[dict
         running += msg_tokens
         cut = i
 
-    cut = min(cut, max(0, n - MIN_KEEP_MESSAGES))
+    floor_cut = max(0, n - MIN_KEEP_MESSAGES)
+    while cut > floor_cut:
+        next_msg_tokens = count_message_tokens([_as_chat_message(tail[cut - 1])])
+        if next_msg_tokens > effective_budget:
+            break
+        cut -= 1
 
     if cut == 0 and n > 1:
         # guarantee forward progress: never fold nothing when we got here
@@ -180,12 +209,16 @@ async def run_compaction(
         "conversation_id": str(conversation_id), "prompt_tokens": count_tokens(prompt), "model": model,
     })
 
-    # /v1/completions defaults max_tokens to a tiny value (16) when unset, unlike
-    # the chat endpoint — without this, the summary gets cut off after one sentence
-    # regardless of summary_target_tokens. 1.5x headroom since the target is a soft
-    # ask in the prompt, not a hard clip point.
-    new_summary = await generator.generate(
-        prompt=prompt,
+    # Uses chat(), not generate(): the raw completions endpoint has no chat
+    # template, so the model has no reliable turn-ending signal there -- in
+    # practice that produced wildly inconsistent summary lengths (as little as
+    # 24 tokens, as much as 8000+ on the same prompt shape) and leaked raw
+    # <think>...</think> reasoning tags into the persisted summary. A single
+    # user-role message is still a stateless, one-shot call, just properly
+    # templated. max_tokens is still an explicit safety cap, not a target --
+    # 1.5x headroom since summary_target_tokens is a soft ask in the prompt.
+    new_summary = await generator.chat(
+        messages=[{"role": "user", "content": prompt}],
         model=model,
         options={"temperature": 0.0, "max_tokens": int(settings.summary_target_tokens * 1.5)},
         stream=False,

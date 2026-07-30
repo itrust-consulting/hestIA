@@ -6,8 +6,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 from hestia.domain.chat.context_budget import (
     check_context_budget,
+    fetch_budget_inputs,
     run_compaction,
 )
+from hestia.domain.chat.tokens import count_message_tokens
 
 
 def _run(coro):
@@ -46,6 +48,21 @@ class TestCheckContextBudget:
         assert check.history is not None
         assert check.fold is None
         assert check.keep is None
+        assert check.tokens == count_message_tokens(check.history)
+
+    def test_tokens_field_set_when_over_budget(self):
+        settings = _settings(max_context_tokens=200, summary_target_tokens=20)
+        tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(10)]
+        check = check_context_budget(None, tail, settings)
+        assert check.needs_compaction is True
+        assert check.tokens == count_message_tokens(tail)
+
+    def test_tokens_field_set_when_cannot_fold(self):
+        settings = _settings(max_context_tokens=10, summary_target_tokens=2)
+        tail = [_big_msg("user", 1)]
+        check = check_context_budget(None, tail, settings)
+        assert check.needs_compaction is False
+        assert check.tokens == count_message_tokens(tail)
 
     def test_empty_tail_never_needs_compaction(self):
         settings = _settings(max_context_tokens=1)
@@ -83,6 +100,25 @@ class TestCheckContextBudget:
         assert len(check.keep) >= 4
         assert check.fold + check.keep == tail
 
+    def test_min_keep_floor_never_drags_an_oversized_message_back_in(self):
+        # Reproduces a real production loop: a single message far larger than
+        # the entire effective budget (e.g. a RAG-augmented prompt or a large
+        # pasted block) landed within the last MIN_KEEP_MESSAGES messages. The
+        # naive count-based floor forced it into `keep` regardless of size,
+        # so `keep` alone stayed over budget forever and every subsequent
+        # turn re-triggered compaction with no progress. The floor must never
+        # protect a message that alone exceeds effective_budget.
+        settings = _settings(max_context_tokens=1000, summary_target_tokens=100)
+        oversized = _msg("user", "word " * 5000, 90, 90)  # far bigger than the whole budget
+        tail = [_msg("assistant", "short reply", i, i) for i in range(85, 90)] + [
+            oversized,
+            _msg("assistant", "ok", 91, 91),
+        ]
+        check = check_context_budget(None, tail, settings)
+        assert check.needs_compaction is True
+        assert all(m["content"] != oversized["content"] for m in check.keep)
+        assert oversized in check.fold
+
     def test_single_message_tail_over_budget_passes_through(self):
         # nothing productive to fold when the tail is just one (huge) message —
         # compaction can't help, so this must not crash and must not compact
@@ -107,6 +143,57 @@ class TestCheckContextBudget:
 
 
 # ---------------------------------------------------------------------------
+# fetch_budget_inputs
+# ---------------------------------------------------------------------------
+
+class TestFetchBudgetInputs:
+
+    def test_returns_prior_summary_and_tail(self):
+        users = MagicMock()
+        users.assert_conversation_owner = MagicMock()
+        users.get_conversation_context_state.return_value = {
+            "context_summary": {"summary": "prior", "boundary_created_at": 5, "boundary_rowid": 5}
+        }
+        tail = [_msg("user", "hi", 6, 6)]
+        users.get_messages_after_boundary.return_value = tail
+        user_id = uuid.uuid4()
+        conversation_id = uuid.uuid4()
+
+        prior_summary, result_tail = fetch_budget_inputs(users, user_id, conversation_id)
+
+        assert prior_summary == "prior"
+        assert result_tail == tail
+        users.get_messages_after_boundary.assert_called_once_with(user_id, conversation_id, 5, 5)
+
+    def test_no_prior_summary_when_missing(self):
+        users = MagicMock()
+        users.assert_conversation_owner = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        users.get_messages_after_boundary.return_value = []
+        user_id, conversation_id = uuid.uuid4(), uuid.uuid4()
+
+        prior_summary, _ = fetch_budget_inputs(users, user_id, conversation_id)
+
+        assert prior_summary is None
+        users.get_messages_after_boundary.assert_called_once_with(user_id, conversation_id, None, None)
+
+    def test_ownership_checked_before_any_other_fetch(self):
+        from hestia.domain.exceptions import NotFoundError
+
+        users = MagicMock()
+        users.assert_conversation_owner = MagicMock(side_effect=NotFoundError("not found"))
+
+        try:
+            fetch_budget_inputs(users, uuid.uuid4(), uuid.uuid4())
+            assert False, "expected NotFoundError"
+        except NotFoundError:
+            pass
+
+        users.get_conversation_context_state.assert_not_called()
+        users.get_messages_after_boundary.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # run_compaction
 # ---------------------------------------------------------------------------
 
@@ -118,7 +205,7 @@ class TestRunCompaction:
     def test_no_prior_summary_calls_llm_once_and_persists_boundary(self):
         settings = _settings()
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="a concise summary")
+        generator.chat = AsyncMock(return_value="a concise summary")
         users = self._users()
         conversation_id = uuid.uuid4()
         fold = [_msg("user", "old q", 1, 10), _msg("assistant", "old a", 2, 11)]
@@ -126,7 +213,7 @@ class TestRunCompaction:
 
         history = _run(run_compaction(generator, settings, users, conversation_id, None, fold, keep))
 
-        generator.generate.assert_awaited_once()
+        generator.chat.assert_awaited_once()
         users.update_conversation_context_summary.assert_called_once_with(
             conversation_id,
             summary="a concise summary",
@@ -140,7 +227,7 @@ class TestRunCompaction:
     def test_prior_summary_is_included_in_prompt_as_rolling_update(self):
         settings = _settings()
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="updated summary")
+        generator.chat = AsyncMock(return_value="updated summary")
         users = self._users()
         conversation_id = uuid.uuid4()
         fold = [_msg("user", "new turn", 5, 20)]
@@ -148,43 +235,43 @@ class TestRunCompaction:
 
         _run(run_compaction(generator, settings, users, conversation_id, "PRIOR SUMMARY TEXT", fold, keep))
 
-        prompt = generator.generate.await_args.kwargs["prompt"]
+        prompt = generator.chat.await_args.kwargs["messages"][0]["content"]
         assert "PRIOR SUMMARY TEXT" in prompt
         assert "do not summarize from scratch" in prompt.lower()
 
     def test_no_prior_summary_prompt_says_first_summarization(self):
         settings = _settings()
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="summary")
+        generator.chat = AsyncMock(return_value="summary")
         users = self._users()
         fold = [_msg("user", "hi", 1, 1)]
 
         _run(run_compaction(generator, settings, users, uuid.uuid4(), None, fold, []))
 
-        prompt = generator.generate.await_args.kwargs["prompt"]
+        prompt = generator.chat.await_args.kwargs["messages"][0]["content"]
         assert "no summary exists yet" in prompt.lower()
 
     def test_uses_summary_model_override_when_set(self):
         settings = _settings(summary_model="override-model", default_gen_model="default-model")
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="summary")
+        generator.chat = AsyncMock(return_value="summary")
         users = self._users()
         fold = [_msg("user", "hi", 1, 1)]
 
         _run(run_compaction(generator, settings, users, uuid.uuid4(), None, fold, []))
 
-        assert generator.generate.await_args.kwargs["model"] == "override-model"
+        assert generator.chat.await_args.kwargs["model"] == "override-model"
 
     def test_falls_back_to_default_gen_model(self):
         settings = _settings(summary_model=None, default_gen_model="default-model")
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="summary")
+        generator.chat = AsyncMock(return_value="summary")
         users = self._users()
         fold = [_msg("user", "hi", 1, 1)]
 
         _run(run_compaction(generator, settings, users, uuid.uuid4(), None, fold, []))
 
-        assert generator.generate.await_args.kwargs["model"] == "default-model"
+        assert generator.chat.await_args.kwargs["model"] == "default-model"
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +295,7 @@ class TestRetryIdempotency:
         assert first_check.needs_compaction is True
 
         generator = MagicMock()
-        generator.generate = AsyncMock(return_value="short summary")
+        generator.chat = AsyncMock(return_value="short summary")
         users = MagicMock()
         conversation_id = uuid.uuid4()
         _run(run_compaction(
@@ -234,4 +321,4 @@ class TestRetryIdempotency:
         second_check = check_context_budget("short summary", tail_for_retry, settings)
 
         assert second_check.needs_compaction is False
-        generator.generate.assert_awaited_once()  # still only the one call from turn 1
+        generator.chat.assert_awaited_once()  # still only the one call from turn 1

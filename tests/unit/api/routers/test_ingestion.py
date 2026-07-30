@@ -131,6 +131,54 @@ class TestListCollections:
 
 
 # ---------------------------------------------------------------------------
+# GET /collections/document-counts
+# ---------------------------------------------------------------------------
+
+class TestGetDocumentCounts:
+
+    def test_admin_gets_all(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.providers = {
+            "db": MagicMock(document_counts=MagicMock(return_value={"col1": 3, "col2": 5}))
+        }
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/document-counts")
+        assert resp.status_code == 200
+        assert resp.json()["counts"] == {"col1": 3, "col2": 5}
+
+    def test_user_filtered_to_permitted(self):
+        user = _make_user(allowed_collections={
+            "col1": CollectionPermission(access=True),
+        })
+        handler = MagicMock()
+        handler.container.providers = {
+            "db": MagicMock(document_counts=MagicMock(return_value={"col1": 3, "col2": 5}))
+        }
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/document-counts")
+        assert resp.status_code == 200
+        assert resp.json()["counts"] == {"col1": 3}
+
+    def test_route_registered_before_name_wildcard(self):
+        # /collections/document-counts must resolve to this route, not be
+        # swallowed by GET /collections/{name} matching name="document-counts"
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.providers = {
+            "db": MagicMock(
+                document_counts=MagicMock(return_value={"col1": 1}),
+                get_collection=MagicMock(return_value={"name": "document-counts", "documents": []}),
+            )
+        }
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/document-counts")
+        assert resp.status_code == 200
+        assert "counts" in resp.json()
+        handler.container.providers["db"].get_collection.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # GET /collections/{name}
 # ---------------------------------------------------------------------------
 

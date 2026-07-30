@@ -77,7 +77,10 @@ class vLLMProvider(LLMProvider):
     async def generate(self, prompt: str, *, model: str | None = None, options: Dict[str, Any] | None = None, stream: bool = False):
         _m = model or self.model
         _log.debug("vllm_generate", extra={"model": _m, "prompt_len": len(prompt), "stream": stream})
-        payload = {"prompt": prompt, "options": options, "stream": stream}
+        # sampling params go at the top level (OpenAI-compatible /v1/completions
+        # contract) -- NOT nested under an "options" key, which is Ollama's native
+        # convention and is silently ignored here, e.g. max_tokens never applied.
+        payload = {"prompt": prompt, "stream": stream, **(options or {})}
         if stream:
             return self._stream(
                 "/v1/completions", payload,
@@ -97,7 +100,8 @@ class vLLMProvider(LLMProvider):
     async def chat(self, messages: List[Message], *, model: str | None = None, options: Dict[str, Any] | None = None, stream: bool = False):
         _m = model or self.model
         _log.debug("vllm_chat", extra={"model": _m, "n_messages": len(messages), "stream": stream})
-        payload = {"messages": messages, "options": options, "stream": stream}
+        # see generate() -- sampling params must be top-level, not nested.
+        payload = {"messages": messages, "stream": stream, **(options or {})}
         if stream:
             return self._stream(
                 "/v1/chat/completions",
