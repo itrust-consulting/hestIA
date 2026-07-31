@@ -78,7 +78,7 @@ class TestChatRouter:
         assert len(call_req.history) == 2
 
     def test_returns_streaming_response_when_stream_true(self):
-        def _stream_gen():
+        async def _stream_gen():
             yield b'{"content":"hello"}\n'
             yield b'{"content":" world"}\n'
 

@@ -102,6 +102,9 @@
             {message.citations.length} source{message.citations.length !== 1 ? 's' : ''}
           </button>
         {/if}
+        {#if message.stopped}
+          <div class="stopped-note">Generation stopped.</div>
+        {/if}
       </div>
     {/if}
 
@@ -273,6 +276,13 @@
 
   .sources-btn:hover {
     background: var(--color-blue-100);
+  }
+
+  .stopped-note {
+    margin-top: 0.5rem;
+    font-size: var(--text-xs, 0.75rem);
+    font-style: italic;
+    color: var(--color-neutral-400);
   }
 
   .thinking-block {

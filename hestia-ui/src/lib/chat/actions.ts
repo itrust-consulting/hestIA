@@ -105,7 +105,7 @@ export async function streamFromHistoryInto(
       model: 'ministral-3:14b',
       model_kwargs: {},
       collection: get(activeCorpusName),
-      query_kwargs: { limit: 20 },
+      query_kwargs: { limit: 10 },
       stream: true,
       conversation_id: get(activeConversationId),
       save_chat: true,
@@ -209,7 +209,9 @@ export async function streamFromHistoryInto(
       if (pending) flushPending();
     }
   } catch (e: any) {
-    if (e.name !== 'AbortError') {
+    if (e.name === 'AbortError') {
+      updateMessage(assistantTempId, { stopped: true });
+    } else {
       updateMessage(assistantTempId, { content: `⚠️ ${e}` });
     }
   } finally {

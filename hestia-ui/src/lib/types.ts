@@ -55,6 +55,10 @@ export type ChatMessage = {
    *  of the generic "Thinking" placeholder. Stops mattering once thinking or
    *  content starts arriving, never explicitly cleared. */
   compacting?: boolean;
+  /** True when generation was interrupted by the user clicking Stop (or the
+   *  stream otherwise aborted) rather than finishing normally -- drives a
+   *  "Generation stopped" note instead of implying the reply is complete. */
+  stopped?: boolean;
   createdAt: number;
   /** Set only for messages loaded from the server; absent for messages pushed
    *  live this session (not yet round-tripped through a fetch). Used to build

@@ -6,30 +6,50 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const body = await request.json();
     const token = cookies.get('token');
 
+    // Tied to the browser disconnecting (Stop button) via the stream's
+    // cancel() below -- lets the abort actually reach the backend/vLLM
+    // instead of the request continuing in the background.
+    const backendAbort = new AbortController();
+
     const upstream = await backendFetch('/api/chat', token, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: backendAbort.signal
     });
 
     if (!upstream.ok || !upstream.body) {
       return new Response(`Upstream error: ${upstream.status}`, { status: upstream.status });
     }
 
+    let cancelled = false;
+    const reader = upstream.body.getReader();
+
     const readableStream = new ReadableStream({
       async start(controller) {
-        const reader = upstream.body!.getReader();
         try {
           while (true) {
             const { value, done } = await reader.read();
-            if (done) break;
+            if (done || cancelled) break;
             controller.enqueue(value);
           }
         } catch (err) {
-          console.error('Streaming error:', err);
+          if (!cancelled) console.error('Streaming error:', err);
         } finally {
-          controller.close();
+          if (!cancelled) controller.close();
         }
+      },
+      cancel(reason) {
+        // The runtime calls this once the client (browser) disconnects --
+        // stop reading and abort the upstream request so the backend (and
+        // vLLM) actually stop generating, instead of running to completion
+        // unseen. Without this handler the controller gets torn down by
+        // the runtime anyway, but start()'s loop keeps calling
+        // enqueue()/close() against it, throwing ERR_INVALID_STATE.
+        cancelled = true;
+        console.info('Chat stream cancelled by client, aborting upstream request.', reason);
+        backendAbort.abort();
+        reader.cancel().catch(() => {});
       }
     });
 
