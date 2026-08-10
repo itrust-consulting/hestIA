@@ -1,24 +1,27 @@
+import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { backendFetch, proxyResponse } from '$lib/server/backend';
+import { requireAdmin } from '$lib/server/help/auth';
+import { putSection, deleteSection } from '$lib/server/help/sections';
+import { HelpError, helpErrorResponse } from '$lib/server/help/errors';
 
-export const GET: RequestHandler = async ({ params, cookies }) => {
-  const token = cookies.get('token');
-  const res = await backendFetch(`/help/${params.section}`, token);
-  return proxyResponse(res);
+export const PUT: RequestHandler = async ({ params, request, locals }) => {
+  try {
+    requireAdmin(locals);
+    const { content } = await request.json();
+    await putSection(params.section, content);
+    return json({ ok: true });
+  } catch (e) {
+    return helpErrorResponse(e);
+  }
 };
 
-export const PUT: RequestHandler = async ({ params, request, cookies }) => {
-  const token = cookies.get('token');
-  const res = await backendFetch(`/help/${params.section}`, token, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: await request.text()
-  });
-  return proxyResponse(res);
-};
-
-export const DELETE: RequestHandler = async ({ params, cookies }) => {
-  const token = cookies.get('token');
-  const res = await backendFetch(`/help/${params.section}`, token, { method: 'DELETE' });
-  return proxyResponse(res);
+export const DELETE: RequestHandler = async ({ params, locals }) => {
+  try {
+    requireAdmin(locals);
+    const deleted = await deleteSection(params.section);
+    if (!deleted) throw new HelpError(404, 'Section not found');
+    return json({ ok: true });
+  } catch (e) {
+    return helpErrorResponse(e);
+  }
 };

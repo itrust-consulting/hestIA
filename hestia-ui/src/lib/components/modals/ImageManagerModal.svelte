@@ -1,5 +1,7 @@
 <script lang="ts">
   import Modal from '$lib/components/Modal.svelte';
+  import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
+  import { addToast } from '$lib/stores/toast';
 
   type ImageEntry = { filename: string; url: string; size: number };
 
@@ -22,6 +24,7 @@
   let renameBusy       = $state(false);
 
   let copiedFilename = $state<string | null>(null);
+  let confirmDeleteImg = $state<ImageEntry | null>(null);
 
   $effect(() => {
     if (open) load();
@@ -81,7 +84,7 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ filename: newName }),
       });
-      if (res.ok) { await load(); resetRename(); }
+      if (res.ok) { await load(); resetRename(); addToast('Image renamed.', 'success'); }
       else { renameError = (await res.json()).detail ?? 'Rename failed.'; }
     } catch {
       renameError = 'Network error.';
@@ -90,10 +93,14 @@
     }
   }
 
-  async function deleteImage(img: ImageEntry) {
-    if (!confirm(`Delete "${img.filename}"? This cannot be undone.`)) return;
+  async function handleDeleteConfirm() {
+    const img = confirmDeleteImg!;
     const res = await fetch(`/api/help/images/${encodeURIComponent(img.filename)}`, { method: 'DELETE' });
-    if (res.ok) images = images.filter(i => i.filename !== img.filename);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.detail ?? 'Failed to delete image.');
+    }
+    images = images.filter(i => i.filename !== img.filename);
   }
 </script>
 
@@ -150,7 +157,7 @@
                 title="Copy markdown"
               >{copiedFilename === img.filename ? 'Copied!' : 'Copy'}</button>
               <button class="btn-rename" onclick={() => startRename(img)} title="Rename">Rename</button>
-              <button class="btn-delete" onclick={() => deleteImage(img)} title="Delete">Delete</button>
+              <button class="btn-delete" onclick={() => (confirmDeleteImg = img)} title="Delete">Delete</button>
             </div>
           {/if}
         </div>
@@ -158,6 +165,16 @@
     </div>
   {/if}
 </Modal>
+
+<ConfirmDeleteModal
+  open={confirmDeleteImg !== null}
+  title="Delete Image"
+  onClose={() => (confirmDeleteImg = null)}
+  onConfirm={handleDeleteConfirm}
+  successMessage="Image deleted."
+>
+  <p>Delete <strong>{confirmDeleteImg?.filename}</strong>? This cannot be undone.</p>
+</ConfirmDeleteModal>
 
 <style>
   .status {

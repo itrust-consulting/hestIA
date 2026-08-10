@@ -37,10 +37,13 @@ services:
       - "7860:7860"
     depends_on:
       - backend
+    volumes:
+      - ./frontend-data/manual:/app/data/manual
     networks:
       - app_network
     environment:
       - 'PRIVATE_MICROSERVICE_URL=http://backend:5555'
+      - 'PRIVATE_HELP_DATA_DIR=/app/data/manual'
       - 'PUBLIC_AUTH_MODE=oidc'
       - 'PORT=7860'
  

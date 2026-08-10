@@ -10,7 +10,6 @@ from hestia.api.routers.auth import router as auth_router
 from hestia.api.routers.account import router as account_router
 from hestia.api.routers.admin import router as admin_router
 from hestia.api.routers.conversations import router as convo_router
-from hestia.api.routers.help import router as help_router
 from hestia.api.routers.encode import router as encode_router
 from hestia.api.routers.generate import router as generate_router
 from hestia.api.routers.chat import router as chat_router
@@ -33,7 +32,6 @@ ROUTER_REGISTRY: Dict[str, RouterSpec] = {
     "account":   RouterSpec(router=account_router,   prefix="",       tags=("account",),      always_on=True),
     "convo":     RouterSpec(router=convo_router,     prefix="",       tags=("conversations",), always_on=True),
     "admin":     RouterSpec(router=admin_router,     prefix="/admin", tags=("admin",),        always_on=True),
-    "help":      RouterSpec(router=help_router,      prefix="",       tags=("help",),         always_on=True),
     "encode":    RouterSpec(router=encode_router,    prefix="/api",   tags=("encode",),       service="encDense"),
     "generate":  RouterSpec(router=generate_router,  prefix="/api",   tags=("generate",),     service="generate"),
     "chat":      RouterSpec(router=chat_router,      prefix="/api",   tags=("chat",),         service="generate"),

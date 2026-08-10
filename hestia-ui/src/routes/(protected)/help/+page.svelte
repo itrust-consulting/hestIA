@@ -5,15 +5,17 @@
   import HelpSidebar from '$lib/components/HelpSidebar.svelte';
   import DiagramModal from '$lib/components/modals/DiagramModal.svelte';
   import ImageManagerModal from '$lib/components/modals/ImageManagerModal.svelte';
+  import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
   import { api } from '$lib/api/client';
   import { marked } from '$lib/render/markdown';
+  import { addToast } from '$lib/stores/toast';
 
   let { data } = $props();
 
   let editing    = $state(false);
   let editContent = $state('');
   let saving     = $state(false);
-  let deleting   = $state(false);
+  let confirmDeleteOpen = $state(false);
   let mermaidLib = $state<any>(null);
   let contentEl  = $state<HTMLDivElement | undefined>(undefined);
   let previewEl  = $state<HTMLDivElement | undefined>(undefined);
@@ -111,10 +113,15 @@
     saving = true;
     try {
       const res = await api.put(`/api/help/${data.section}`, { content: editContent });
-      if (res.ok) {
-        editing = false;
-        await invalidateAll();
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail ?? 'Failed to save page.');
       }
+      editing = false;
+      addToast('Page saved.', 'success');
+      await invalidateAll();
+    } catch (e: any) {
+      addToast(e.message ?? 'Failed to save page.', 'error');
     } finally {
       saving = false;
     }
@@ -133,10 +140,17 @@
     if (!slug) return;
 
     const initial = `# ${title}\n\nWrite your content here.\n`;
-    const res = await api.put(`/api/help/${slug}`, { content: initial });
-    if (res.ok) {
+    try {
+      const res = await api.put(`/api/help/${slug}`, { content: initial });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail ?? 'Failed to create page.');
+      }
+      addToast('Page created.', 'success');
       await invalidateAll();
       goto(`/help?section=${slug}`);
+    } catch (e: any) {
+      addToast(e.message ?? 'Failed to create page.', 'error');
     }
   }
 
@@ -182,28 +196,26 @@
         editContent = editContent.replace(placeholder, `![image](${url})`);
       } else {
         editContent = editContent.replace(placeholder, '');
+        addToast('Failed to upload image.', 'error');
       }
     } catch {
       editContent = editContent.replace(placeholder, '');
+      addToast('Failed to upload image.', 'error');
     }
   }
 
   // ── Delete ──────────────────────────────────────────
 
-  async function deleteSection() {
-    if (!confirm(`Delete "${data.section}"? This cannot be undone.`)) return;
-    deleting = true;
-    try {
-      const res = await api.delete(`/api/help/${data.section}`);
-      if (res.ok) {
-        const remaining = data.sections.filter((s: any) => s.id !== data.section);
-        const next = remaining[0]?.id ?? 'getting-started';
-        await invalidateAll();
-        goto(`/help?section=${next}`);
-      }
-    } finally {
-      deleting = false;
+  async function handleDeleteConfirm() {
+    const res = await api.delete(`/api/help/${data.section}`);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.detail ?? 'Failed to delete page.');
     }
+    const remaining = data.sections.filter((s: any) => s.id !== data.section);
+    const next = remaining[0]?.id ?? 'getting-started';
+    await invalidateAll();
+    goto(`/help?section=${next}`);
   }
 </script>
 
@@ -221,8 +233,8 @@
       <div class="edit-toolbar">
         <span class="edit-label">Editing — <em>{data.section}</em></span>
         <div class="edit-actions">
-          <button class="btn-danger" onclick={deleteSection} disabled={deleting}>
-            {deleting ? '…' : 'Delete page'}
+          <button class="btn-danger" onclick={() => (confirmDeleteOpen = true)}>
+            Delete page
           </button>
           <button class="btn-secondary" onclick={() => {
             insertCursor = textareaEl?.selectionStart ?? editContent.length;
@@ -289,6 +301,16 @@
     imageManagerOpen = false;
   }}
 />
+
+<ConfirmDeleteModal
+  open={confirmDeleteOpen}
+  title="Delete Page"
+  onClose={() => (confirmDeleteOpen = false)}
+  onConfirm={handleDeleteConfirm}
+  successMessage="Page deleted."
+>
+  <p>Delete <strong>{data.section}</strong>? This cannot be undone.</p>
+</ConfirmDeleteModal>
 
 <style>
   .layout {
