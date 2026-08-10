@@ -4,6 +4,9 @@
     import Modal from '$lib/components/Modal.svelte';
     import { api } from '$lib/api/client';
     import { addToast } from '$lib/stores/toast';
+    import ShowIcon from '../icons/showIcon.svelte';
+    import HideIcon from '../icons/hideIcon.svelte';
+    import CopyIcon from "../icons/copyIcon.svelte";
     /** Props passed from parent */
     const { open, onClose, onSuccess, isAdmin } = $props();
 
@@ -27,10 +30,6 @@
     let defaultPassword = $state("");
     let expiresAt = $state<number | null>(null);
 
-    let creatingOrg = $state(false);
-    let newOrgName = $state("");
-    let newOrgAbbreviation = $state("");
-
     let organizations: Organization[] = $state([]);
     let roles: Role[] = $state([]);
 
@@ -52,47 +51,9 @@
     onMount(loadRoles);
     onMount(loadOrganizations);
 
-    function handleOrganizationChange(value: string) {
-    if (value === "__new__") {
-        creatingOrg = true;
-        assignOrganization = "";
-    } else {
-        creatingOrg = false;
-        assignOrganization = value;
-    }
-    }
-
-    async function saveNewOrganization() {
-        if (!newOrgName || !newOrgAbbreviation) return;
-
-        try {
-            const res = await api.post('/api/admin/organizations', {
-                name: newOrgName,
-                abbreviation: newOrgAbbreviation
-            });
-
-            if (!res.ok) {
-                const msg = await res.text();
-                throw new Error(msg || 'Failed to create organization');
-            }
-
-            const createdOrg: Organization = await res.json();
-
-            organizations = [...organizations, createdOrg];
-
-            assignOrganization = String(createdOrg.id);
-
-
-            creatingOrg = false;
-            newOrgName = "";
-            newOrgAbbreviation = "";
-        } catch (e: any) {
-            addToast(e?.message ?? 'Failed to create organization.', 'error');
-        }
-    }
-
     // UI state
     let submitting = $state(false);
+    let showPassword = $state(false);
 
     async function createUser() {
         if (!assignRole) {
@@ -121,8 +82,8 @@
             addToast('User created successfully.', 'success');
             onSuccess?.();
             onClose();
-        } catch {
-            addToast('Could not create user.', 'error');
+        } catch (e: any) {
+            addToast(e?.message ?? 'Could not create user.', 'error');
         } finally {
             submitting = false;
         }
@@ -144,6 +105,16 @@
         }
 
         defaultPassword = password;
+    }
+
+    async function copyPassword() {
+        if (!defaultPassword) return;
+        try {
+            await navigator.clipboard.writeText(defaultPassword);
+            addToast('Password copied to clipboard.', 'success');
+        } catch {
+            addToast('Could not copy password.', 'error');
+        }
     }
 
 </script>
@@ -191,11 +162,6 @@
                     <select
                         class="input"
                         bind:value={assignOrganization}
-                        onchange={(e) =>
-                            handleOrganizationChange(
-                                (e.currentTarget as HTMLSelectElement).value
-                            )
-                        }
                     >
                         <option value="" disabled selected hidden>Select organization</option>
 
@@ -204,41 +170,8 @@
                                 {org.name} ({org.abbreviation})
                             </option>
                         {/each}
-
-                        <option value="__new__">✚ Add organization</option>
                     </select>
             </label>
-
-            {#if creatingOrg}
-            <div class="new-org-card">
-                <label>
-                <span>Organization Name</span>
-                <input
-                    type="text"
-                    class="input"
-                    bind:value={newOrgName}
-                />
-                </label>
-
-                <label>
-                <span>Abbreviation</span>
-                <input
-                    type="text"
-                    class="input"
-                    maxlength="8"
-                    bind:value={newOrgAbbreviation}
-                />
-                </label>
-
-                <button
-                class="secondary-btn"
-                onclick={saveNewOrganization}
-                disabled={!newOrgName || !newOrgAbbreviation}
-                >
-                Add Organization
-                </button>
-            </div>
-            {/if}
 
             <label class="full-width">
                 <span>Default Password<span class="required">*</span></span>
@@ -246,10 +179,34 @@
                 <div class="password-field">
                     <input
                         class="input"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         bind:value={defaultPassword}
                         placeholder="Enter or generate a password"
                     />
+
+                    <div class="icon-actions">
+                        <button
+                            type="button"
+                            class="icon-btn"
+                            onclick={() => (showPassword = !showPassword)}
+                            title={showPassword ? "Hide password" : "Show password"}
+                        >
+                            {#if showPassword}
+                                <HideIcon />
+                            {:else}
+                                <ShowIcon />
+                            {/if}
+                        </button>
+
+                        <button
+                            type="button"
+                            class="icon-btn"
+                            onclick={copyPassword}
+                            title="Copy password"
+                        >
+                            <CopyIcon />
+                        </button>
+                    </div>
 
                     <button
                         type="button"
@@ -302,34 +259,6 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem 1.5rem;
-}
-
-.new-org-card {
-    grid-column: span 2;
-
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem 1.5rem;
-
-    padding: 0.85rem 1rem;
-    margin-top: 0.25rem;
-
-    background: linear-gradient(
-        180deg,
-        var(--color-neutral-50),
-        var(--color-neutral-100)
-    );
-
-    border-radius: var(--radius-md);
-
-    box-shadow:
-        inset 0 0 0 1px var(--color-neutral-200),
-        0 1px 2px rgba(0, 0, 0, 0.04);
-}
-
-.new-org-card button {
-    grid-column: span 2;
-    justify-self: flex-start;
 }
 
 .password-field {
@@ -413,4 +342,31 @@ label span {
     border-radius: var(--radius-md);
     cursor: pointer;
 }
+
+.icon-actions {
+    display: flex;
+    align-items: center;
+}
+
+.icon-actions .icon-btn:first-child {
+    margin-right: 0.7rem;
+}
+
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-800);
+    border: 1px solid var(--color-neutral-300);
+    padding: 0.48rem 0.48rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.icon-btn :global(svg) {
+    width: 13px;
+    height: 13px;
+}
+
 </style>

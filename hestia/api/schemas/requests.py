@@ -95,7 +95,7 @@ class CreateUserRequest(Request):
     last_name: str
     password: str
     roles: list[int] = Field([0])
-    organization: str = None
+    organization: str | None = None
     expires_at: int | None = None
 
 
