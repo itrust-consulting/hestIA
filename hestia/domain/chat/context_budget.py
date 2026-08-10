@@ -62,6 +62,10 @@ def _as_chat_message(m: dict) -> dict:
     return {"role": m["role"], "content": m["content"]}
 
 
+def build_history(prior_summary: str | None, tail: list[dict]) -> list[dict]:
+    return ([_framed_summary(prior_summary)] if prior_summary else []) + [_as_chat_message(m) for m in tail]
+
+
 def fetch_budget_inputs(users, user_id: uuid.UUID, conversation_id: uuid.UUID) -> tuple[str | None, list[dict]]:
     """Fetch (prior_summary, tail) for context-budget bookkeeping for a given
     conversation. Decoupled from ExecutionRequest so RequestHandler, the
@@ -80,10 +84,16 @@ def fetch_budget_inputs(users, user_id: uuid.UUID, conversation_id: uuid.UUID) -
     return prior_summary, tail
 
 
-def check_context_budget(prior_summary: str | None, tail: list[dict], settings) -> BudgetCheck:
+def check_context_budget(prior_summary: str | None, tail: list[dict], settings, *, force: bool = False) -> BudgetCheck:
     """Cheap, synchronous, no I/O. Decides whether the given tail (plus any
     prior summary) fits the configured budget, and if not, how to split it
     into a fold (oldest, to be summarized) / keep (newest, kept verbatim).
+
+    force=True skips the budget check entirely and always folds down to
+    MIN_KEEP_MESSAGES (via _split_force_fold) as long as there's anything
+    productive to fold — used for user-initiated manual compaction, which
+    should always do real work when clicked, not only when the auto-trigger
+    budget is exceeded.
 
     Concurrency note: this function and update_conversation_context_summary
     are not used atomically as a pair — two overlapping requests for the same
@@ -93,9 +103,7 @@ def check_context_budget(prior_summary: str | None, tail: list[dict], settings) 
     worst case is a redundant summarization call and one of two boundary
     updates being discarded — self-healing on the next turn.
     """
-    candidate = ([_framed_summary(prior_summary)] if prior_summary else []) + [
-        _as_chat_message(m) for m in tail
-    ]
+    candidate = build_history(prior_summary, tail)
     effective_budget = int(settings.max_context_tokens * SAFETY_MARGIN)
     candidate_tokens = count_message_tokens(candidate)
     _log.debug("context_budget_check", extra={
@@ -104,23 +112,29 @@ def check_context_budget(prior_summary: str | None, tail: list[dict], settings) 
         "prior_summary_tokens": count_tokens(prior_summary) if prior_summary else 0,
         "candidate_tokens": candidate_tokens,
         "effective_budget": effective_budget,
+        "force": force,
     })
 
-    if not tail or candidate_tokens <= effective_budget:
+    if not tail:
+        return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
+    if not force and candidate_tokens <= effective_budget:
         return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
 
-    keep_budget = max(effective_budget - settings.summary_target_tokens - RESERVE_FOR_NEW_TURN, 0)
-    fold, keep = _split_oldest_to_fold(tail, keep_budget, effective_budget)
+    if force:
+        fold, keep = _split_force_fold(tail)
+    else:
+        keep_budget = max(effective_budget - settings.summary_target_tokens - RESERVE_FOR_NEW_TURN, 0)
+        fold, keep = _split_oldest_to_fold(tail, keep_budget, effective_budget)
     if not fold:
         # Nothing productive to fold (e.g. a single message alone exceeds
-        # budget) — compaction can't help here. Pass through rather than
-        # calling run_compaction with an empty fold.
-        _log.debug("context_budget_cannot_fold", extra={"tail_len": len(tail), "keep_budget": keep_budget})
+        # budget, or the tail is too short) — compaction can't help here.
+        # Pass through rather than calling run_compaction with an empty fold.
+        _log.debug("context_budget_cannot_fold", extra={"tail_len": len(tail), "force": force})
         return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
 
     _log.info("context_budget_compaction_needed", extra={
         "tail_len": len(tail), "fold_len": len(fold), "keep_len": len(keep),
-        "candidate_tokens": candidate_tokens, "effective_budget": effective_budget,
+        "candidate_tokens": candidate_tokens, "effective_budget": effective_budget, "force": force,
     })
     return BudgetCheck(needs_compaction=True, fold=fold, keep=keep, tokens=candidate_tokens)
 
@@ -172,6 +186,18 @@ def _split_oldest_to_fold(
     while cut < n and tail[cut]["role"] != "user":
         cut += 1
 
+    return tail[:cut], tail[cut:]
+
+
+def _split_force_fold(tail: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Fold everything except the most recent MIN_KEEP_MESSAGES, regardless of
+    token budget -- used for user-initiated manual compaction, which should
+    always do real work when clicked rather than only when the auto-trigger
+    budget is exceeded."""
+    n = len(tail)
+    cut = max(0, n - MIN_KEEP_MESSAGES)
+    while cut < n and tail[cut]["role"] != "user":
+        cut += 1
     return tail[:cut], tail[cut:]
 
 

@@ -10,6 +10,7 @@ from hestia.domain.auth.users import now_epoch
 from hestia.domain.chat.context_budget import (
     BudgetCheck, check_context_budget, fetch_budget_inputs, run_compaction,
 )
+from hestia.domain.chat.tokens import count_message_tokens
 from hestia.domain.exceptions import ConfigurationError, ForbiddenError, HestiaError
 from hestia.domain.policies.guard import ExecutionPolicy, PolicyDecision, PolicyGuard, PolicyResult
 from hestia.domain.rag.graph import ExecutionRequest
@@ -50,31 +51,36 @@ RAG_PROMPT = """
 
 # @MRS-032, @MRS-068
 def _format_citations(hits: list) -> tuple[dict, list]:
+    """Assigns each retrieved *chunk* its own citation key, even when two
+    chunks come from the same source document. This lets the model cite the
+    exact chunk backing a given claim (\\cite{3}) instead of a document as a
+    whole -- if two chunks of the same doc were used for two different facts,
+    the reply's citations for those facts must point at different chunks,
+    not both collapse onto one shared key. The model can still group several
+    keys together (\\cite{1,2}) when a claim genuinely draws on more than one
+    chunk; the frontend resolves and pages through exactly the keys cited
+    (see renderChatContent.ts)."""
     retrieved_data = []
     source_map = []
     cite_list = []
-    source_to_key: dict[str, str] = {}
 
-    for point in hits:
+    for i, point in enumerate(hits, start=1):
         chunk = point.payload
         doc_info = chunk.get("doc_info") or {}
         info = chunk.get("info") or {}
         source = chunk.get("source", "unknown")
         content = chunk.get("content", "")
+        key = str(i)
 
-        if source not in source_to_key:
-            key = str(len(source_to_key) + 1)
-            source_to_key[source] = key
-            source_map.append(f"- {key}: {source}")
-            cite_list.append({
-                "key": key,
-                "source": source,
-                "subject": doc_info.get("subject", ""),
-                "path": info.get("path", ""),
-                "excerpt": content,
-            })
-
-        retrieved_data.append(f"[{source_to_key[source]}]\n{content}")
+        source_map.append(f"- {key}: {source}")
+        cite_list.append({
+            "key": key,
+            "source": source,
+            "subject": doc_info.get("subject", ""),
+            "path": info.get("path", ""),
+            "excerpt": content,
+        })
+        retrieved_data.append(f"[{key}]\n{content}")
 
     return {
         "retrieved_data": "\n\n".join(retrieved_data),
@@ -302,30 +308,42 @@ class PersistChat:
             c_id, user_msg_id, assistant_msg_id = self._persist(
                 req, final_text, slot, citations=citations, thinking=thinking_text or None
             )
+            usage_fields = await self._usage_fields(req, c_id)
             yield (json.dumps({
                 "conversation_id": str(c_id),
                 "user_message_id": str(user_msg_id) if user_msg_id else None,
                 "assistant_message_id": str(assistant_msg_id),
                 "citations": citations,
                 "thinking": thinking_text or None,
-                **self._usage_fields(req, c_id),
+                **usage_fields,
             }) + "\n").encode("utf-8")
 
         return generator()
 
-    def _usage_fields(self, req: ExecutionRequest, c_id: uuid.UUID) -> dict:
+    async def _usage_fields(self, req: ExecutionRequest, c_id: uuid.UUID) -> dict:
         """Fresh (post-persist) context-usage snapshot for the final stream
-        frame. Fail-open — a usage-display glitch must never break the chat
-        stream, same reasoning as RequestHandler's budget-check try/except."""
+        frame. Never compacts here -- auto-compaction only runs at the START
+        of a turn whose incoming history is itself over budget
+        (RequestHandler._check_and_compact_budget), never as a side effect of
+        the turn that just finished. needs_compaction reflects the current
+        state right after this reply, so the UI can show "over budget"
+        immediately even though the fold itself is deferred to whichever
+        later turn triggers it. If a fold DID run at the start of THIS turn,
+        req.freed_tokens carries the freed amount so this frame can announce
+        it the same way manual compaction does. Fail-open — a usage glitch
+        must never break the chat stream."""
         try:
             settings = self.runner.container.settings
             prior_summary, tail = fetch_budget_inputs(self.users, req.user.id, c_id)
             check = check_context_budget(prior_summary, tail, settings)
-            return {
+            fields = {
                 "used_tokens": check.tokens,
                 "max_tokens": settings.max_context_tokens,
                 "needs_compaction": check.needs_compaction,
             }
+            if getattr(req, "freed_tokens", None):
+                fields["freed_tokens"] = req.freed_tokens
+            return fields
         except Exception:
             _log.warning("context_usage_fields_failed", extra={"conversation_id": str(c_id)})
             return {}
@@ -397,22 +415,49 @@ class RequestHandler:
     def _needs_context_budget(self, req: ExecutionRequest) -> bool:
         return bool(req.conversation_id) and req.exec_type in CONTEXT_BUDGET_EXEC_TYPES
 
+    async def _check_and_compact_budget(self, req: ExecutionRequest) -> None:
+        """Checks whether this turn's incoming history is over budget and,
+        if so, folds it right now, before generation starts -- this is the
+        only place auto-compaction runs. Since it only fires when a NEW user
+        query arrives on an already-over-budget conversation, it never
+        delays the turn that pushed the conversation over the limit, only
+        whichever later turn happens to be the one that triggers the fold.
+        Sets req.history to the (possibly folded) history, and
+        req.freed_tokens when a fold actually happened, so callers can
+        surface the same notification manual compaction shows. Raises on
+        failure -- callers are responsible for failing open."""
+        users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
+        check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
+        if not check.needs_compaction:
+            req.history = check.history
+            return
+        await self._compact(req, users, conversation_id, prior_summary, check)
+
+    async def _compact(
+        self, req: ExecutionRequest, users, conversation_id: uuid.UUID,
+        prior_summary: str | None, check: BudgetCheck,
+    ) -> None:
+        """Actually runs the (slow) summarization call and mutates req.history
+        / req.freed_tokens. Split out from _check_and_compact_budget so the
+        streaming path can emit a "compacting" status frame right before
+        calling this, once it already knows a fold is needed but before the
+        slow part actually starts."""
+        generator = self.container.services.get("generate")
+        before_tokens = check.tokens
+        new_history = await run_compaction(
+            generator, self.container.settings, users, conversation_id,
+            prior_summary, check.fold, check.keep,
+        )
+        req.history = new_history
+        req.freed_tokens = max(0, before_tokens - count_message_tokens(new_history))
+
     async def _apply_context_budget_sync(self, req: ExecutionRequest) -> None:
         """Non-streaming path: no stream to show a notice through, so this
         just runs the check + compaction (if needed) and mutates req.history
         in place. Fails open — a bug here must never break the endpoint."""
         _log.debug("context_budget_sync_start", extra={"conversation_id": req.conversation_id})
         try:
-            users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
-            check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
-            if check.needs_compaction:
-                generator = self.container.services.get("generate")
-                req.history = await run_compaction(
-                    generator, self.container.settings, users, conversation_id,
-                    prior_summary, check.fold, check.keep,
-                )
-            else:
-                req.history = check.history
+            await self._check_and_compact_budget(req)
         except Exception:
             _log.warning("context_budget_failed_fallback", extra={"conversation_id": req.conversation_id})
             # req.history stays whatever the client sent — never break this endpoint over it
@@ -470,12 +515,19 @@ class RequestHandler:
         return response
 
     async def _stream_with_budget_notice(self, req: ExecutionRequest, template: str):
-        """Streaming path: runs the context-budget check before building the
-        graph. If compaction is needed, emits a {"status": "compacting"}
-        frame — a distinct key from {"thinking"/"content"}, so the frontend
-        can flip the existing "Thinking" placeholder's label to "Compacting…"
-        without any literal status text ever being written into the message
-        body. Fails open on any error, same as the sync path."""
+        """Streaming path. Auto-compaction runs here, at the START of
+        handling a NEW user turn, and only when that turn's incoming history
+        is already over budget -- never as a side effect of the turn that
+        just finished (PersistChat._usage_fields only reports the current
+        state, it never folds). A turn that pushes the conversation over
+        budget therefore always streams back immediately with no delay; the
+        fold happens lazily, on whichever later turn actually needs it, and
+        that turn's response is what pays for it -- so it emits a
+        {"status": "compacting"} frame first (the frontend swaps the
+        "Thinking" placeholder's label to "Compacting…" for it, never
+        writing literal status text into the message body) since that turn
+        genuinely does wait on the summarization call before it can start
+        generating. Fails open on any error, same as the sync path."""
         if self._needs_context_budget(req):
             _log.debug("context_budget_stream_start", extra={"conversation_id": req.conversation_id})
             try:
@@ -483,11 +535,7 @@ class RequestHandler:
                 check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
                 if check.needs_compaction:
                     yield (json.dumps({"status": "compacting"}) + "\n").encode("utf-8")
-                    generator = self.container.services.get("generate")
-                    req.history = await run_compaction(
-                        generator, self.container.settings, users, conversation_id,
-                        prior_summary, check.fold, check.keep,
-                    )
+                    await self._compact(req, users, conversation_id, prior_summary, check)
                 else:
                     req.history = check.history
             except Exception:
@@ -496,8 +544,11 @@ class RequestHandler:
 
         graph = self.builder.build(req, template)
         runner = PersistChat(self.runner, req) if req.save_chat else self.runner
-        gen, _ = await runner.run(graph, stream=True)
         try:
+            # gen, _ = await runner.run(...) runs the RAG retrieve/augment
+            # nodes eagerly (before any chunk exists), so a provider failure
+            # there must be caught here too, not just around the chunk loop.
+            gen, _ = await runner.run(graph, stream=True)
             async for chunk in gen:
                 yield chunk
         except HestiaError as e:

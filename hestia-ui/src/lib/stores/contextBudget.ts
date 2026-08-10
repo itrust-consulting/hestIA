@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { api } from '$lib/api/client';
+import { addToast } from '$lib/stores/toast';
 
 export type ContextBudget = {
   usedTokens: number;
@@ -17,6 +18,15 @@ export function setContextBudget(
 ) {
   if (usedTokens == null || maxTokens == null) return;
   contextBudget.set({ usedTokens, maxTokens, needsCompaction: !!needsCompaction });
+}
+
+export function announceCompaction(freedTokens: number | null | undefined) {
+  addToast(
+    freedTokens != null && freedTokens > 0
+      ? `Conversation context compacted — freed ${freedTokens.toLocaleString()} tokens.`
+      : 'Conversation context compacted.',
+    'success',
+  );
 }
 
 export async function compactNow(conversationId: string): Promise<'compacted' | 'not_needed' | null> {

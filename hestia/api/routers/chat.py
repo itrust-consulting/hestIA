@@ -20,14 +20,28 @@ async def chat(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
-    last_user_message = next(
-        (m["content"] for m in reversed(req.messages) if m["role"] == "user"), None
+    # The client always appends the current user message plus an empty
+    # assistant placeholder before calling this endpoint (see
+    # hestia-ui/src/lib/chat/actions.ts's sendMessage/streamFromHistoryInto),
+    # so req.messages ends with [..., current_user_msg, empty_placeholder].
+    # Slicing off just the last element (the placeholder) still leaves the
+    # CURRENT turn inside "history" -- normally masked for existing
+    # conversations because RequestHandler overwrites history from the
+    # authoritative DB tail, but fully exposed on a brand-new conversation's
+    # first message (no conversation_id yet, so that overwrite never runs),
+    # producing two consecutive user-role messages sent to the model. Slice
+    # at the last user-role message instead, which is correct in both cases.
+    last_user_idx = next(
+        (i for i in range(len(req.messages) - 1, -1, -1) if req.messages[i]["role"] == "user"),
+        None,
     )
+    last_user_message = req.messages[last_user_idx]["content"] if last_user_idx is not None else None
+    history = req.messages[:last_user_idx] if last_user_idx is not None else req.messages
 
     exec_req = ExecutionRequest(
         user=user,
         exec_type="rag_chat" if req.collection else "chat",
-        history=req.messages[:-1],
+        history=history,
         last_user_message=last_user_message,
         last_user_display_content=req.last_user_display_content,
         last_user_attachments=req.last_user_attachments,

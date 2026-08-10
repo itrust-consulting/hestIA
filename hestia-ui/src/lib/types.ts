@@ -50,15 +50,14 @@ export type ChatMessage = {
    *  timestamps in actions.ts — set once and never recomputed, so it
    *  survives the id swap from a local temp id to the persisted message id. */
   thinkingSecs?: number;
-  /** True while the server is compacting conversation context before this
-   *  turn's real generation begins; drives the "Compacting…" label instead
-   *  of the generic "Thinking" placeholder. Stops mattering once thinking or
-   *  content starts arriving, never explicitly cleared. */
-  compacting?: boolean;
   /** True when generation was interrupted by the user clicking Stop (or the
    *  stream otherwise aborted) rather than finishing normally -- drives a
    *  "Generation stopped" note instead of implying the reply is complete. */
   stopped?: boolean;
+  /** True when this turn's history was over budget and the server is
+   *  folding it before it can start generating -- swaps the "Thinking"
+   *  placeholder's label to "Compacting…". */
+  compacting?: boolean;
   createdAt: number;
   /** Set only for messages loaded from the server; absent for messages pushed
    *  live this session (not yet round-tripped through a fetch). Used to build

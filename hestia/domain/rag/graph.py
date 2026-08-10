@@ -23,6 +23,10 @@ class ExecutionRequest(BaseModel):
     conversation_title: Optional[str] = None
     save_chat: bool = False
     stream: bool = False
+    # Set by RequestHandler._check_and_compact_budget when this turn's
+    # incoming history was over budget and got folded before generation
+    # started -- carried through so the final stream frame can announce it.
+    freed_tokens: Optional[int] = None
 
 
 class Node(BaseModel):

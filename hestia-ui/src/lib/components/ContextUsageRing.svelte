@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { contextBudget, compacting, compactNow } from '$lib/stores/contextBudget';
+  import { contextBudget, compacting, compactNow, announceCompaction } from '$lib/stores/contextBudget';
   import { activeConversationId } from '$lib/stores/conversations';
   import { addToast } from '$lib/stores/toast';
   import { tooltip } from '$lib/actions/tooltip';
@@ -34,12 +34,7 @@
     } else if (status === 'compacted') {
       const after = $contextBudget?.usedTokens ?? null;
       const freed = before != null && after != null ? before - after : null;
-      addToast(
-        freed != null && freed > 0
-          ? `Conversation context compacted — freed ${freed.toLocaleString()} tokens.`
-          : 'Conversation context compacted.',
-        'success',
-      );
+      announceCompaction(freed);
     }
   }
 </script>

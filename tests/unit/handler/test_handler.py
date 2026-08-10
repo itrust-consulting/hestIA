@@ -81,14 +81,21 @@ class TestFormatCitations:
         }
         return p
 
-    def test_deduplicates_by_source(self):
+    def test_gives_every_chunk_its_own_key_even_when_source_repeats(self):
+        # Two chunks from the same document must get DISTINCT keys so the
+        # model can cite them individually for different facts -- if both
+        # got "1", the model could never point at just one of them.
         hits = [
             self._make_point("docA", "chunk1"),
             self._make_point("docA", "chunk2"),
             self._make_point("docB", "chunk3"),
         ]
         _, cite_list = _format_citations(hits)
-        assert len(cite_list) == 2
+        assert len(cite_list) == 3
+        keys = [c["key"] for c in cite_list]
+        assert keys == ["1", "2", "3"]
+        excerpts = [c["excerpt"] for c in cite_list]
+        assert excerpts == ["chunk1", "chunk2", "chunk3"]
 
     def test_keys_are_sequential(self):
         hits = [
@@ -572,7 +579,7 @@ class TestSvc:
 
 class TestWrapStream:
 
-    def _make_persist_chat(self):
+    def _make_persist_chat(self, generator=None):
         from hestia.handler import PersistChat
         runner = MagicMock()
         req = MagicMock()
@@ -583,11 +590,12 @@ class TestWrapStream:
         req.last_user_attachments = None
         req.conversation_title = None
         req.model_kwargs = {}
+        req.freed_tokens = None
 
         users_svc = MagicMock()
         users_svc.create_user_conversation.return_value = uuid.uuid4()
         users_svc.append_conversation_message.return_value = uuid.uuid4()
-        runner.container.services.get.return_value = users_svc
+        runner.container.services.get.side_effect = lambda name: {"users": users_svc, "generate": generator}.get(name)
 
         pc = PersistChat(runner=runner, req=req)
         pc.users = users_svc
@@ -662,6 +670,61 @@ class TestWrapStream:
         output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
         last = json.loads(output[-1].decode())
         assert "used_tokens" not in last
+
+    def test_over_budget_after_persist_reports_needs_compaction_without_compacting(self):
+        # Auto-compaction never runs as part of finishing this turn -- it
+        # only fires at the start of a later turn (see
+        # RequestHandler._check_and_compact_budget /
+        # TestStreamWithBudgetNotice). If this reply pushed the conversation
+        # over budget, the final frame must say so (needs_compaction: True)
+        # without actually folding anything itself.
+        import json
+        generator = MagicMock()
+        generator.chat = AsyncMock(return_value="a concise summary")
+        pc, req = self._make_persist_chat(generator=generator)
+        pc.users.assert_conversation_owner = MagicMock()
+        pc.users.get_conversation_context_state.return_value = {}
+        big_tail = [
+            {"role": "user" if i % 2 == 0 else "assistant", "content": "word " * 100,
+             "created_at": i, "rowid": i}
+            for i in range(20)
+        ]
+        pc.users.get_messages_after_boundary.return_value = big_tail
+        pc.runner.container.settings.max_context_tokens = 200
+        pc.runner.container.settings.summary_target_tokens = 20
+
+        chunks = ["hello"]
+        output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
+        last = json.loads(output[-1].decode())
+
+        generator.chat.assert_not_awaited()
+        pc.users.update_conversation_context_summary.assert_not_called()
+        assert last["needs_compaction"] is True
+        assert "freed_tokens" not in last
+        assert last["used_tokens"] > 0
+
+    def test_freed_tokens_from_prior_compaction_surfaces_in_final_frame(self):
+        # If this turn started over budget, RequestHandler._stream_with_
+        # budget_notice already folded the history and set req.freed_tokens
+        # BEFORE generation began. _usage_fields must pass that through
+        # verbatim, not recompute or ignore it.
+        import json
+        pc, req = self._make_persist_chat()
+        pc.users.assert_conversation_owner = MagicMock()
+        pc.users.get_conversation_context_state.return_value = {}
+        pc.users.get_messages_after_boundary.return_value = [
+            {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
+        ]
+        pc.runner.container.settings.max_context_tokens = 32000
+        pc.runner.container.settings.summary_target_tokens = 6000
+        req.freed_tokens = 750
+
+        chunks = ["hello"]
+        output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
+        last = json.loads(output[-1].decode())
+
+        assert last["freed_tokens"] == 750
+        assert last["needs_compaction"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -946,11 +1009,12 @@ class TestRequestHandlerResolve:
 
 
 # ---------------------------------------------------------------------------
-# RequestHandler._stream_with_budget_notice — context budget check runs
-# before streaming; a {"status": "compacting"} frame (distinct from
-# "thinking"/"content") is emitted when compaction is needed, so the frontend
-# can swap the existing "Thinking" placeholder's label to "Compacting…"
-# without ever writing literal status text into the message body.
+# RequestHandler._stream_with_budget_notice — auto-compaction runs at the
+# START of a turn whose incoming history is already over budget, before
+# generation begins for that turn. It never runs as a side effect of the
+# turn that just finished (that would delay/interrupt content that's
+# already streaming); it only ever fires the next time a user submits a
+# query while the conversation is over budget.
 # ---------------------------------------------------------------------------
 
 class TestStreamWithBudgetNotice:
@@ -993,7 +1057,13 @@ class TestStreamWithBudgetNotice:
     async def _collect(self, agen):
         return [chunk async for chunk in agen]
 
-    def test_yields_compacting_status_frame_when_compaction_needed(self):
+    def test_over_budget_compacts_before_generation_starts(self):
+        # This is the only place auto-compaction can fire: the incoming
+        # turn's history is already over budget, so it must emit a
+        # "compacting" status frame, then fold BEFORE generation starts, and
+        # req.freed_tokens must carry the result so the final frame can
+        # announce it.
+        import json
         users = MagicMock()
         users.get_conversation_context_state.return_value = {}
         big_tail = [
@@ -1010,13 +1080,13 @@ class TestStreamWithBudgetNotice:
 
         chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
 
-        first = json.loads(chunks[0])
-        assert first == {"status": "compacting"}
+        assert json.loads(chunks[0].decode()) == {"status": "compacting"}
         assert chunks[1:] == [b'{"content": "hi"}\n']
         generator.chat.assert_awaited_once()
         users.update_conversation_context_summary.assert_called_once()
         assert req.history is not None
-        assert req.history[0]["role"] == "system"
+        assert len(req.history) < len(big_tail)
+        assert req.freed_tokens is not None and req.freed_tokens > 0
 
     def test_no_status_frame_when_under_budget(self):
         users = MagicMock()
@@ -1045,3 +1115,25 @@ class TestStreamWithBudgetNotice:
         asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
 
         users.get_conversation_context_state.assert_not_called()
+
+    def test_provider_failure_during_retrieval_degrades_gracefully(self):
+        # A provider failure (e.g. Qdrant search) can happen inside
+        # runner.run() itself -- before any chunk exists -- not just while
+        # iterating the resulting generator. Must still degrade to an
+        # in-band ⚠️ frame instead of crashing the stream.
+        from hestia.domain.exceptions import ProviderError
+
+        users = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        users.get_messages_after_boundary.return_value = [
+            {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
+        ]
+        generator = MagicMock()
+        h = self._handler(users, generator)
+        h.runner.run = AsyncMock(side_effect=ProviderError("vector search failed"))
+        req = self._req()
+
+        chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        assert len(chunks) == 1
+        assert b"vector search failed" in chunks[0]

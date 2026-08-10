@@ -123,7 +123,7 @@
   let thinkingExpanded: Record<string, boolean> = {};
 
   function thinkingLabel(m: ChatMessage, isActive: boolean): string {
-    if (m.compacting && !m.thinking && !m.content) return 'Compacting…';
+    if (m.compacting && !m.thinking) return 'Compacting…';
     if (m.thinkingSecs != null) return `Thought for ${m.thinkingSecs}s`;
     return isActive ? 'Thinking' : 'Thought';
   }

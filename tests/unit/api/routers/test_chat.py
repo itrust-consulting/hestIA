@@ -62,7 +62,11 @@ class TestChatRouter:
         call_req = handler.resolve.call_args[0][0]
         assert call_req.exec_type == "chat"
 
-    def test_history_excludes_last_message(self):
+    def test_history_excludes_current_turn_and_trailing_placeholder(self):
+        # Mirrors the real frontend payload shape (actions.ts always appends
+        # the current user message plus an empty assistant placeholder
+        # before calling this endpoint) -- history must exclude BOTH, not
+        # just the trailing placeholder.
         handler = MagicMock()
         handler.resolve = AsyncMock(return_value="response")
 
@@ -70,12 +74,37 @@ class TestChatRouter:
             {"role": "user", "content": "msg1"},
             {"role": "assistant", "content": "reply"},
             {"role": "user", "content": "msg2"},
+            {"role": "assistant", "content": ""},
         ]
         client = TestClient(_app(handler=handler))
         client.post("/chat", json={"messages": messages})
         call_req = handler.resolve.call_args[0][0]
-        # history = messages[:-1]
-        assert len(call_req.history) == 2
+        assert call_req.history == [
+            {"role": "user", "content": "msg1"},
+            {"role": "assistant", "content": "reply"},
+        ]
+        assert call_req.last_user_message == "msg2"
+
+    def test_first_message_of_new_conversation_has_empty_history(self):
+        # Regression test: on a brand-new conversation there is no prior
+        # conversation_id, so RequestHandler's DB-based history reconstruction
+        # never runs -- whatever this route computes is what the model sees
+        # unmodified. history must be empty here, not contain the current
+        # question (which would send it to the model twice, back-to-back,
+        # with no assistant turn between -- breaking chat-template
+        # alternation and looking like retrieval/context "isn't working").
+        handler = MagicMock()
+        handler.resolve = AsyncMock(return_value="response")
+
+        messages = [
+            {"role": "user", "content": "what does this policy say about backups?"},
+            {"role": "assistant", "content": ""},
+        ]
+        client = TestClient(_app(handler=handler))
+        client.post("/chat", json={"messages": messages, "collection": "my-col"})
+        call_req = handler.resolve.call_args[0][0]
+        assert call_req.history == []
+        assert call_req.last_user_message == "what does this policy say about backups?"
 
     def test_returns_streaming_response_when_stream_true(self):
         async def _stream_gen():

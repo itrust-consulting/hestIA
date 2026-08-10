@@ -143,6 +143,44 @@ class TestCheckContextBudget:
 
 
 # ---------------------------------------------------------------------------
+# check_context_budget(force=True) -- manual compaction
+# ---------------------------------------------------------------------------
+
+class TestCheckContextBudgetForce:
+
+    def test_force_compacts_even_when_comfortably_under_budget(self):
+        settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
+        tail = [_msg("user" if i % 2 == 0 else "assistant", "hi", i, i) for i in range(20)]
+        check = check_context_budget(None, tail, settings, force=True)
+        assert check.needs_compaction is True
+        assert check.fold
+        assert check.keep
+        assert check.fold + check.keep == tail
+
+    def test_force_still_reports_not_needed_when_tail_too_short_to_fold(self):
+        settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
+        tail = [_msg("user", "hi", 1, 1)]
+        check = check_context_budget(None, tail, settings, force=True)
+        assert check.needs_compaction is False
+
+    def test_force_keeps_only_min_keep_messages(self):
+        settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
+        tail = [_msg("user" if i % 2 == 0 else "assistant", "hi", i, i) for i in range(20)]
+        check = check_context_budget(None, tail, settings, force=True)
+        # snapped forward to a user-role boundary, so keep may be slightly
+        # larger than MIN_KEEP_MESSAGES but never dramatically so
+        assert len(check.keep) <= 6
+        assert check.keep[0]["role"] == "user"
+
+    def test_default_is_unaffected_by_force_param(self):
+        # force omitted entirely must be byte-identical to today's behavior
+        settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
+        tail = [_msg("user", "hi", 1, 1), _msg("assistant", "hello", 2, 2)]
+        check = check_context_budget(None, tail, settings)
+        assert check.needs_compaction is False
+
+
+# ---------------------------------------------------------------------------
 # fetch_budget_inputs
 # ---------------------------------------------------------------------------
 

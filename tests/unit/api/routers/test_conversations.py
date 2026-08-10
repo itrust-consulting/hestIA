@@ -102,6 +102,26 @@ class TestCompactConversation:
         generator.chat.assert_not_awaited()
         users.update_conversation_context_summary.assert_not_called()
 
+    def test_compacts_even_when_under_budget_since_manual_is_forced(self):
+        long_tail = [
+            {"role": "user" if i % 2 == 0 else "assistant", "content": "hi",
+             "created_at": i, "rowid": i}
+            for i in range(20)
+        ]
+        users = _users(long_tail)
+        generator = MagicMock()
+        generator.chat = AsyncMock(return_value="a concise summary")
+        handler = _handler(users, generator, max_context_tokens=100_000, summary_target_tokens=20)
+
+        client = TestClient(_app(handler=handler))
+        resp = client.post(f"/conversations/{uuid.uuid4()}/compact")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "compacted"
+        generator.chat.assert_awaited_once()
+        users.update_conversation_context_summary.assert_called_once()
+
     def test_compacts_when_over_budget(self):
         big_tail = [
             {"role": "user" if i % 2 == 0 else "assistant", "content": "word " * 100,

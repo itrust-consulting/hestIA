@@ -108,7 +108,7 @@ async def compact_conversation(
     settings = h.container.settings
     conversation_id = uuid.UUID(cid)
     prior_summary, tail = fetch_budget_inputs(users, user.id, conversation_id)
-    check = check_context_budget(prior_summary, tail, settings)
+    check = check_context_budget(prior_summary, tail, settings, force=True)
     if not check.needs_compaction:
         return CompactOut(
             status="not_needed", used_tokens=check.tokens, max_tokens=settings.max_context_tokens,

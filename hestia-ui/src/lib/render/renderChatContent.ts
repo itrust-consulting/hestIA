@@ -38,18 +38,27 @@ export function renderWithCitations(md: string, citations?: Citation[]): string 
   const html = renderChatContent(cleaned);
   if (!citations?.length) return html;
 
-  const citationMap = new Map(citations.map(c => [normalizeKey(c.key), c]));
+  // Each retrieved chunk gets its own unique key (see _format_citations in
+  // handler.py), so a key normally maps to exactly one citation. Still grouped
+  // into arrays because a single \cite{} marker can reference several keys
+  // together (\cite{1,2}) when a claim draws on more than one chunk -- that
+  // case must page through all of them, not just the first.
+  const citationMap = new Map<string, Citation[]>();
+  for (const c of citations) {
+    const k = normalizeKey(c.key);
+    const group = citationMap.get(k);
+    if (group) group.push(c);
+    else citationMap.set(k, [c]);
+  }
 
   return html.replace(/\\cite\{([^}]+)\}/g, (_match, group: string) => {
     const keys = group.split(',').map((s: string) => s.trim());
-    const first = citationMap.get(normalizeKey(keys[0]));
+    const first = citationMap.get(normalizeKey(keys[0]))?.[0];
     if (!first) return _match;
 
     const label = shortLabel(first);
-    const extra = keys.length > 1 ? ` +${keys.length - 1}` : '';
-    const chipCitations = keys
-      .map(k => citationMap.get(normalizeKey(k)))
-      .filter(Boolean);
+    const chipCitations = keys.flatMap(k => citationMap.get(normalizeKey(k)) ?? []);
+    const extra = chipCitations.length > 1 ? ` +${chipCitations.length - 1}` : '';
 
     return `<span class="cite-chip" data-cites="${escAttr(JSON.stringify(chipCitations))}">${escAttr(label)}${extra}</span>`;
   });

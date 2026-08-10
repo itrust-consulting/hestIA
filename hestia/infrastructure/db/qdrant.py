@@ -4,19 +4,28 @@ import logging
 import time
 from typing import Any, Callable, Dict
 
+import httpx
 from qdrant_client import QdrantClient, models
-from qdrant_client.http.exceptions import UnexpectedResponse
+from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
+from hestia.domain.exceptions import ProviderError
 from hestia.domain.rag.types import DenseVector, HybridQuery, Query, SparseVector
 from hestia.infrastructure.db.protocol import DBProvider
 
 _log = logging.getLogger("hestia.system")
 
 
-def _retry_on_rate_limit(fn: Callable, *args, max_attempts: int = 4, base_delay: float = 0.5, **kwargs):
-    """Qdrant returns 429 under load; this is an expected, recoverable
-    condition (unlike other 4xx responses), so retry with backoff instead
-    of failing the request outright."""
+def _retry_on_transient_error(fn: Callable, *args, max_attempts: int = 2, base_delay: float = 0.5, **kwargs):
+    """Retries on transient, recoverable failures: Qdrant returning 429 under
+    load, or a stale/reset pooled connection (ResponseHandlingException
+    wrapping a raw socket error, e.g. the peer closing an idle keep-alive
+    connection) -- both are expected conditions worth retrying on a fresh
+    connection, unlike a genuine 4xx/5xx from Qdrant itself. Kept low (2, not
+    the previous 4): a deterministic failure (e.g. a client-side path/MTU
+    problem where the request body itself never gets through) doesn't get
+    better on the 3rd or 4th try, so extra attempts just add tens of seconds
+    of user-facing wait for no benefit -- genuinely transient blips still
+    recover within one retry."""
     for attempt in range(max_attempts):
         try:
             return fn(*args, **kwargs)
@@ -25,6 +34,26 @@ def _retry_on_rate_limit(fn: Callable, *args, max_attempts: int = 4, base_delay:
                 raise
             _log.warning("qdrant_rate_limited_retry", extra={"attempt": attempt})
             time.sleep(base_delay * (2 ** attempt))
+        except ResponseHandlingException:
+            if attempt == max_attempts - 1:
+                raise
+            _log.warning("qdrant_connection_retry", extra={"attempt": attempt})
+            time.sleep(base_delay * (2 ** attempt))
+
+
+def _qdrant_call(fn: Callable, *args, **kwargs):
+    """Runs a Qdrant client call with the same retry as
+    _retry_on_transient_error, and converts an exhausted connection failure
+    (Qdrant unreachable -- DNS failure, connection refused, etc.) into a
+    domain ProviderError. Without this, callers like the admin
+    collection-list/detail endpoints see a raw httpx/qdrant transport
+    exception escape uncaught, crashing the ASGI app instead of returning a
+    clean HTTP error response."""
+    try:
+        return _retry_on_transient_error(fn, *args, **kwargs)
+    except ResponseHandlingException as e:
+        _log.warning("qdrant_call_failed", extra={"fn": getattr(fn, "__name__", str(fn))})
+        raise ProviderError(f"Vector database request failed: {e.source}") from e
 
 
 class QdrantDB(DBProvider):
@@ -32,7 +61,18 @@ class QdrantDB(DBProvider):
     UPSERT_BATCH = 64  # points per request — keeps payload size manageable
 
     def __init__(self, http: str, timeout: float = 300.0, api_key: str | None = None):
-        self.client = QdrantClient(url=http, timeout=timeout, api_key=api_key)
+        # qdrant-client disables HTTP keep-alive automatically for literal
+        # localhost/127.0.0.1 deployments (its own comment: "may cause extra
+        # delays" -- see qdrant_remote.py), but our deployment goes through a
+        # remote reverse proxy (e.g. qdrant.itrust.lu), which never matches
+        # that check. Without this, httpx pools/reuses connections that the
+        # proxy can silently kill server-side, surfacing as a
+        # ResponseHandlingException (WinError 10054) only once reused --
+        # disabling keep-alive here applies the same workaround unconditionally.
+        self.client = QdrantClient(
+            url=http, timeout=timeout, api_key=api_key,
+            limits=httpx.Limits(max_connections=None, max_keepalive_connections=0),
+        )
 
     # @MRS-024, @MRS-093
     def initialize(self, collection: str, config: Dict[str, Any]) -> None:
@@ -119,53 +159,64 @@ class QdrantDB(DBProvider):
             "has_filter": filter_ is not None,
         })
 
-        # @MRS-027
-        if isinstance(query, HybridQuery):
-            result = self.client.query_points(
-                collection_name=collection,
-                prefetch=[
-                    models.Prefetch(
-                        query=models.SparseVector(indices=query.sparse.indices, values=query.sparse.values),
-                        using="sparse",
-                        limit=200,
-                        filter=filter_,
-                    ),
-                    models.Prefetch(
-                        query=query.dense.vector,
-                        using="dense",
-                        limit=100,
-                        filter=filter_,
-                    ),
-                ],
-                query=models.FusionQuery(fusion=models.Fusion.RRF),
-                limit=limit,
-                with_payload=True,
-            )
-        elif isinstance(query, SparseVector):
-            result = self.client.query_points(
-                collection_name=collection,
-                query=models.SparseVector(indices=query.indices, values=query.values),
-                using="sparse",
-                limit=limit,
-                with_payload=with_payload,
-                with_vectors=with_vectors,
-                score_threshold=score_threshold,
-                query_filter=filter_,
-            )
-        # @MRS-030
-        elif isinstance(query, DenseVector):
-            result = self.client.query_points(
-                collection_name=collection,
-                query=query.vector,
-                using="dense",
-                limit=limit,
-                with_payload=with_payload,
-                with_vectors=with_vectors,
-                score_threshold=score_threshold,
-                query_filter=filter_,
-            )
-        else:
-            raise TypeError(f"Unsupported query type: {type(query)}")
+        try:
+            # @MRS-027
+            if isinstance(query, HybridQuery):
+                result = _retry_on_transient_error(
+                    self.client.query_points,
+                    collection_name=collection,
+                    prefetch=[
+                        models.Prefetch(
+                            query=models.SparseVector(indices=query.sparse.indices, values=query.sparse.values),
+                            using="sparse",
+                            limit=200,
+                            filter=filter_,
+                        ),
+                        models.Prefetch(
+                            query=query.dense.vector,
+                            using="dense",
+                            limit=100,
+                            filter=filter_,
+                        ),
+                    ],
+                    query=models.FusionQuery(fusion=models.Fusion.RRF),
+                    limit=limit,
+                    with_payload=True,
+                )
+            elif isinstance(query, SparseVector):
+                result = _retry_on_transient_error(
+                    self.client.query_points,
+                    collection_name=collection,
+                    query=models.SparseVector(indices=query.indices, values=query.values),
+                    using="sparse",
+                    limit=limit,
+                    with_payload=with_payload,
+                    with_vectors=with_vectors,
+                    score_threshold=score_threshold,
+                    query_filter=filter_,
+                )
+            # @MRS-030
+            elif isinstance(query, DenseVector):
+                result = _retry_on_transient_error(
+                    self.client.query_points,
+                    collection_name=collection,
+                    query=query.vector,
+                    using="dense",
+                    limit=limit,
+                    with_payload=with_payload,
+                    with_vectors=with_vectors,
+                    score_threshold=score_threshold,
+                    query_filter=filter_,
+                )
+            else:
+                raise TypeError(f"Unsupported query type: {type(query)}")
+        except ResponseHandlingException as e:
+            # Retries in _retry_on_transient_error are exhausted -- surface as
+            # a domain error so callers (e.g. the chat stream) can degrade
+            # gracefully instead of a raw connection error crashing the
+            # response mid-stream.
+            _log.warning("qdrant_search_failed", extra={"collection": collection})
+            raise ProviderError(f"Vector search failed: {e.source}") from e
 
         n_hits = len(result.points) if hasattr(result, "points") else 0
         _log.debug("qdrant_search_done", extra={"collection": collection, "n_hits": n_hits})
@@ -194,10 +245,10 @@ class QdrantDB(DBProvider):
 
     @property
     def collections(self) -> dict:
-        descs = _retry_on_rate_limit(self.client.get_collections).collections
+        descs = _qdrant_call(self.client.get_collections).collections
         result = []
         for c in descs:
-            info = _retry_on_rate_limit(self.client.get_collection, collection_name=c.name)
+            info = _qdrant_call(self.client.get_collection, collection_name=c.name)
             result.append({
                 "id": c.name,
                 "name": c.name,
@@ -232,7 +283,7 @@ class QdrantDB(DBProvider):
         docs: dict[str, dict] = {}
         offset = None
         while True:
-            results, next_offset = _retry_on_rate_limit(
+            results, next_offset = _qdrant_call(
                 self.client.scroll,
                 collection_name=collection,
                 limit=1000,
@@ -274,9 +325,9 @@ class QdrantDB(DBProvider):
         return docs
 
     def get_collection(self, collection: str) -> dict | None:
-        if not self.client.collection_exists(collection_name=collection):
+        if not _qdrant_call(self.client.collection_exists, collection_name=collection):
             return None
-        info = self.client.get_collection(collection_name=collection)
+        info = _qdrant_call(self.client.get_collection, collection_name=collection)
         docs = self._scroll_documents(collection)
         return {
             "name": collection,
@@ -289,5 +340,5 @@ class QdrantDB(DBProvider):
         """Document counts for every collection, computed sequentially (not
         in parallel) so this single call never itself becomes a burst of
         concurrent scroll requests against Qdrant."""
-        descs = _retry_on_rate_limit(self.client.get_collections).collections
+        descs = _qdrant_call(self.client.get_collections).collections
         return {c.name: len(self._scroll_documents(c.name)) for c in descs}

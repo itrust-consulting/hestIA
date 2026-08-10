@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch, call
 
+import httpx
 import pytest
-from qdrant_client.http.exceptions import UnexpectedResponse
+from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
-from hestia.infrastructure.db.qdrant import QdrantDB, _retry_on_rate_limit
+from hestia.domain.exceptions import ProviderError
+from hestia.infrastructure.db.qdrant import QdrantDB, _retry_on_transient_error
 from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 
 
@@ -22,6 +24,22 @@ def mock_client():
 def db(mock_client):
     with patch("hestia.infrastructure.db.qdrant.QdrantClient", return_value=mock_client):
         return QdrantDB(http="http://localhost:6333")
+
+
+# ---------------------------------------------------------------------------
+# __init__ — HTTP keep-alive disabled (avoids reusing a pooled connection a
+# remote reverse proxy has already silently killed, surfacing as WinError
+# 10054 only once reused)
+# ---------------------------------------------------------------------------
+
+class TestInit:
+
+    def test_disables_keepalive_on_client_construction(self, mock_client):
+        with patch("hestia.infrastructure.db.qdrant.QdrantClient", return_value=mock_client) as MockClient:
+            QdrantDB(http="https://qdrant.itrust.lu:6333")
+        limits = MockClient.call_args.kwargs["limits"]
+        assert isinstance(limits, httpx.Limits)
+        assert limits.max_keepalive_connections == 0
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +126,27 @@ class TestSearch:
         db.search("col", query)
         assert mock_client.search.called or mock_client.query_points.called
 
+    def test_retries_and_recovers_from_stale_connection(self, db, mock_client, monkeypatch):
+        # A stale pooled connection to Qdrant (e.g. the peer closing an idle
+        # keep-alive connection) surfaces as ResponseHandlingException --
+        # this must be retried transparently, not crash the search.
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        mock_client.query_points.side_effect = [
+            ResponseHandlingException(ConnectionResetError("reset")),
+            MagicMock(points=[]),
+        ]
+        query = DenseVector(vector=[0.1, 0.2])
+        result = db.search("col", query)
+        assert result.points == []
+        assert mock_client.query_points.call_count == 2
+
+    def test_raises_provider_error_when_connection_never_recovers(self, db, mock_client, monkeypatch):
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        mock_client.query_points.side_effect = ResponseHandlingException(ConnectionResetError("reset"))
+        query = DenseVector(vector=[0.1, 0.2])
+        with pytest.raises(ProviderError):
+            db.search("col", query)
+
 
 # ---------------------------------------------------------------------------
 # delete_collection
@@ -162,6 +201,29 @@ class TestBuildFilter:
 
 
 # ---------------------------------------------------------------------------
+# collections
+# ---------------------------------------------------------------------------
+
+class TestCollections:
+
+    def test_lists_collections_with_point_counts(self, db, mock_client):
+        mock_client.get_collections.return_value = MagicMock(
+            collections=[_collection_desc("a"), _collection_desc("b")]
+        )
+        mock_client.get_collection.return_value = MagicMock(points_count=5, status=MagicMock(value="green"))
+        result = db.collections
+        assert [c["name"] for c in result["collections"]] == ["a", "b"]
+
+    def test_raises_provider_error_when_qdrant_unreachable(self, db, mock_client, monkeypatch):
+        # e.g. Qdrant's container is down / DNS resolution fails -- must not
+        # let a raw transport exception escape and crash the ASGI app.
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        mock_client.get_collections.side_effect = ResponseHandlingException(OSError("getaddrinfo failed"))
+        with pytest.raises(ProviderError):
+            _ = db.collections
+
+
+# ---------------------------------------------------------------------------
 # get_collection — deduplication
 # ---------------------------------------------------------------------------
 
@@ -171,6 +233,12 @@ class TestGetCollection:
         mock_client.collection_exists.return_value = False
         result = db.get_collection("missing")
         assert result is None
+
+    def test_raises_provider_error_when_qdrant_unreachable(self, db, mock_client, monkeypatch):
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        mock_client.collection_exists.side_effect = ResponseHandlingException(OSError("getaddrinfo failed"))
+        with pytest.raises(ProviderError):
+            db.get_collection("col")
 
     def test_deduplicates_points_by_source_uri(self, db, mock_client):
         mock_client.collection_exists.return_value = True
@@ -221,6 +289,12 @@ class TestDocumentCounts:
         result = db.document_counts()
         assert result == {"col-a": 2, "col-b": 1}
 
+    def test_raises_provider_error_when_qdrant_unreachable(self, db, mock_client, monkeypatch):
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        mock_client.get_collections.side_effect = ResponseHandlingException(OSError("getaddrinfo failed"))
+        with pytest.raises(ProviderError):
+            db.document_counts()
+
     def test_scrolls_once_per_collection_sequentially(self, db, mock_client):
         mock_client.get_collections.return_value = MagicMock(
             collections=[_collection_desc("x"), _collection_desc("y"), _collection_desc("z")]
@@ -232,28 +306,28 @@ class TestDocumentCounts:
 
 
 # ---------------------------------------------------------------------------
-# _retry_on_rate_limit
+# _retry_on_transient_error
 # ---------------------------------------------------------------------------
 
-class TestRetryOnRateLimit:
+class TestRetryOnTransientError:
 
     def test_returns_result_on_success(self):
         fn = MagicMock(return_value="ok")
-        assert _retry_on_rate_limit(fn) == "ok"
+        assert _retry_on_transient_error(fn) == "ok"
         fn.assert_called_once()
 
     def test_raises_immediately_on_non_429(self):
         err = UnexpectedResponse(status_code=500, reason_phrase="Error", content=b"", headers={})
         fn = MagicMock(side_effect=err)
         with pytest.raises(UnexpectedResponse):
-            _retry_on_rate_limit(fn)
+            _retry_on_transient_error(fn)
         fn.assert_called_once()
 
     def test_retries_then_succeeds_on_429(self, monkeypatch):
         monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
         err = UnexpectedResponse(status_code=429, reason_phrase="Too Many Requests", content=b"", headers={})
         fn = MagicMock(side_effect=[err, "ok"])
-        assert _retry_on_rate_limit(fn) == "ok"
+        assert _retry_on_transient_error(fn) == "ok"
         assert fn.call_count == 2
 
     def test_raises_after_exhausting_attempts(self, monkeypatch):
@@ -261,5 +335,29 @@ class TestRetryOnRateLimit:
         err = UnexpectedResponse(status_code=429, reason_phrase="Too Many Requests", content=b"", headers={})
         fn = MagicMock(side_effect=err)
         with pytest.raises(UnexpectedResponse):
-            _retry_on_rate_limit(fn, max_attempts=3)
-        assert fn.call_count == 3
+            _retry_on_transient_error(fn, max_attempts=3)
+
+    def test_retries_then_succeeds_on_stale_connection(self, monkeypatch):
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        err = ResponseHandlingException(ConnectionResetError("reset"))
+        fn = MagicMock(side_effect=[err, "ok"])
+        assert _retry_on_transient_error(fn) == "ok"
+        assert fn.call_count == 2
+
+    def test_raises_after_exhausting_attempts_on_stale_connection(self, monkeypatch):
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        err = ResponseHandlingException(ConnectionResetError("reset"))
+        fn = MagicMock(side_effect=err)
+        with pytest.raises(ResponseHandlingException):
+            _retry_on_transient_error(fn, max_attempts=3)
+
+    def test_default_max_attempts_is_two(self, monkeypatch):
+        # A deterministic failure (e.g. a client-side path/MTU problem) never
+        # recovers on a 3rd or 4th try -- keep the default low so a doomed
+        # call doesn't make the user wait tens of extra seconds for nothing.
+        monkeypatch.setattr("hestia.infrastructure.db.qdrant.time.sleep", lambda *_: None)
+        err = ResponseHandlingException(ConnectionResetError("reset"))
+        fn = MagicMock(side_effect=err)
+        with pytest.raises(ResponseHandlingException):
+            _retry_on_transient_error(fn)
+        assert fn.call_count == 2

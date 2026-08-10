@@ -8,7 +8,7 @@ import {
 } from '$lib/stores/chat';
 
 import { activeConversationId, loadConversations, forceEvictStaleHeadNow } from '$lib/stores/conversations';
-import { setContextBudget } from '$lib/stores/contextBudget';
+import { setContextBudget, announceCompaction } from '$lib/stores/contextBudget';
 import { activeCorpusName } from '$lib/stores/isms';
 import { api } from '$lib/api/client';
 import type { ContentPart } from '$lib/types';
@@ -105,7 +105,7 @@ export async function streamFromHistoryInto(
       model: 'ministral-3:14b',
       model_kwargs: {},
       collection: get(activeCorpusName),
-      query_kwargs: { limit: 10 },
+      query_kwargs: { limit: 20 },
       stream: true,
       conversation_id: get(activeConversationId),
       save_chat: true,
@@ -162,6 +162,9 @@ export async function streamFromHistoryInto(
             activeConversationId.set(obj.conversation_id);
             await loadConversations();
             setContextBudget(obj.used_tokens, obj.max_tokens, obj.needs_compaction);
+            if (obj.freed_tokens != null) {
+              announceCompaction(obj.freed_tokens);
+            }
           }
           if (obj.user_message_id) {
             updateMessage(userTempId, { id: obj.user_message_id });
@@ -178,6 +181,8 @@ export async function streamFromHistoryInto(
               ...(obj.thinking ? { thinking: obj.thinking } : {}),
             });
           }
+        } else if (obj.status === 'compacting') {
+          updateMessage(assistantTempId, { compacting: true });
         } else if (typeof obj.thinking === 'string') {
           if (thinkingStartedAt == null) thinkingStartedAt = Date.now();
           messages.update(m =>
@@ -187,8 +192,6 @@ export async function streamFromHistoryInto(
                 : msg
             )
           );
-        } else if (obj.status === 'compacting') {
-          updateMessage(assistantTempId, { compacting: true });
         }
       }
 
