@@ -3,13 +3,15 @@
     export let open: boolean = false;
     export let onClose: () => void;
     export let wide: boolean = false;
+    export let xl: boolean = false;
+    export let closeLabel: string = "Close";
 </script>
 
 {#if open}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="modal-overlay" on:click={onClose}>
-        <div class="modal-window" class:wide on:click|stopPropagation>
+        <div class="modal-window" class:wide class:xl on:click|stopPropagation>
             <header class="modal-header">
             <h2 class="modal-title">
                 <slot name="title">{title}</slot>
@@ -24,7 +26,7 @@
                 <slot name="footer" />
 
                 <button on:click={onClose} class="close-btn">
-                    Close
+                    {closeLabel}
                 </button>
             </footer>
 
@@ -47,6 +49,7 @@
         width: min(60vw, 1100px);
         max-width: 60vw;
         max-height: 70vh;
+        transition: width 180ms ease, max-width 180ms ease, max-height 180ms ease;
         background: var(--color-white);
         border-radius: var(--radius-xl);
         padding: 1.25rem;
@@ -55,6 +58,12 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+    }
+
+    .modal-window.xl {
+        width: min(85vw, 1400px);
+        max-width: 85vw;
+        max-height: 88vh;
     }
 
     @keyframes fadeIn {

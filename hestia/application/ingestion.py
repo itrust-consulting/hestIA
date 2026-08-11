@@ -77,8 +77,11 @@ class IngestionPipeline:
         })
 
         parser = self._get_parser(file_path, req.itrust_template, req.selected_sheets)
-        body = parser.to_markdown()
-        metadata = parser.get_metadata(builtIn_only=not req.itrust_template, mask_name=req.mask_name)
+        try:
+            body = parser.to_markdown()
+            metadata = parser.get_metadata(builtIn_only=not req.itrust_template, mask_name=req.mask_name)
+        finally:
+            parser.close()
 
         # If the file was written to a temp path, restore the original name so it
         # doesn't leak into source / source_uri / document_id.

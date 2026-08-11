@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
   import DocumentUploadModal from '$lib/components/modals/DocumentUploadModal.svelte';
+  import SyncFolderModal from '$lib/components/modals/SyncFolderModal.svelte';
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import type { AccessGrant, Collection, CollectionDocument, Org } from '$lib/types';
@@ -108,7 +109,10 @@
 
   // ── Upload / replace ───────────────────────────────────────────────────
   let uploadOpen = $state(false);
+  let syncOpen = $state(false);
   let confirmingReplace = $state<CollectionDocument | null>(null);
+
+  async function handleSyncSuccess() { await invalidateAll(); }
 
   async function handleUploadSuccess() { await invalidateAll(); }
 
@@ -131,7 +135,8 @@
       <span class="badge {statusClass(c.status)}">{c.status}</span>
     </div>
     <div class="page-header-right">
-      <button class="action-btn" onclick={() => (uploadOpen = true)}>Add document</button>
+      <button class="add-btn" onclick={() => (uploadOpen = true)}>Add document</button>
+      <button class="sync-btn" onclick={() => (syncOpen = true)}>Sync folder</button>
       {#if data.canManage}
         <button class="secondary-btn" onclick={openManageAccess}>Manage access</button>
         <button class="danger-btn" onclick={() => (confirmDelete = true)}>Delete collection</button>
@@ -220,6 +225,14 @@
   collectionName={c.id}
   defaultTenants={c.access.map(a => a.abbreviation)}
   onSuccess={handleUploadSuccess}
+/>
+
+<SyncFolderModal
+  open={syncOpen}
+  onClose={() => (syncOpen = false)}
+  collectionName={c.id}
+  defaultTenants={c.access.map(a => a.abbreviation)}
+  onSuccess={handleSyncSuccess}
 />
 
 <ConfirmDeleteModal
@@ -548,13 +561,21 @@
 .revoke-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────── */
-.action-btn {
+.add-btn {
   background: var(--color-blue-600); color: white;
   padding: 0.5rem 1rem; border-radius: var(--radius-lg);
   cursor: pointer; font-weight: 600; border: none; font-size: var(--text-sm);
 }
-.action-btn:hover:not(:disabled) { background: var(--color-blue-700); }
-.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.add-btn:hover:not(:disabled) { background: var(--color-blue-700); }
+.add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sync-btn {
+  background: var(--color-green-500); color: white;
+  padding: 0.5rem 1rem; border-radius: var(--radius-lg);
+  cursor: pointer; font-weight: 600; border: none; font-size: var(--text-sm);
+}
+.sync-btn:hover:not(:disabled) { background: var(--color-blue-700); }
+.sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .secondary-btn {
   background: var(--color-neutral-100); color: var(--color-neutral-800);

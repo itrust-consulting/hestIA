@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -15,6 +15,18 @@ def _client(mock_async_client, api_key=None):
     client = HttpClient(base_url="http://localhost", api_key=api_key)
     client._client = mock_async_client
     return client
+
+
+def _blocking_client(mock_sync_client, api_key=None):
+    """Build an HttpClient with a mocked httpx.Client injected."""
+    client = HttpClient(base_url="http://localhost", api_key=api_key)
+    client._sync_client = mock_sync_client
+    return client
+
+
+def _http_error(status_code, headers=None):
+    response = MagicMock(status_code=status_code, headers=headers or {})
+    return httpx.HTTPStatusError("error", request=MagicMock(), response=response)
 
 
 async def _collect(agen):
@@ -77,6 +89,70 @@ class TestPost:
         )
         with pytest.raises(ProviderError, match="503"):
             asyncio.run(_client(async_client).post("/endpoint", {}))
+
+
+# ---------------------------------------------------------------------------
+# post_blocking (sync ingestion path — retries on 429/503)
+# ---------------------------------------------------------------------------
+
+class TestPostBlocking:
+
+    def test_returns_response(self):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        sync_client = MagicMock()
+        sync_client.post.return_value = mock_resp
+        result = _blocking_client(sync_client).post_blocking("/endpoint", {"key": "val"})
+        assert result is mock_resp
+
+    def test_raises_provider_error_on_timeout(self):
+        sync_client = MagicMock()
+        sync_client.post.side_effect = httpx.TimeoutException("timed out")
+        with pytest.raises(ProviderError, match="timed out"):
+            _blocking_client(sync_client).post_blocking("/endpoint", {})
+
+    def test_raises_provider_error_on_non_retryable_status(self):
+        sync_client = MagicMock()
+        sync_client.post.side_effect = _http_error(400)
+        with pytest.raises(ProviderError, match="400"):
+            _blocking_client(sync_client).post_blocking("/endpoint", {})
+        assert sync_client.post.call_count == 1
+
+    @patch("hestia.infrastructure.http.client.time.sleep")
+    def test_retries_on_429_then_succeeds(self, mock_sleep):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        sync_client = MagicMock()
+        sync_client.post.side_effect = [_http_error(429), _http_error(429), mock_resp]
+
+        result = _blocking_client(sync_client).post_blocking("/endpoint", {})
+
+        assert result is mock_resp
+        assert sync_client.post.call_count == 3
+        assert mock_sleep.call_count == 2
+
+    @patch("hestia.infrastructure.http.client.time.sleep")
+    def test_gives_up_after_max_retries_on_429(self, mock_sleep):
+        sync_client = MagicMock()
+        sync_client.post.side_effect = _http_error(429)  # every call raises
+
+        with pytest.raises(ProviderError, match="429"):
+            _blocking_client(sync_client).post_blocking("/endpoint", {})
+
+        # 1 initial attempt + 3 retries = 4 calls total
+        assert sync_client.post.call_count == 4
+        assert mock_sleep.call_count == 3
+
+    @patch("hestia.infrastructure.http.client.time.sleep")
+    def test_respects_retry_after_header(self, mock_sleep):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        sync_client = MagicMock()
+        sync_client.post.side_effect = [_http_error(429, headers={"Retry-After": "2.5"}), mock_resp]
+
+        _blocking_client(sync_client).post_blocking("/endpoint", {})
+
+        mock_sleep.assert_called_once_with(2.5)
 
 
 # ---------------------------------------------------------------------------

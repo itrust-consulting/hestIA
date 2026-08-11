@@ -2,8 +2,15 @@
   import Modal from '$lib/components/Modal.svelte';
   import InfoIcon from '../icons/infoIcon.svelte';
   import { renderChatContent } from '$lib/render/renderChatContent';
-  import { enqueueUpload } from '$lib/stores/uploadQueue';
+  import { enqueueUpload, createBatchToast } from '$lib/stores/uploadQueue';
   import { tooltip } from '$lib/actions/tooltip';
+  import { fromDataTransferItems, ACCEPTED_EXTS, type SelectedFile } from '$lib/upload/folderSelect';
+  import { sha256Hex } from '$lib/upload/hash';
+
+  // Fixed pseudo sync_id for plain (non-Sync-Folder) uploads — lets these
+  // participate in the same collection-wide content-hash dedup as Sync
+  // Folder sources without the backend needing to special-case "no sync_id".
+  const MANUAL_SYNC_ID = 'manual';
 
   type Props = {
     open: boolean;
@@ -37,9 +44,12 @@
 
   type BatchItem = {
     file: File;
+    /** Relative path (e.g. "docs/guide.md") when the file came from a folder pick/drop. */
+    relPath?: string;
     status: 'pending' | 'parsing' | 'queued' | 'uploading' | 'done' | 'skipped' | 'error';
     error?: string;
     n_chunks?: number;
+    duplicateOf?: string;
   };
 
   let uploadDone = $state(false);
@@ -72,8 +82,7 @@
   const isLastFile  = $derived(batchIndex >= batchFiles.length - 1);
 
   let isDragOver = $state(false);
-  const EXCEL_EXTS    = ['.xlsx', '.xlsm'];
-  const ACCEPTED_EXTS = ['.docx', '.pdf', '.xlsx', '.xlsm', '.json', '.csv', '.txt', '.md', '.markdown', '.pptx'];
+  const EXCEL_EXTS = ['.xlsx', '.xlsm'];
 
   // Excel sheet selection / navigation
   let allSheets: string[]                   = $state([]);
@@ -125,26 +134,38 @@
     isDragOver = false;
     if (autoRunning) return;
 
-    const dropped = Array.from(e.dataTransfer?.files ?? [])
-      .filter(f => ACCEPTED_EXTS.some(ext => f.name.toLowerCase().endsWith(ext)));
-    if (!dropped.length) return;
+    let selected: SelectedFile[];
+    const items = e.dataTransfer?.items;
+    const traversed = items && items.length ? await fromDataTransferItems(items) : null;
+    if (traversed) {
+      selected = traversed;
+    } else {
+      selected = Array.from(e.dataTransfer?.files ?? [])
+        .filter(f => ACCEPTED_EXTS.some(ext => f.name.toLowerCase().endsWith(ext)))
+        .map(f => ({ file: f, relPath: f.name }));
+    }
+    if (!selected.length) return;
 
     if (batchMode === 'interactive' && batchFiles.length > 0) {
-      batchFiles = [...batchFiles, ...dropped];
-      batchItems = [...batchItems, ...dropped.map(f => ({ file: f, status: 'pending' as const }))];
+      batchFiles = [...batchFiles, ...selected.map(s => s.file)];
+      batchItems = [...batchItems, ...selected.map(s => ({ file: s.file, relPath: s.relPath, status: 'pending' as const }))];
     } else {
-      batchFiles = dropped;
-      batchItems = dropped.map(f => ({ file: f, status: 'pending' as const }));
+      toBatch(selected);
       batchIndex = 0;
       resetFileState();
-      if (dropped.length === 1) {
+      if (selected.length === 1) {
         batchMode  = 'interactive';
-        uploadFile = dropped[0];
+        uploadFile = selected[0].file;
         await triggerParse();
       } else {
         batchMode = null;
       }
     }
+  }
+
+  function toBatch(selected: { file: File; relPath?: string }[]) {
+    batchFiles = selected.map(s => s.file);
+    batchItems = selected.map(s => ({ file: s.file, relPath: s.relPath, status: 'pending' as const }));
   }
 
   function resetFileState() {
@@ -175,7 +196,7 @@
   }
 
   function closeModal() {
-    uploadDone = false;
+    openModal();
     onClose();
   }
 
@@ -184,8 +205,7 @@
     const files = Array.from(input.files ?? []);
     if (!files.length) return;
 
-    batchFiles = files;
-    batchItems = files.map(f => ({ file: f, status: 'pending' as const }));
+    toBatch(files.map(f => ({ file: f })));
     batchIndex = 0;
     resetFileState();
 
@@ -210,6 +230,7 @@
   async function startAuto() {
     batchMode   = 'auto';
     autoRunning = true;
+    const batchId = createBatchToast(collectionName, batchFiles.length);
 
     for (let i = 0; i < batchFiles.length; i++) {
       const file = batchFiles[i];
@@ -231,23 +252,27 @@
       batchItems = [...batchItems];
 
       const capturedI = i;
+      const contentHash = await sha256Hex(file);
       enqueueUpload({
         id: crypto.randomUUID(),
         file,
+        relPath: batchItems[i].relPath,
         collection: collectionName,
         tenants: uploadTenants,
         itrTemplate: uploadITR,
         metadata: parsedMeta,
         language: uploadLanguage,
-        onDone: (n_chunks) => {
-          batchItems[capturedI] = { ...batchItems[capturedI], status: 'done', n_chunks };
+        syncId: MANUAL_SYNC_ID,
+        contentHash,
+        onDone: (n_chunks, info) => {
+          batchItems[capturedI] = { ...batchItems[capturedI], status: 'done', n_chunks, duplicateOf: info?.duplicateOf };
           batchItems = [...batchItems];
         },
         onError: (err) => {
           batchItems[capturedI] = { ...batchItems[capturedI], status: 'error', error: err };
           batchItems = [...batchItems];
         },
-      });
+      }, batchId);
     }
 
     autoRunning = false;
@@ -297,13 +322,15 @@
 
   function onITRChange() { if (uploadFile) triggerParse(); }
 
-  function _enqueue(i: number) {
+  async function _enqueue(i: number) {
     const file = batchFiles[i];
     batchItems[i] = { ...batchItems[i], status: 'queued' };
     batchItems = [...batchItems];
+    const contentHash = await sha256Hex(file);
     enqueueUpload({
       id: crypto.randomUUID(),
       file,
+      relPath: batchItems[i].relPath,
       collection: collectionName,
       tenants: uploadTenants,
       itrTemplate: uploadITR,
@@ -311,8 +338,10 @@
       language: uploadLanguage,
       selectedSheets: isExcel && selectedSheets.length > 0 && selectedSheets.length < allSheets.length
         ? [...selectedSheets] : undefined,
-      onDone: (n_chunks) => {
-        batchItems[i] = { ...batchItems[i], status: 'done', n_chunks };
+      syncId: MANUAL_SYNC_ID,
+      contentHash,
+      onDone: (n_chunks, info) => {
+        batchItems[i] = { ...batchItems[i], status: 'done', n_chunks, duplicateOf: info?.duplicateOf };
         batchItems = [...batchItems];
         if (!isBatch) onSuccess?.(collectionName, [...uploadTenants]);
       },
@@ -324,15 +353,15 @@
   }
 
   // @MRS-102
-  function handleUpload() {
+  async function handleUpload() {
     if (!uploadFile) return;
-    _enqueue(batchIndex);
+    await _enqueue(batchIndex);
     if (isBatch) { uploadDone = true; } else { closeModal(); }
   }
 
   async function uploadAndNext() {
     if (!uploadFile) return;
-    _enqueue(batchIndex);
+    await _enqueue(batchIndex);
     if (isLastFile) { uploadDone = true; return; }
     batchIndex++;
     await loadFileAtIndex(batchIndex);
@@ -357,6 +386,8 @@
   {open}
   onClose={closeModal}
   wide={true}
+  xl={parseDone && !uploadDone}
+  closeLabel="Cancel"
 >
 
   <!-- ── Done ──────────────────────────────────────────────────────────── -->
@@ -374,10 +405,11 @@
             {:else if item.status === 'queued' || item.status === 'uploading'}⟳
             {:else}—{/if}
           </span>
-          <span class="batch-filename">{item.file.name}</span>
+          <span class="batch-filename">{item.relPath ?? item.file.name}</span>
           <span class="batch-file-status">
             {#if item.status === 'queued'}Queued…
             {:else if item.status === 'uploading'}Uploading…
+            {:else if item.status === 'done' && item.duplicateOf}Duplicate of {item.duplicateOf}
             {:else if item.status === 'done'}{item.n_chunks} chunks
             {:else if item.status === 'error'}<span class="error-text">{item.error}</span>
             {:else}skipped{/if}
@@ -420,10 +452,11 @@
             {:else if item.status === 'parsing' || item.status === 'queued'}⟳
             {:else}·{/if}
           </span>
-          <span class="batch-filename">{item.file.name}</span>
+          <span class="batch-filename">{item.relPath ?? item.file.name}</span>
           <span class="batch-file-status">
             {#if item.status === 'parsing'}Parsing…
             {:else if item.status === 'queued'}Queued…
+            {:else if item.status === 'done' && item.duplicateOf}Duplicate of {item.duplicateOf}
             {:else if item.status === 'done'}{item.n_chunks} chunks
             {:else if item.status === 'error'}<span class="error-text">{item.error}</span>
             {:else}Pending{/if}
@@ -444,7 +477,7 @@
             class:queue-queued={item.status === 'queued'}
             class:queue-skipped={item.status === 'skipped'}
             class:queue-error={item.status === 'error'}
-            title={item.file.name}
+            title={item.relPath ?? item.file.name}
             onclick={() => { batchIndex = i; loadFileAtIndex(i); }}
           >{i + 1}</button>
         {/each}
@@ -452,7 +485,7 @@
       </div>
     {/if}
 
-    <div class="upload-layout">
+    <div class="upload-layout" class:upload-layout-lg={parseDone}>
       <div class="upload-left">
         <div class="field">
           <span>Collection</span>
@@ -694,6 +727,10 @@
 .upload-layout {
   display: grid; grid-template-columns: 240px 1fr 200px; gap: 1.25rem;
   height: 420px;
+  transition: height 180ms ease;
+}
+.upload-layout.upload-layout-lg {
+  height: min(65vh, 780px);
 }
 .upload-left  { display: flex; flex-direction: column; gap: 0.875rem; overflow-y: auto; min-height: 0; }
 .upload-right { display: flex; flex-direction: column; gap: 0.5rem; position: relative; overflow: hidden; }

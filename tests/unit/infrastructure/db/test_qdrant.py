@@ -179,6 +179,120 @@ class TestDeleteDocument:
 
 
 # ---------------------------------------------------------------------------
+# bump_classification
+# ---------------------------------------------------------------------------
+
+class TestBumpClassification:
+
+    def test_sets_when_no_current_value(self, db, mock_client):
+        point = MagicMock(payload={"access": {}})
+        mock_client.scroll.return_value = ([point], None)
+
+        db.bump_classification("col", "doc.pdf", 3)
+
+        mock_client.set_payload.assert_called_once()
+        kwargs = mock_client.set_payload.call_args.kwargs
+        assert kwargs["payload"] == {"access": {"classification": 3}}
+
+    def test_sets_when_requested_higher_than_current(self, db, mock_client):
+        point = MagicMock(payload={"access": {"classification": 1}})
+        mock_client.scroll.return_value = ([point], None)
+
+        db.bump_classification("col", "doc.pdf", 3)
+
+        mock_client.set_payload.assert_called_once()
+
+    def test_noop_when_current_already_at_or_above_requested(self, db, mock_client):
+        point = MagicMock(payload={"access": {"classification": 3}})
+        mock_client.scroll.return_value = ([point], None)
+
+        db.bump_classification("col", "doc.pdf", 1)
+
+        mock_client.set_payload.assert_not_called()
+
+    def test_noop_when_document_not_found(self, db, mock_client):
+        mock_client.scroll.return_value = ([], None)
+
+        db.bump_classification("col", "doc.pdf", 3)
+
+        mock_client.set_payload.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# get_classifications
+# ---------------------------------------------------------------------------
+
+class TestGetClassifications:
+
+    def test_empty_source_uris_returns_empty_without_querying(self, db, mock_client):
+        assert db.get_classifications("col", []) == {}
+        mock_client.scroll.assert_not_called()
+
+    def test_finds_classification_for_each_uri_in_one_page(self, db, mock_client):
+        points = [
+            MagicMock(payload={"source_uri": "a.pdf", "access": {"classification": 1}}),
+            MagicMock(payload={"source_uri": "b.pdf", "access": {"classification": 3}}),
+        ]
+        mock_client.scroll.return_value = (points, None)
+
+        result = db.get_classifications("col", ["a.pdf", "b.pdf"])
+
+        assert result == {"a.pdf": 1, "b.pdf": 3}
+        mock_client.scroll.assert_called_once()
+
+    def test_ignores_points_not_in_requested_set(self, db, mock_client):
+        points = [
+            MagicMock(payload={"source_uri": "other.pdf", "access": {"classification": 4}}),
+            MagicMock(payload={"source_uri": "a.pdf", "access": {"classification": 1}}),
+        ]
+        mock_client.scroll.return_value = (points, None)
+
+        result = db.get_classifications("col", ["a.pdf"])
+
+        assert result == {"a.pdf": 1}
+
+    def test_stops_early_once_all_uris_found(self, db, mock_client):
+        points = [MagicMock(payload={"source_uri": "a.pdf", "access": {"classification": 0}})]
+        mock_client.scroll.return_value = (points, "some-next-offset")
+
+        result = db.get_classifications("col", ["a.pdf"])
+
+        assert result == {"a.pdf": 0}
+        mock_client.scroll.assert_called_once()
+
+    def test_paginates_until_all_found_or_exhausted(self, db, mock_client):
+        page1 = ([MagicMock(payload={"source_uri": "a.pdf", "access": {"classification": 2}})], "offset-2")
+        page2 = ([MagicMock(payload={"source_uri": "b.pdf", "access": {"classification": 3}})], None)
+        mock_client.scroll.side_effect = [page1, page2]
+
+        result = db.get_classifications("col", ["a.pdf", "b.pdf"])
+
+        assert result == {"a.pdf": 2, "b.pdf": 3}
+        assert mock_client.scroll.call_count == 2
+
+    def test_missing_uri_after_exhausted_scroll_is_simply_absent(self, db, mock_client):
+        mock_client.scroll.return_value = ([], None)
+
+        result = db.get_classifications("col", ["missing.pdf"])
+
+        assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# rename_source
+# ---------------------------------------------------------------------------
+
+class TestRenameSource:
+
+    def test_calls_set_payload_with_new_source_uri(self, db, mock_client):
+        db.rename_source("col", "old/doc.pdf", "new/doc.pdf")
+
+        mock_client.set_payload.assert_called_once()
+        kwargs = mock_client.set_payload.call_args.kwargs
+        assert kwargs["payload"] == {"source_uri": "new/doc.pdf"}
+
+
+# ---------------------------------------------------------------------------
 # _build_filter
 # ---------------------------------------------------------------------------
 

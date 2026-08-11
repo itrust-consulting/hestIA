@@ -36,8 +36,12 @@
         <div class="toast-body">
           <div class="toast-filename">{t.filename}</div>
           <div class="toast-detail">
-            {#if t.status === 'queued'}Queued — {t.collection}
+            {#if t.isBatch}
+              {t.completed} / {t.total} documents uploaded to <strong>{t.collection}</strong>
+              {#if t.failedCount}({t.failedCount} failed){/if}
+            {:else if t.status === 'queued'}Queued — {t.collection}
             {:else if t.status === 'uploading'}Uploading to <strong>{t.collection}</strong>…
+            {:else if t.status === 'done' && t.deduped}Duplicate of <strong>{t.duplicateOf}</strong>
             {:else if t.status === 'done'}{t.n_chunks} chunks indexed in <strong>{t.collection}</strong>
             {:else if t.status === 'error'}{t.error}
             {/if}

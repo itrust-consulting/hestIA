@@ -3,14 +3,17 @@ from __future__ import annotations
 import asyncio
 import json
 import tempfile
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, UploadFile, File
+from pydantic import BaseModel
 
 from hestia.api.dependencies import get_handler
 from hestia.api.security import get_current_user, assert_collection_moderator
 from hestia.application.ingestion import IngestionPipeline, IngestionRequest
 from hestia.domain.auth.models import User
+from hestia.domain.rag.classification import Classification
 from hestia.handler import RequestHandler
 
 router = APIRouter()
@@ -120,6 +123,8 @@ async def upload_document(
     metadata_overrides: str = Form("{}"),
     language: str = Form("english"),
     selected_sheets: str = Form("[]"),
+    sync_id: str | None = Form(None),
+    content_hash: str | None = Form(None),
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
@@ -159,17 +164,41 @@ async def upload_document(
         language=language,
         selected_sheets=sheets_list,
     )
-    result = await asyncio.to_thread(pipeline.ingest, req)
+    result = None
+    deduped = False
+    duplicate_of: str | None = None
+
+    if sync_id and content_hash:
+        sync_repo = h.container.services["sync_manifest"]
+        owner = sync_repo.claim_owner(collection, content_hash, file.filename)
+        if owner == file.filename:
+            result = await asyncio.to_thread(pipeline.ingest, req)
+        else:
+            # Identical content already owned by a different source_uri in this
+            # collection — skip parsing/embedding entirely and just make sure
+            # the owner's classification is at least as strict as requested.
+            deduped = True
+            duplicate_of = owner
+            classification_override = overrides.get("classification")
+            if isinstance(classification_override, str):
+                requested = Classification.from_label(classification_override)
+                if requested is not None:
+                    h.container.providers["db"].bump_classification(collection, owner, requested.level)
+        sync_repo.upsert_entry(collection, sync_id, file.filename, content_hash, int(time.time()))
+    else:
+        result = await asyncio.to_thread(pipeline.ingest, req)
 
     Path(tmp_path).unlink(missing_ok=True)
 
     return {
         "ok": True,
-        "collection": result.collection,
-        "source": result.source,
-        "n_chunks": result.n_chunks,
-        "n_upserted": result.n_upserted,
-        "elapsed_ms": result.elapsed_ms,
+        "collection": collection,
+        "source": result.source if result else duplicate_of,
+        "n_chunks": result.n_chunks if result else 0,
+        "n_upserted": result.n_upserted if result else 0,
+        "elapsed_ms": result.elapsed_ms if result else 0.0,
+        "deduped": deduped,
+        "duplicate_of": duplicate_of,
     }
 
 
@@ -240,11 +269,102 @@ def delete_document(
     user: User = Depends(get_current_user),
 ):
     assert_collection_moderator(user, name, h)
-    h.container.providers["db"].delete_document(name, source_uri)
-    sparse_enc = h.container.services.get("encSparse")
-    if sparse_enc is not None:
-        sparse_enc.remove_document(source_uri, name)
+
+    db = h.container.providers["db"]
+    sync_repo = h.container.services["sync_manifest"]
+
+    should_delete_content = True
+    content_hash = sync_repo.get_hash_for_source(name, source_uri)
+    if content_hash is not None:
+        owner = sync_repo.get_owner(name, content_hash)
+        if owner is not None and owner != source_uri:
+            # This source_uri never had real Qdrant content of its own — it was
+            # a deduped reference piggybacking on another source's upload.
+            should_delete_content = False
+        elif owner is not None and owner == source_uri:
+            remaining = [u for u in sync_repo.get_references(name, content_hash) if u != source_uri]
+            if remaining:
+                new_owner = remaining[0]
+                sync_repo.reassign_owner(name, content_hash, new_owner)
+                db.rename_source(name, source_uri, new_owner)
+                should_delete_content = False
+            else:
+                sync_repo.remove_owner(name, content_hash)
+
+    if should_delete_content:
+        db.delete_document(name, source_uri)
+        sparse_enc = h.container.services.get("encSparse")
+        if sparse_enc is not None:
+            sparse_enc.remove_document(source_uri, name)
+
+    sync_repo.delete_entry(name, source_uri)
     return {"ok": True, "deleted": source_uri}
+
+
+class SyncManifestEntry(BaseModel):
+    path: str        # relative path, matches what will be sent as source_uri on upload
+    checksum: str    # client-computed SHA-256 hex digest
+
+
+class SyncDiffRequest(BaseModel):
+    sync_id: str
+    manifest: list[SyncManifestEntry]
+
+
+@router.post("/collections/{name}/sync/diff")
+def sync_diff(
+    name: str,
+    body: SyncDiffRequest,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    """Diff a client-supplied file manifest against previously-synced documents
+    tagged with the same sync_id, without touching any documents outside that
+    scope (manual uploads or other sync sources sharing the collection)."""
+    assert_collection_moderator(user, name, h)
+    sync_repo = h.container.services["sync_manifest"]
+    last_synced_at = sync_repo.get_last_synced_at(name, body.sync_id)
+    existing = sync_repo.get_manifest(name, body.sync_id)
+    incoming = {m.path: m.checksum for m in body.manifest}
+
+    added = sorted(set(incoming) - set(existing))
+    deleted = sorted(set(existing) - set(incoming))
+    modified = sorted(p for p in (set(incoming) & set(existing)) if incoming[p] != existing[p])
+    unmodified_count = len(incoming) - len(added) - len(modified)
+
+    # Let the client pre-fill a modified document's classification with
+    # whatever's already stored, rather than defaulting to "auto-detect" for
+    # a file whose content changed slightly but is still the same document.
+    levels = h.container.providers["db"].get_classifications(name, modified)
+    previous_classifications = {
+        uri: cls.aliases[0]
+        for uri, level in levels.items()
+        if (cls := Classification.from_level(level)) is not None
+    }
+
+    return {
+        "added": added, "modified": modified, "deleted": deleted, "unmodified_count": unmodified_count,
+        "last_synced_at": last_synced_at, "previous_classifications": previous_classifications,
+    }
+
+
+class SyncCompleteRequest(BaseModel):
+    sync_id: str
+
+
+@router.post("/collections/{name}/sync/complete")
+def sync_complete(
+    name: str,
+    body: SyncCompleteRequest,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    """Record that a sync run for this source finished — deliberately separate
+    from sync_diff, so a run that's only diffed and then cancelled doesn't
+    count as a completed sync."""
+    assert_collection_moderator(user, name, h)
+    h.container.services["sync_manifest"].mark_synced(name, body.sync_id, int(time.time()))
+    return {"ok": True}
 
 
 @router.delete("/collections/{name}")
@@ -264,4 +384,5 @@ def delete_collection(
     sparse_enc = h.container.services.get("encSparse")
     if sparse_enc is not None:
         sparse_enc.delete_corpus(name)
+    h.container.services["sync_manifest"].delete_collection(name)
     return {"ok": True, "deleted": name}

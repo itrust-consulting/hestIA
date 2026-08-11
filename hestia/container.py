@@ -14,6 +14,7 @@ from hestia.domain.auth.service import AuthenticationService
 from hestia.domain.auth.users import LDAPService, UserService
 from hestia.domain.rag.services import DenseEncoder, Generator, Retriever, SparseEncoder
 from hestia.infrastructure.db.qdrant import QdrantDB
+from hestia.infrastructure.db.sync_repository import SyncManifestRepository
 from hestia.infrastructure.db.user_repository import UserRepository, create_sqlite_connection
 from hestia.infrastructure.llm.ollama import OllamaProvider
 from hestia.infrastructure.llm.vllm import vLLMProvider
@@ -58,12 +59,17 @@ def build_container(settings: Settings) -> Container:
         raise ConfigurationError(f"Unknown DB backend: '{settings.db_backend}'")
     _log.info("provider_init", extra={"provider": "db", "backend": settings.db_backend, "url": settings.db_url})
 
+    # --- Shared SQLite connection (users, sync manifests) ---
+    get_conn, close, lock = create_sqlite_connection(str(settings.udb_path))
+
+    sync_repo = SyncManifestRepository(get_conn, lock)
+    sync_repo.initialize()
+    c.services["sync_manifest"] = sync_repo
+
     # --- Auth services ---
     if settings.enable_auth:
-        get_conn, close, lock = create_sqlite_connection(str(settings.udb_path))
         repo = UserRepository(get_conn, lock)
         repo.initialize()
-        close()
 
         user_service = UserService(repo, password_min_length=settings.auth.password_min_length)
 
@@ -93,6 +99,8 @@ def build_container(settings: Settings) -> Container:
         c.services["auth"] = AuthenticationService(user_service, ldap, oidc, config=settings.auth)
         c.services["users"] = user_service
         _log.info("service_init", extra={"service": "auth", "mode": settings.auth.auth_mode})
+
+    close()
 
     # --- RAG services ---
     requested = set(settings.services_to_start)

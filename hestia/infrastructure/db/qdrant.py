@@ -274,6 +274,88 @@ class QdrantDB(DBProvider):
         )
         _log.info("qdrant_delete_document", extra={"collection": collection, "source_uri": source_uri})
 
+    def bump_classification(self, collection: str, source_uri: str, level: int) -> None:
+        """Raise a document's stored classification to `level` if it's currently
+        lower or unset -- never downgrades. Used when duplicate content
+        uploaded through a different source requests a stricter
+        classification than what's already stored for the owning document."""
+        results, _ = _qdrant_call(
+            self.client.scroll,
+            collection_name=collection,
+            scroll_filter=models.Filter(
+                must=[models.FieldCondition(key="source_uri", match=models.MatchValue(value=source_uri))]
+            ),
+            limit=1,
+            with_payload=["access"],
+            with_vectors=False,
+        )
+        if not results:
+            return
+        current = (results[0].payload or {}).get("access", {}).get("classification")
+        if current is not None and current >= level:
+            return
+        self.client.set_payload(
+            collection_name=collection,
+            payload={"access": {"classification": level}},
+            points=models.Filter(
+                must=[models.FieldCondition(key="source_uri", match=models.MatchValue(value=source_uri))]
+            ),
+        )
+        _log.info("qdrant_bump_classification", extra={"collection": collection, "source_uri": source_uri, "level": level})
+
+    def get_classifications(self, collection: str, source_uris: list[str]) -> dict[str, int]:
+        """Current stored classification level per source_uri (any one chunk's
+        value -- all chunks of a document share the same access.classification).
+        Used to pre-fill a re-sync's classification UI for modified documents.
+
+        Implemented as a single filtered scroll loop rather than one query per
+        file, so a re-sync with many modified files costs one bounded pass
+        over the collection instead of N round-trips."""
+        if not source_uris:
+            return {}
+        remaining = set(source_uris)
+        out: dict[str, int] = {}
+        offset = None
+        scroll_filter = models.Filter(
+            should=[models.FieldCondition(key="source_uri", match=models.MatchValue(value=uri)) for uri in source_uris]
+        )
+        while remaining:
+            results, next_offset = _qdrant_call(
+                self.client.scroll,
+                collection_name=collection,
+                scroll_filter=scroll_filter,
+                limit=256,
+                offset=offset,
+                with_payload=["source_uri", "access"],
+                with_vectors=False,
+            )
+            for r in results:
+                payload = r.payload or {}
+                uri = payload.get("source_uri")
+                if uri in remaining:
+                    level = (payload.get("access") or {}).get("classification")
+                    if level is not None:
+                        out[uri] = level
+                    remaining.discard(uri)
+            if next_offset is None:
+                break
+            offset = next_offset
+        return out
+
+    def rename_source(self, collection: str, old_source_uri: str, new_source_uri: str) -> None:
+        """Repoint all of a document's points at a new source_uri. Used when
+        ownership of shared (deduped) content hands off to a different
+        tracked reference because the original owner's source_uri is being
+        deleted but other references to the same content still exist."""
+        self.client.set_payload(
+            collection_name=collection,
+            payload={"source_uri": new_source_uri},
+            points=models.Filter(
+                must=[models.FieldCondition(key="source_uri", match=models.MatchValue(value=old_source_uri))]
+            ),
+        )
+        _log.info("qdrant_rename_source", extra={"collection": collection, "old": old_source_uri, "new": new_source_uri})
+
     def _scroll_documents(self, collection: str) -> dict[str, dict]:
         """Scroll through all points, deduplicate by source_uri to build the
         document list. Fetch the full payload to avoid partial-selector

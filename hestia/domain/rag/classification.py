@@ -21,3 +21,10 @@ class Classification(Enum):
             if cleaned in item.aliases:
                 return item
         return None
+
+    @classmethod
+    def from_level(cls, level: int) -> Classification | None:
+        for item in cls:
+            if item.level == level:
+                return item
+        return None

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import random
+import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict, Iterator, Optional, Tuple
 
@@ -10,6 +12,22 @@ import httpx
 from hestia.domain.exceptions import ProviderError
 
 _log = logging.getLogger("hestia.system")
+
+# Status codes worth retrying on the blocking (ingestion) path: transient
+# provider-side overload/rate-limiting, not client errors like 400/401/404.
+_RETRYABLE_STATUS_CODES = {429, 503}
+_MAX_RETRIES = 3
+_BASE_DELAY_S = 1.0
+
+
+def _retry_delay(response: httpx.Response, attempt: int) -> float:
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return float(retry_after)
+        except ValueError:
+            pass
+    return _BASE_DELAY_S * (2 ** attempt) + random.uniform(0, 0.5)
 
 
 class HttpClient:
@@ -156,22 +174,34 @@ class HttpClient:
 
     def post_blocking(self, endpoint: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None):
         url = self.base_url + endpoint
-        try:
-            r = self._sync_client.post(url, json=payload, headers=self._auth_headers(headers))
-            r.raise_for_status()
-            return r
-        except httpx.TimeoutException:
-            _log.warning("http_timeout", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Request timed out: POST {endpoint}")
-        except httpx.ConnectError:
-            _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Could not connect to provider: {self.base_url}")
-        except httpx.ReadError:
-            _log.warning("http_read_error", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
-        except httpx.HTTPStatusError as e:
-            _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
-            raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")
+        attempt = 0
+        while True:
+            try:
+                r = self._sync_client.post(url, json=payload, headers=self._auth_headers(headers))
+                r.raise_for_status()
+                return r
+            except httpx.TimeoutException:
+                _log.warning("http_timeout", extra={"url": url, "method": "POST"})
+                raise ProviderError(f"Request timed out: POST {endpoint}")
+            except httpx.ConnectError:
+                _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
+                raise ProviderError(f"Could not connect to provider: {self.base_url}")
+            except httpx.ReadError:
+                _log.warning("http_read_error", extra={"url": url, "method": "POST"})
+                raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                if status in _RETRYABLE_STATUS_CODES and attempt < _MAX_RETRIES:
+                    delay = _retry_delay(e.response, attempt)
+                    attempt += 1
+                    _log.warning("http_retrying_after_status", extra={
+                        "url": url, "method": "POST", "status_code": status,
+                        "attempt": attempt, "delay_s": delay,
+                    })
+                    time.sleep(delay)
+                    continue
+                _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": status})
+                raise ProviderError(f"Provider returned {status}: POST {endpoint}")
 
     @staticmethod
     def iter_ndjson_sync(r: httpx.Response) -> Iterator[Dict[str, Any]]:

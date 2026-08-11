@@ -40,3 +40,20 @@ class TestClassificationFromLabel:
         assert Classification.INTERNAL.level < Classification.RESTRICTED.level
         assert Classification.RESTRICTED.level < Classification.CONFIDENTIAL.level
         assert Classification.CONFIDENTIAL.level < Classification.SECRET.level
+
+
+class TestClassificationFromLevel:
+
+    def test_level_zero_is_public(self):
+        assert Classification.from_level(0) == Classification.PUBLIC
+
+    def test_level_four_is_secret(self):
+        assert Classification.from_level(4) == Classification.SECRET
+
+    def test_each_level_round_trips(self):
+        for item in Classification:
+            assert Classification.from_level(item.level) == item
+
+    def test_unknown_level_returns_none(self):
+        assert Classification.from_level(99) is None
+        assert Classification.from_level(-1) is None

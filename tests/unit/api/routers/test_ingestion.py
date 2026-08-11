@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -281,3 +281,331 @@ class TestUploadDocument:
         data = resp.json()
         assert data["ok"] is True
         assert data["n_chunks"] == 3
+        handler.container.services["sync_manifest"].upsert_entry.assert_not_called()
+
+    def test_records_sync_manifest_entry_when_sync_fields_present(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.settings.classification_labels = []
+
+        mock_pipeline = MagicMock()
+        from hestia.application.ingestion import IngestionResult
+        mock_pipeline.ingest.return_value = IngestionResult(
+            collection="test-col", source="doc", n_chunks=0, n_upserted=0, elapsed_ms=1.0
+        )
+        handler.container.services.get.return_value = mock_pipeline
+        sync_manifest = MagicMock()
+        sync_manifest.claim_owner.return_value = "sub/doc.md"  # this upload wins ownership
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        from io import BytesIO
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/upload",
+            data={
+                "collection": "test-col", "tenants": "[]",
+                "sync_id": "my-repo", "content_hash": "abc123",
+            },
+            files={"file": ("sub/doc.md", BytesIO(b"# Title\n\nBody"), "text/plain")},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["deduped"] is False
+        assert data["n_chunks"] == 0
+        mock_pipeline.ingest.assert_called_once()
+        sync_manifest.upsert_entry.assert_called_once()
+        args = sync_manifest.upsert_entry.call_args[0]
+        assert args[0] == "test-col"
+        assert args[1] == "my-repo"
+        assert args[2] == "sub/doc.md"
+        assert args[3] == "abc123"
+
+    def test_skips_ingest_when_content_already_owned_elsewhere(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.settings.classification_labels = []
+
+        mock_pipeline = MagicMock()
+        handler.container.services.get.return_value = mock_pipeline
+        sync_manifest = MagicMock()
+        sync_manifest.claim_owner.return_value = "original/report.pdf"  # someone else already owns this hash
+        db = MagicMock()
+        handler.container.providers = {"db": db}
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        from io import BytesIO
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/upload",
+            data={
+                "collection": "test-col", "tenants": "[]",
+                "sync_id": "my-repo", "content_hash": "abc123",
+            },
+            files={"file": ("copy/report.pdf", BytesIO(b"duplicate bytes"), "application/pdf")},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["deduped"] is True
+        assert data["duplicate_of"] == "original/report.pdf"
+        assert data["n_chunks"] == 0
+        mock_pipeline.ingest.assert_not_called()
+        db.bump_classification.assert_not_called()
+        sync_manifest.upsert_entry.assert_called_once_with("test-col", "my-repo", "copy/report.pdf", "abc123", ANY)
+
+    def test_dedup_bumps_owner_classification_when_more_restrictive(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.settings.classification_labels = []
+
+        mock_pipeline = MagicMock()
+        handler.container.services.get.return_value = mock_pipeline
+        sync_manifest = MagicMock()
+        sync_manifest.claim_owner.return_value = "original/report.pdf"
+        db = MagicMock()
+        handler.container.providers = {"db": db}
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        from io import BytesIO
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/upload",
+            data={
+                "collection": "test-col", "tenants": "[]",
+                "sync_id": "my-repo", "content_hash": "abc123",
+                "metadata_overrides": json.dumps({"classification": "confidential"}),
+            },
+            files={"file": ("copy/report.pdf", BytesIO(b"duplicate bytes"), "application/pdf")},
+        )
+        assert resp.status_code == 200
+        db.bump_classification.assert_called_once_with("test-col", "original/report.pdf", 3)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /collections/{name}/documents
+# ---------------------------------------------------------------------------
+
+class TestDeleteDocument:
+
+    def _client(self, sync_manifest):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.providers = {"db": MagicMock()}
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+        handler.container.services.get.return_value = None
+        return TestClient(_app(user=user, handler=handler)), handler
+
+    def test_untracked_document_deletes_normally(self):
+        # No sync_manifest row at all (plain document, never hash-tracked).
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = None
+        client, handler = self._client(sync_manifest)
+
+        resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 200
+        handler.container.providers["db"].delete_document.assert_called_once_with("test-col", "sub/doc.md")
+        sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
+
+    def test_non_owner_reference_skips_real_delete(self):
+        # This source_uri was a deduped reference — it never had real Qdrant content.
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = "hash123"
+        sync_manifest.get_owner.return_value = "other/owner.md"
+        client, handler = self._client(sync_manifest)
+
+        resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 200
+        handler.container.providers["db"].delete_document.assert_not_called()
+        sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
+
+    def test_owner_with_remaining_references_hands_off(self):
+        # This source_uri IS the owner, but another reference to the same content survives.
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = "hash123"
+        sync_manifest.get_owner.return_value = "sub/doc.md"
+        sync_manifest.get_references.return_value = ["sub/doc.md", "other/copy.md"]
+        client, handler = self._client(sync_manifest)
+
+        resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 200
+        handler.container.providers["db"].delete_document.assert_not_called()
+        sync_manifest.reassign_owner.assert_called_once_with("test-col", "hash123", "other/copy.md")
+        handler.container.providers["db"].rename_source.assert_called_once_with("test-col", "sub/doc.md", "other/copy.md")
+        sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
+
+    def test_owner_with_no_remaining_references_deletes_for_real(self):
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = "hash123"
+        sync_manifest.get_owner.return_value = "sub/doc.md"
+        sync_manifest.get_references.return_value = ["sub/doc.md"]
+        client, handler = self._client(sync_manifest)
+
+        resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 200
+        handler.container.providers["db"].delete_document.assert_called_once_with("test-col", "sub/doc.md")
+        sync_manifest.remove_owner.assert_called_once_with("test-col", "hash123")
+        sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
+
+
+# ---------------------------------------------------------------------------
+# POST /collections/{name}/sync/diff
+# ---------------------------------------------------------------------------
+
+class TestSyncDiff:
+
+    def test_diffs_added_modified_deleted_unmodified(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        sync_manifest = MagicMock()
+        sync_manifest.get_manifest.return_value = {
+            "unchanged.md": "hash-unchanged",
+            "changed.md": "hash-old",
+            "removed.md": "hash-removed",
+        }
+        sync_manifest.get_last_synced_at.return_value = 1700000000
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/collections/test-col/sync/diff",
+            json={
+                "sync_id": "my-repo",
+                "manifest": [
+                    {"path": "unchanged.md", "checksum": "hash-unchanged"},
+                    {"path": "changed.md", "checksum": "hash-new"},
+                    {"path": "new.md", "checksum": "hash-new-file"},
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["added"] == ["new.md"]
+        assert data["modified"] == ["changed.md"]
+        assert data["deleted"] == ["removed.md"]
+        assert data["unmodified_count"] == 1
+        assert data["last_synced_at"] == 1700000000
+        sync_manifest.get_last_synced_at.assert_called_once_with("test-col", "my-repo")
+
+    def test_returns_null_last_synced_at_when_never_synced(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        sync_manifest = MagicMock()
+        sync_manifest.get_manifest.return_value = {}
+        sync_manifest.get_last_synced_at.return_value = None
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/collections/test-col/sync/diff",
+            json={"sync_id": "my-repo", "manifest": []},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["last_synced_at"] is None
+
+    def test_returns_previous_classifications_for_modified_only(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        sync_manifest = MagicMock()
+        sync_manifest.get_manifest.return_value = {
+            "changed.md": "hash-old",
+            "unchanged.md": "hash-unchanged",
+        }
+        sync_manifest.get_last_synced_at.return_value = None
+        db = MagicMock()
+        db.get_classifications.return_value = {"changed.md": 3}
+        handler.container.providers = {"db": db}
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/collections/test-col/sync/diff",
+            json={
+                "sync_id": "my-repo",
+                "manifest": [
+                    {"path": "changed.md", "checksum": "hash-new"},
+                    {"path": "unchanged.md", "checksum": "hash-unchanged"},
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["modified"] == ["changed.md"]
+        assert data["previous_classifications"] == {"changed.md": "confidential"}
+        db.get_classifications.assert_called_once_with("test-col", ["changed.md"])
+
+    def test_previous_classifications_empty_when_level_unresolvable(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        sync_manifest = MagicMock()
+        sync_manifest.get_manifest.return_value = {"changed.md": "hash-old"}
+        sync_manifest.get_last_synced_at.return_value = None
+        db = MagicMock()
+        db.get_classifications.return_value = {"changed.md": 99}  # not a real Classification level
+        handler.container.providers = {"db": db}
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/collections/test-col/sync/diff",
+            json={"sync_id": "my-repo", "manifest": [{"path": "changed.md", "checksum": "hash-new"}]},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["previous_classifications"] == {}
+
+
+class TestSyncComplete:
+
+    def test_marks_synced(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        sync_manifest = MagicMock()
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post("/collections/test-col/sync/complete", json={"sync_id": "my-repo"})
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        sync_manifest.mark_synced.assert_called_once()
+        args = sync_manifest.mark_synced.call_args[0]
+        assert args[0] == "test-col"
+        assert args[1] == "my-repo"
+
+
+class TestDeleteCollection:
+
+    def test_deletes_collection_and_associated_sync_data(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.delete_collection.return_value = True
+        handler.container.providers = {"db": db}
+        sync_manifest = MagicMock()
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+        handler.container.services.get.return_value = None
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.request("DELETE", "/collections/test-col")
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        db.delete_collection.assert_called_once_with("test-col")
+        sync_manifest.delete_collection.assert_called_once_with("test-col")
+
+    def test_returns_404_without_touching_sync_data_when_not_found(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.delete_collection.return_value = False
+        handler.container.providers = {"db": db}
+        sync_manifest = MagicMock()
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.request("DELETE", "/collections/missing-col")
+
+        assert resp.status_code == 404
+        sync_manifest.delete_collection.assert_not_called()

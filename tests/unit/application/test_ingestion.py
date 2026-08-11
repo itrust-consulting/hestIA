@@ -191,3 +191,27 @@ class TestIngest:
 
         assert result.collection == "test-col"
         assert result.n_chunks > 0
+        mock_parser.close.assert_called_once()
+
+    def test_closes_parser_even_when_reading_it_fails(self, pipeline, tmp_path):
+        # Parsers can hold OS-level file locks (e.g. PDF/XLSX libraries); close()
+        # must still run if to_markdown()/get_metadata() raises, so the temp
+        # file can be deleted afterward (Windows locks files that are open).
+        md_file = tmp_path / "doc.md"
+        md_file.write_text("# Section\nSome content here.")
+
+        mock_parser = MagicMock()
+        mock_parser.to_markdown.side_effect = RuntimeError("parse boom")
+        mock_parser.close.return_value = None
+
+        req = IngestionRequest(
+            file_path=str(md_file),
+            collection="test-col",
+            tenants=["org1"],
+        )
+
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            with pytest.raises(RuntimeError, match="parse boom"):
+                pipeline.ingest(req)
+
+        mock_parser.close.assert_called_once()
