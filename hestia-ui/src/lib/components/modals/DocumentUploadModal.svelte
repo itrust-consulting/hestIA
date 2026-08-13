@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import Modal from '$lib/components/Modal.svelte';
   import InfoIcon from '../icons/infoIcon.svelte';
   import { renderChatContent } from '$lib/render/renderChatContent';
@@ -6,6 +7,8 @@
   import { tooltip } from '$lib/actions/tooltip';
   import { fromDataTransferItems, ACCEPTED_EXTS, type SelectedFile } from '$lib/upload/folderSelect';
   import { sha256Hex } from '$lib/upload/hash';
+  import { DOCUMENT_CLASSIFICATION_OPTIONS } from '$lib/classification';
+  import { LANGUAGE_OPTIONS, guessLanguage } from '$lib/language';
 
   // Fixed pseudo sync_id for plain (non-Sync-Folder) uploads — lets these
   // participate in the same collection-wide content-hash dedup as Sync
@@ -30,17 +33,27 @@
     onSuccess,
   }: Props = $props();
 
+  // Free-text fields rendered in the "Document information" step, in the
+  // fixed layout: Title (full width), then Author/Publisher, then
+  // Classification/Language (rendered separately, see template), then
+  // Version/Year.
   const META_FIELDS: { key: string; label: string }[] = [
-    { key: 'title',          label: 'Title' },
-    { key: 'subject',        label: 'Subject' },
-    { key: 'category',       label: 'Category' },
-    { key: 'author',         label: 'Author' },
-    { key: 'reference',      label: 'Reference' },
-    { key: 'version',        label: 'Version' },
-    { key: 'classification', label: 'Classification' },
-    { key: 'description',    label: 'Description' },
-    { key: 'lang',           label: 'Language' },
+    { key: 'title',     label: 'Title' },
+    { key: 'author',    label: 'Author' },
+    { key: 'publisher', label: 'Publisher' },
+    { key: 'version',   label: 'Version' },
+    { key: 'year',      label: 'Year' },
   ];
+
+  // Full set of keys the parse endpoint may populate / that get sent as
+  // metadata overrides on upload.
+  const ALL_METADATA_KEYS = [...META_FIELDS.map(({ key }) => key), 'classification', 'lang'];
+
+  // Field names a power user's custom metadata field may not use — they're
+  // already owned by a fixed form field or computed server-side.
+  const RESERVED_METADATA_KEYS = [...ALL_METADATA_KEYS, 'source', 'source_uri', 'document_id'];
+
+  type CustomField = { key: string; value: string };
 
   type BatchItem = {
     file: File;
@@ -65,21 +78,64 @@
   let uploadFile: File | null   = $state(null);
   let uploadTenants: string[]   = $state([...defaultTenants]);
   let uploadITR                 = $state(false);
-  let uploadLanguage            = $state('english');
+  let uploadLanguage            = $state('');
+  let docStep: 'select' | 'details' = $state('select');
   let parsing                   = $state(false);
   let parseError: string | null = $state(null);
   let parseDone                 = $state(false);
   let markdownContent           = $state('');
   let previewRaw                = $state(false);
   let metadata: Record<string, string> = $state({});
+  let customFields: CustomField[]      = $state([]);
 
   $effect(() => {
     if (open) uploadTenants = [...defaultTenants];
   });
 
-  const filledCount = $derived(META_FIELDS.filter(({ key }) => !!metadata[key]).length);
+  // The Language select (step 2) is the single source of truth for the
+  // document's language — it drives both the stemmer (`uploadLanguage`,
+  // sent as the `language` form field) and the stored `lang` metadata value,
+  // so there is no separate manual stemmer picker to keep in sync.
+  $effect(() => {
+    metadata.lang = uploadLanguage;
+  });
+
   const isBatch     = $derived(batchFiles.length > 1);
   const isLastFile  = $derived(batchIndex >= batchFiles.length - 1);
+
+  // Blank-key rows are just in-progress additions, not errors — they're
+  // ignored on upload rather than blocked.
+  function customFieldKeyError(key: string, index: number): string | null {
+    const trimmed = key.trim().toLowerCase();
+    if (!trimmed) return null;
+    if (RESERVED_METADATA_KEYS.includes(trimmed)) return 'Reserved field name';
+    if (customFields.some((f, i) => i !== index && f.key.trim().toLowerCase() === trimmed)) return 'Duplicate field name';
+    return null;
+  }
+
+  const hasCustomFieldErrors = $derived(
+    customFields.some((f, i) => customFieldKeyError(f.key, i) !== null)
+  );
+
+  const customFieldsRecord = $derived(
+    Object.fromEntries(
+      customFields
+        .filter((f, i) => f.key.trim() && !customFieldKeyError(f.key, i))
+        .map((f) => [f.key.trim(), f.value])
+    )
+  );
+
+  let customFieldsListEl: HTMLDivElement | null = $state(null);
+
+  async function addCustomField() {
+    customFields = [...customFields, { key: '', value: '' }];
+    await tick();
+    customFieldsListEl?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function removeCustomField(index: number) {
+    customFields = customFields.filter((_, i) => i !== index);
+  }
 
   let isDragOver = $state(false);
   const EXCEL_EXTS = ['.xlsx', '.xlsm'];
@@ -170,12 +226,14 @@
 
   function resetFileState() {
     uploadFile      = null;
+    docStep         = 'select';
     parsing         = false;
     parseError      = null;
     parseDone       = false;
     markdownContent = '';
     previewRaw      = false;
     metadata        = {};
+    customFields    = [];
     allSheets       = [];
     selectedSheets  = [];
     activeSheet     = null;
@@ -190,7 +248,7 @@
     autoRunning      = false;
     uploadTenants    = [...defaultTenants];
     uploadITR        = false;
-    uploadLanguage   = 'english';
+    uploadLanguage   = '';
     uploadDone       = false;
     resetFileState();
   }
@@ -245,7 +303,7 @@
         const pr   = await fetch('/api/admin/collections/parse', { method: 'POST', body: fd });
         const pdat = await pr.json();
         if (pr.ok && !pdat.parse_error)
-          parsedMeta = Object.fromEntries(META_FIELDS.map(({ key }) => [key, (pdat.metadata ?? {})[key] ?? '']));
+          parsedMeta = Object.fromEntries(ALL_METADATA_KEYS.map((key) => [key, (pdat.metadata ?? {})[key] ?? '']));
       } catch { /* proceed with empty metadata */ }
 
       batchItems[i] = { ...batchItems[i], status: 'queued' };
@@ -279,9 +337,23 @@
     uploadDone = true;
   }
 
+  // Best-effort match of a parsed classification string against the
+  // controlled option list. Returns '' when unsure — Classification is
+  // required in step 2, so an uncertain guess must fall back to an explicit
+  // user choice rather than silently picking the wrong value.
+  function guessClassification(raw: string | undefined | null): string {
+    if (!raw) return '';
+    const cleaned = raw.trim().toLowerCase();
+    const match = DOCUMENT_CLASSIFICATION_OPTIONS.find(
+      (opt) => opt.value === cleaned || opt.label.toLowerCase() === cleaned
+    );
+    return match?.value ?? '';
+  }
+
   // @MRS-102
   async function triggerParse() {
     if (!uploadFile) return;
+    docStep         = 'select';
     parsing         = true;
     parseError      = null;
     parseDone       = false;
@@ -303,17 +375,21 @@
       sheetContents  = sheets.length > 1 ? _splitToSheets(markdownContent, sheets) : {};
       activeSheet    = sheets.length > 1 ? sheets[0] : null;
       if (data.parse_error) {
-        parseError = data.parse_error;
-        metadata   = Object.fromEntries(META_FIELDS.map(({ key }) => [key, '']));
+        parseError     = data.parse_error;
+        metadata       = Object.fromEntries(ALL_METADATA_KEYS.map((key) => [key, '']));
+        uploadLanguage = '';
       } else {
         const raw: Record<string, string> = data.metadata ?? {};
-        metadata = Object.fromEntries(META_FIELDS.map(({ key }) => [key, raw[key] ?? '']));
+        metadata = Object.fromEntries(ALL_METADATA_KEYS.map((key) => [key, raw[key] ?? '']));
+        metadata.classification = guessClassification(raw.classification);
+        uploadLanguage = guessLanguage(raw.lang);
       }
       parseDone = true;
     } catch (err: any) {
       parseError      = err.message ?? 'Could not parse document.';
       markdownContent = '';
-      metadata        = Object.fromEntries(META_FIELDS.map(({ key }) => [key, '']));
+      metadata        = Object.fromEntries(ALL_METADATA_KEYS.map((key) => [key, '']));
+      uploadLanguage  = '';
       parseDone       = true;
     } finally {
       parsing = false;
@@ -334,7 +410,7 @@
       collection: collectionName,
       tenants: uploadTenants,
       itrTemplate: uploadITR,
-      metadata,
+      metadata: { ...metadata, ...customFieldsRecord },
       language: uploadLanguage,
       selectedSheets: isExcel && selectedSheets.length > 0 && selectedSheets.length < allSheets.length
         ? [...selectedSheets] : undefined,
@@ -380,13 +456,14 @@
   title={
     uploadDone                               ? (isBatch ? 'Batch Complete' : 'Upload Complete') :
     batchMode === 'auto'                     ? 'Auto-Upload' :
+    docStep === 'details'                    ? 'Document Information' :
     (batchMode === 'interactive' && isBatch) ? `Upload (${batchIndex + 1} / ${batchFiles.length})` :
                                                'Add Document'
   }
   {open}
   onClose={closeModal}
   wide={true}
-  xl={parseDone && !uploadDone}
+  xl={docStep === 'select' && parseDone && !uploadDone}
   closeLabel="Cancel"
 >
 
@@ -485,172 +562,227 @@
       </div>
     {/if}
 
-    <div class="upload-layout" class:upload-layout-lg={parseDone}>
-      <div class="upload-left">
-        <div class="field">
-          <span>Collection</span>
-          <span class="collection-name-display">{collectionName}</span>
+    {#if docStep === 'select'}
+      <div class="upload-layout" class:upload-layout-lg={parseDone}>
+        <div class="upload-left">
+          <div class="field">
+            <span>Collection</span>
+            <span class="collection-name-display">{collectionName}</span>
+          </div>
+
+          {#if isBatch}
+            <div class="field">
+              <span>Current file</span>
+              <span class="current-filename">{uploadFile?.name ?? '—'}</span>
+            </div>
+          {:else}
+            <label class="field">
+              <span>Select File(s) <span class="req">*</span></span>
+              <input type="file" accept=".docx,.pdf,.xlsx,.xlsm,.json,.csv,.txt,.md,.markdown,.pptx" multiple onchange={onFileChange} />
+            </label>
+          {/if}
+          <label class="field toggle-field">
+            <input type="checkbox" bind:checked={uploadITR} onchange={onITRChange} />
+            <span>itrust document template
+              <span class="info-icon" use:tooltip={"Parser will assume itrust template to extract metadata."}><InfoIcon/></span>
+            </span>
+          </label>
+
+          {#if isExcel && allSheets.length > 1 && parseDone}
+            <div class="field">
+              <span>Sheets
+                <span class="info-icon" use:tooltip={"Select which sheets to include in the upload."}><InfoIcon/></span>
+              </span>
+              <div class="sheet-list">
+                {#each allSheets as sheet}
+                  <label class="sheet-item">
+                    <input
+                      type="checkbox"
+                      checked={selectedSheets.includes(sheet)}
+                      onchange={() => {
+                        selectedSheets = selectedSheets.includes(sheet)
+                          ? selectedSheets.filter(s => s !== sheet)
+                          : [...selectedSheets, sheet];
+                      }}
+                    />
+                    <span class="sheet-name">{sheet}</span>
+                  </label>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </div>
 
-        {#if isBatch}
-          <div class="field">
-            <span>Current file</span>
-            <span class="current-filename">{uploadFile?.name ?? '—'}</span>
-          </div>
-        {:else}
-          <label class="field">
-            <span>Select File(s) <span class="req">*</span></span>
-            <input type="file" accept=".docx,.pdf,.xlsx,.xlsm,.json,.csv,.txt,.md,.markdown,.pptx" multiple onchange={onFileChange} />
-          </label>
-        {/if}
-        <label class="field toggle-field">
-          <input type="checkbox" bind:checked={uploadITR} onchange={onITRChange} />
-          <span>itrust document template
-            <span class="info-icon" use:tooltip={"Parser will assume itrust template to extract metadata."}><InfoIcon/></span>
-          </span>
-        </label>
-
-        {#if isExcel && allSheets.length > 1 && parseDone}
-          <div class="field">
-            <span>Sheets
-              <span class="info-icon" use:tooltip={"Select which sheets to include in the upload."}><InfoIcon/></span>
-            </span>
-            <div class="sheet-list">
-              {#each allSheets as sheet}
-                <label class="sheet-item">
-                  <input
-                    type="checkbox"
-                    checked={selectedSheets.includes(sheet)}
-                    onchange={() => {
-                      selectedSheets = selectedSheets.includes(sheet)
-                        ? selectedSheets.filter(s => s !== sheet)
-                        : [...selectedSheets, sheet];
-                    }}
-                  />
-                  <span class="sheet-name">{sheet}</span>
-                </label>
-              {/each}
+        <div class="upload-right"
+          role="region"
+          aria-label="Document preview — drop files here to add them"
+          class:drag-over={isDragOver}
+          ondragover={onDragOver}
+          ondragleave={onDragLeave}
+          ondrop={onDrop}
+        >
+          {#if isDragOver}
+            <div class="drop-overlay">Drop to add files</div>
+          {/if}
+          <div class="preview-header">
+            <span class="preview-label">Document preview</span>
+            <div class="preview-header-right">
+              {#if uploadFile}
+                {#if parsing}
+                  <span class="status-indicator parsing">Parsing…</span>
+                {:else if parseError}
+                  <span class="status-indicator error">Parse error — <button class="link-btn" onclick={triggerParse}>retry</button></span>
+                {:else if parseDone}
+                  <span class="status-indicator ok">Ready</span>
+                {/if}
+              {/if}
+              {#if parseDone && !parseError}
+                <div class="preview-toggle">
+                  <button class="toggle-btn" class:active={!previewRaw} onclick={() => (previewRaw = false)}>Preview</button>
+                  <button class="toggle-btn" class:active={previewRaw}  onclick={() => (previewRaw = true)}>Edit</button>
+                </div>
+              {/if}
             </div>
           </div>
-        {/if}
-
-        <label class="field">
-          <span>Stemmer language
-            <span class="info-icon" use:tooltip={"Language used for keyword stemming. Locked after first document is ingested into a collection."}><InfoIcon/></span>
-          </span>
-          <select bind:value={uploadLanguage}>
-            <option value="english">English</option>
-            <option value="french">French</option>
-            <option value="german">German</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="upload-right"
-        role="region"
-        aria-label="Document preview — drop files here to add them"
-        class:drag-over={isDragOver}
-        ondragover={onDragOver}
-        ondragleave={onDragLeave}
-        ondrop={onDrop}
-      >
-        {#if isDragOver}
-          <div class="drop-overlay">Drop to add files</div>
-        {/if}
-        <div class="preview-header">
-          <span class="preview-label">Document preview</span>
-          <div class="preview-header-right">
-            {#if uploadFile}
-              {#if parsing}
-                <span class="status-indicator parsing">Parsing…</span>
-              {:else if parseError}
-                <span class="status-indicator error">Parse error — <button class="link-btn" onclick={triggerParse}>retry</button></span>
-              {:else if parseDone}
-                <span class="status-indicator ok">Ready</span>
-              {/if}
-            {/if}
-            {#if parseDone && !parseError}
-              <div class="preview-toggle">
-                <button class="toggle-btn" class:active={!previewRaw} onclick={() => (previewRaw = false)}>Preview</button>
-                <button class="toggle-btn" class:active={previewRaw}  onclick={() => (previewRaw = true)}>Edit</button>
-              </div>
-            {/if}
-          </div>
-        </div>
-        {#if previewRaw}
-          {#if isExcel && activeSheet && sheetContents[activeSheet] !== undefined}
-            <textarea
-              class="preview-area raw-editor"
-              value={sheetContents[activeSheet]}
-              oninput={(e) => { sheetContents = { ...sheetContents, [activeSheet!]: (e.currentTarget as HTMLTextAreaElement).value }; }}
-              spellcheck={false}
-            ></textarea>
-          {:else}
-            <textarea class="preview-area raw-editor" bind:value={markdownContent} spellcheck={false}></textarea>
-          {/if}
-        {:else}
-          <div class="preview-area prose dark:prose-invert max-w-none" class:error-area={!!parseError}>
-            {#if parseError}
-              <pre class="parse-error-text">{parseError}</pre>
-            {:else if displayMarkdown}
-              {@html renderChatContent(displayMarkdown)}
+          {#if previewRaw}
+            {#if isExcel && activeSheet && sheetContents[activeSheet] !== undefined}
+              <textarea
+                class="preview-area raw-editor"
+                value={sheetContents[activeSheet]}
+                oninput={(e) => { sheetContents = { ...sheetContents, [activeSheet!]: (e.currentTarget as HTMLTextAreaElement).value }; }}
+                spellcheck={false}
+              ></textarea>
             {:else}
-              <span class="preview-placeholder">Select a file to preview its content…</span>
+              <textarea class="preview-area raw-editor" bind:value={markdownContent} spellcheck={false}></textarea>
             {/if}
-          </div>
-        {/if}
+          {:else}
+            <div class="preview-area prose dark:prose-invert max-w-none" class:error-area={!!parseError}>
+              {#if parseError}
+                <pre class="parse-error-text">{parseError}</pre>
+              {:else if displayMarkdown}
+                {@html renderChatContent(displayMarkdown)}
+              {:else}
+                <span class="preview-placeholder">Select a file to preview its content…</span>
+              {/if}
+            </div>
+          {/if}
 
-        {#if isExcel && allSheets.length > 1 && parseDone && !parseError}
-          <div class="sheet-tabs-bar">
-            {#each allSheets as sheet}
-              <button
-                class="sheet-tab-btn"
-                class:active={activeSheet === sheet}
-                onclick={() => (activeSheet = sheet)}
-              >{sheet}</button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="upload-meta">
-        <span class="meta-header">
-          Metadata
-          {#if parseDone}<span class="meta-count">({filledCount}/{META_FIELDS.length})</span>{/if}
-        </span>
-        <div class="meta-fields">
-          {#each META_FIELDS as { key, label }}
-            <label class="field">
-              <span>{label}</span>
-              <input type="text" bind:value={metadata[key]} placeholder="—" />
-            </label>
-          {/each}
+          {#if isExcel && allSheets.length > 1 && parseDone && !parseError}
+            <div class="sheet-tabs-bar">
+              {#each allSheets as sheet}
+                <button
+                  class="sheet-tab-btn"
+                  class:active={activeSheet === sheet}
+                  onclick={() => (activeSheet = sheet)}
+                >{sheet}</button>
+              {/each}
+            </div>
+          {/if}
         </div>
       </div>
-    </div>
+    {:else}
+      <div class="upload-details">
+        <label class="field field-full">
+          <span>Title</span>
+          <input type="text" bind:value={metadata.title} placeholder="—" />
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Author</span>
+            <input type="text" bind:value={metadata.author} placeholder="—" />
+          </label>
+          <label class="field">
+            <span>Publisher</span>
+            <input type="text" bind:value={metadata.publisher} placeholder="—" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Classification <span class="req">*</span>
+              <span class="info-icon" use:tooltip={"Document classification set for retrieval."}><InfoIcon/></span>
+            </span>
+            <select bind:value={metadata.classification} required>
+              <option value="" disabled>Select…</option>
+              {#each DOCUMENT_CLASSIFICATION_OPTIONS as opt}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="field">
+            <span>Language <span class="req">*</span>
+              <span class="info-icon" use:tooltip={"Selected Language determines the stemmer used for keyword search."}><InfoIcon/></span>
+            </span>
+            <select bind:value={uploadLanguage} required>
+              <option value="" disabled>Select…</option>
+              {#each LANGUAGE_OPTIONS as opt}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Version</span>
+            <input type="text" bind:value={metadata.version} placeholder="—" />
+          </label>
+          <label class="field">
+            <span>Year</span>
+            <input type="text" bind:value={metadata.year} placeholder="—" />
+          </label>
+        </div>
+
+        <div class="custom-fields">
+          <div class="custom-fields-actions">
+            <button type="button" class="link-btn" onclick={addCustomField}>+ Add field</button>
+          </div>
+          {#if customFields.length}
+            <div class="custom-fields-list" bind:this={customFieldsListEl}>
+              {#each customFields as field, i}
+                {@const error = customFieldKeyError(field.key, i)}
+                <div class="custom-field-row">
+                  <input type="text" placeholder="Field name" bind:value={field.key} class:input-error={!!error} />
+                  <input type="text" placeholder="Value" bind:value={field.value} />
+                  <button type="button" class="remove-btn" onclick={() => removeCustomField(i)} aria-label="Remove field">×</button>
+                </div>
+                {#if error}<span class="field-error">{error}</span>{/if}
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
   {/if}
 
   <svelte:fragment slot="footer">
     {#if uploadDone}
       <button class="action-btn" onclick={openModal}>Upload another</button>
-    {:else if batchMode === 'interactive'}
-      {#if isBatch && !isLastFile}
-        <button class="secondary-btn" onclick={skipCurrent} disabled={parsing}>Skip</button>
-        <button class="action-btn" onclick={uploadAndNext}
-          disabled={!uploadFile || parsing || (isExcel && allSheets.length > 1 && selectedSheets.length === 0)}>
-          Upload & Next
+    {:else if batchMode === 'interactive' || (batchMode === null && !isBatch)}
+      {#if docStep === 'select'}
+        {#if isBatch && !isLastFile}
+          <button class="secondary-btn" onclick={skipCurrent} disabled={parsing}>Skip</button>
+        {/if}
+        <button class="action-btn" onclick={() => (docStep = 'details')}
+          disabled={!uploadFile || parsing || !!parseError || (isExcel && allSheets.length > 1 && selectedSheets.length === 0)}>
+          Proceed
         </button>
       {:else}
-        <button class="action-btn" onclick={handleUpload}
-          disabled={!uploadFile || parsing || (isExcel && allSheets.length > 1 && selectedSheets.length === 0)}>
-          {isBatch ? 'Upload & Finish' : 'Upload'}
-        </button>
+        <button class="secondary-btn" onclick={() => (docStep = 'select')} disabled={parsing}>Back</button>
+        {#if isBatch && !isLastFile}
+          <button class="secondary-btn" onclick={skipCurrent} disabled={parsing}>Skip</button>
+          <button class="action-btn" onclick={uploadAndNext}
+            disabled={!uploadFile || parsing || !metadata.classification || !uploadLanguage || hasCustomFieldErrors}>
+            Upload & Next
+          </button>
+        {:else}
+          <button class="action-btn" onclick={handleUpload}
+            disabled={!uploadFile || parsing || !metadata.classification || !uploadLanguage || hasCustomFieldErrors}>
+            {isBatch ? 'Upload & Finish' : 'Upload'}
+          </button>
+        {/if}
       {/if}
-    {:else if batchMode === null && !isBatch}
-      <button class="action-btn" onclick={handleUpload}
-        disabled={!uploadFile || parsing || (isExcel && allSheets.length > 1 && selectedSheets.length === 0)}>
-        Upload
-      </button>
     {/if}
   </svelte:fragment>
 </Modal>
@@ -723,9 +855,9 @@
 .error-text { color: var(--color-red-700); }
 .current-filename { font-size: var(--text-sm); font-weight: 500; color: var(--color-neutral-800); word-break: break-all; }
 
-/* ── Upload layout ── */
+/* ── Upload layout (step 1: select & preview) ── */
 .upload-layout {
-  display: grid; grid-template-columns: 240px 1fr 200px; gap: 1.25rem;
+  display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem;
   height: 420px;
   transition: height 180ms ease;
 }
@@ -734,20 +866,34 @@
 }
 .upload-left  { display: flex; flex-direction: column; gap: 0.875rem; overflow-y: auto; min-height: 0; }
 .upload-right { display: flex; flex-direction: column; gap: 0.5rem; position: relative; overflow: hidden; }
-.upload-meta  {
-  display: flex; flex-direction: column; gap: 0.5rem;
-  border-left: 1px solid var(--color-neutral-200); padding-left: 1rem;
-  overflow: hidden;
+
+/* ── Document information (step 2) ── */
+.upload-details {
+  display: flex; flex-direction: column; gap: 1.25rem;
+  min-height: 300px;
 }
-.meta-header {
-  font-size: var(--text-sm); font-weight: 600; color: var(--color-neutral-700);
-  flex-shrink: 0;
+.field-full { width: 100%; }
+.field-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
 }
-.meta-count { font-weight: 400; color: var(--color-neutral-400); margin-left: 0.25rem; }
-.meta-fields {
-  flex: 1; min-height: 0; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 0.5rem;
+
+/* ── Custom fields (step 2) ── */
+.custom-fields { display: flex; flex-direction: column; gap: 0.5rem; }
+.custom-fields-actions { display: flex; justify-content: flex-end; font-size: smaller;}
+.custom-fields-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.custom-field-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; align-items: center; }
+.custom-field-row input {
+  padding: 0.5rem 0.75rem; border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md); font-size: var(--text-sm); background: var(--color-white);
 }
+.custom-field-row input.input-error { border-color: var(--color-red-400); }
+.remove-btn {
+  width: 1.75rem; height: 1.75rem; border-radius: var(--radius-md);
+  border: 1px solid var(--color-neutral-200); background: var(--color-neutral-50);
+  color: var(--color-neutral-500); cursor: pointer; font-size: var(--text-md); line-height: 1;
+}
+.remove-btn:hover { background: var(--color-red-50); color: var(--color-red-700); border-color: var(--color-red-200); }
+.field-error { font-size: var(--text-xs); color: var(--color-red-700); margin-top: -0.15rem; }
 .upload-right.drag-over .preview-area {
   border-color: var(--color-blue-400);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-blue-500) 15%, transparent);
