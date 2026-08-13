@@ -449,7 +449,7 @@ class TestRunRetrieve:
 
 class TestRunAugment:
 
-    def test_no_hits_leaves_prompt_unchanged_and_no_aug_prompt_key(self):
+    def test_no_hits_leaves_prompt_unchanged(self):
         runner = Runner(container=MagicMock())
         node = Node(id="n1", type="Augment", inputs={"prompt": "hello", "hits": []}, outputs={})
         slot = {}
@@ -457,10 +457,9 @@ class TestRunAugment:
         asyncio.run(runner._run_augment(node, slot, stream=False))
 
         assert slot["prompt"] == "hello"
-        assert "_aug_prompt" not in slot
         assert slot["_cite_list"] == []
 
-    def test_with_hits_sets_aug_prompt_and_cite_list(self):
+    def test_with_hits_sets_prompt_and_cite_list(self):
         runner = Runner(container=MagicMock())
         point = MagicMock()
         point.payload = {"source": "docA", "content": "chunk text", "doc_info": {}, "info": {}}
@@ -471,7 +470,6 @@ class TestRunAugment:
 
         assert "question" in slot["prompt"]
         assert "chunk text" in slot["prompt"]
-        assert slot["_aug_prompt"] == slot["prompt"]
         assert len(slot["_cite_list"]) == 1
 
 
@@ -774,6 +772,23 @@ class TestPersistChatPersist:
         c_id, _, _ = pc._persist(req, "reply", {})
         users_svc.create_user_conversation.assert_not_called()
         assert c_id == existing_cid
+
+    def test_rag_turn_persists_raw_message_not_augmented_prompt(self):
+        # A RAG turn's Augment node produces a slot with retrieved chunks
+        # baked into slot["prompt"] and citations in slot["_cite_list"], but
+        # none of that should ever end up in the persisted user message --
+        # only the original, unaugmented user text (history is resent
+        # verbatim every turn, so leaking retrieved chunks into it would
+        # blow up the context budget on every subsequent turn).
+        pc, req, users_svc, _ = self._make()
+        rag_slot = {
+            "prompt": "<retrieved-data>\nchunk text\n</retrieved-data>\n\ntest message",
+            "_cite_list": [{"key": "1", "source": "docA"}],
+        }
+        pc._persist(req, "assistant reply", rag_slot, citations=rag_slot["_cite_list"])
+        user_call = users_svc.append_conversation_message.call_args_list[0]
+        assert user_call.kwargs["content"] == req.last_user_message
+        assert "retrieved-data" not in user_call.kwargs["content"]
 
 
 # ---------------------------------------------------------------------------

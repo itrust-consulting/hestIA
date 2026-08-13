@@ -184,8 +184,6 @@ class Runner:
         augmented, cite_list = _build_prompt(prompt, hits)
         slot[node.outputs.get("prompt", "prompt")] = augmented
         slot["_cite_list"] = cite_list
-        if hits:
-            slot["_aug_prompt"] = augmented
 
     async def _run_generate(self, node, slot, stream):
         svc = self._svc("generate")
@@ -360,15 +358,9 @@ class PersistChat:
         user_msg_id = None
         if req.last_user_message:
             user_meta: dict = {}
-            aug_prompt = slot.get("_aug_prompt")
-            if aug_prompt:
-                user_content = aug_prompt
-                user_meta["display_content"] = req.last_user_display_content \
-                    if req.last_user_display_content is not None else req.last_user_message
-            else:
-                user_content = req.last_user_message
-                if req.last_user_display_content is not None:
-                    user_meta["display_content"] = req.last_user_display_content
+            user_content = req.last_user_message
+            if req.last_user_display_content is not None:
+                user_meta["display_content"] = req.last_user_display_content
             if req.last_user_attachments:
                 user_meta["attachments"] = req.last_user_attachments
             user_msg_id = self.users.append_conversation_message(
