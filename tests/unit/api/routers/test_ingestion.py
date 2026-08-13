@@ -451,6 +451,100 @@ class TestDeleteDocument:
 
 
 # ---------------------------------------------------------------------------
+# GET /collections/{name}/documents (single document detail)
+# ---------------------------------------------------------------------------
+
+class TestGetDocument:
+
+    def test_returns_document_detail(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.get_document.return_value = {
+            "source_uri": "doc.pdf", "doc_info": {"title": "T"}, "chunks": [{"id": "c1", "content": "hi"}],
+        }
+        handler.container.providers = {"db": db}
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/test-col/documents", params={"source_uri": "doc.pdf"})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["doc_info"] == {"title": "T"}
+        assert len(data["chunks"]) == 1
+        db.get_document.assert_called_once_with("test-col", "doc.pdf")
+
+    def test_returns_404_when_not_found(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.get_document.return_value = None
+        handler.container.providers = {"db": db}
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/test-col/documents", params={"source_uri": "missing.pdf"})
+
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# PATCH /collections/{name}/documents
+# ---------------------------------------------------------------------------
+
+class TestUpdateDocumentMetadata:
+
+    def test_updates_metadata_and_derives_classification(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.update_document_metadata.return_value = True
+        handler.container.providers = {"db": db}
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.patch(
+            "/collections/test-col/documents",
+            json={"source_uri": "doc.pdf", "metadata": {"title": "New Title", "classification": "confidential"}},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        db.update_document_metadata.assert_called_once_with(
+            "test-col", "doc.pdf", {"title": "New Title", "classification": "confidential"}, 3
+        )
+
+    def test_no_classification_field_yields_null_level(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.update_document_metadata.return_value = True
+        handler.container.providers = {"db": db}
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.patch(
+            "/collections/test-col/documents",
+            json={"source_uri": "doc.pdf", "metadata": {"author": "Someone"}},
+        )
+
+        assert resp.status_code == 200
+        db.update_document_metadata.assert_called_once_with("test-col", "doc.pdf", {"author": "Someone"}, None)
+
+    def test_returns_404_when_document_not_found(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.update_document_metadata.return_value = False
+        handler.container.providers = {"db": db}
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.patch(
+            "/collections/test-col/documents",
+            json={"source_uri": "missing.pdf", "metadata": {}},
+        )
+
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
 # POST /collections/{name}/sync/diff
 # ---------------------------------------------------------------------------
 

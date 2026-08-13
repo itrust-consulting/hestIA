@@ -93,7 +93,8 @@
   box-shadow: 0 1px 0 var(--color-neutral-200);
 }
 
-.data-table tbody tr:hover { background: var(--color-neutral-50); }
+.data-table tbody tr { transition: background 100ms ease; }
+.data-table tbody tr:hover { background: var(--color-gray-700); }
 
 .empty-state {
   padding: 2rem;

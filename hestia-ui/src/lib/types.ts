@@ -7,6 +7,30 @@ export type CollectionDocument = {
   uploaded_by: string;
   uploaded_at: string;
   chunk_count: number;
+  doc_info: Record<string, string>;
+};
+
+/** Mirrors the raw Qdrant point payload (see Chunk.to_payload() in
+ *  hestia/domain/rag/chunk.py) — shown as-is in the document detail view. */
+export type DocumentChunk = {
+  id: string;
+  content: string;
+  token_count: number | null;
+  source: string;
+  source_uri: string;
+  uploaded_by: string;
+  uploaded_at: string;
+  previous: string | null;
+  next: string | null;
+  info: { header?: string; path?: string; level?: number; position?: number; part?: number };
+  doc_info: Record<string, string>;
+  access: { classification: number | null };
+};
+
+export type DocumentDetail = {
+  source_uri: string;
+  doc_info: Record<string, string>;
+  chunks: DocumentChunk[];
 };
 
 export type Collection = {

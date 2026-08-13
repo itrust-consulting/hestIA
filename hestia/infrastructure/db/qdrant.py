@@ -356,6 +356,75 @@ class QdrantDB(DBProvider):
         )
         _log.info("qdrant_rename_source", extra={"collection": collection, "old": old_source_uri, "new": new_source_uri})
 
+    def get_document(self, collection: str, source_uri: str) -> dict | None:
+        """Fetch a single document's stored metadata plus its ordered chunks,
+        for the document detail view. Returns None if no chunks exist for
+        source_uri. Chunks are the raw stored payload for each point (same
+        shape as Chunk.to_payload()), ordered by their original position in
+        the source document (section start line), falling back to the `part`
+        index for oversized sections split into multiple chunks."""
+        chunks: list[dict] = []
+        doc_info: dict | None = None
+        offset = None
+        scroll_filter = models.Filter(
+            must=[models.FieldCondition(key="source_uri", match=models.MatchValue(value=source_uri))]
+        )
+        while True:
+            results, next_offset = _qdrant_call(
+                self.client.scroll,
+                collection_name=collection,
+                scroll_filter=scroll_filter,
+                limit=256,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for point in results:
+                p = point.payload or {}
+                if doc_info is None:
+                    doc_info = p.get("doc_info") or {}
+                chunks.append({"id": p.get("id") or str(point.id), **p})
+            if next_offset is None:
+                break
+            offset = next_offset
+        if doc_info is None:
+            return None
+        chunks.sort(key=lambda c: ((c.get("info") or {}).get("position", 0), (c.get("info") or {}).get("part", 0)))
+        return {"source_uri": source_uri, "doc_info": doc_info, "chunks": chunks}
+
+    def update_document_metadata(
+        self, collection: str, source_uri: str, doc_info: dict, classification_level: int | None
+    ) -> bool:
+        """Overwrite a document's stored doc_info fields (and derived
+        classification) across all its chunks, without touching vectors.
+        Returns False if no chunks exist for source_uri. `doc_info` is merged
+        over the existing payload rather than replacing it outright, so
+        reserved fields the caller never sends (document_id, source,
+        source_uri) survive untouched."""
+        results, _ = _qdrant_call(
+            self.client.scroll,
+            collection_name=collection,
+            scroll_filter=models.Filter(
+                must=[models.FieldCondition(key="source_uri", match=models.MatchValue(value=source_uri))]
+            ),
+            limit=1,
+            with_payload=["doc_info"],
+            with_vectors=False,
+        )
+        if not results:
+            return False
+        existing = (results[0].payload or {}).get("doc_info") or {}
+        merged = {**existing, **doc_info}
+        self.client.set_payload(
+            collection_name=collection,
+            payload={"doc_info": merged, "access": {"classification": classification_level}},
+            points=models.Filter(
+                must=[models.FieldCondition(key="source_uri", match=models.MatchValue(value=source_uri))]
+            ),
+        )
+        _log.info("qdrant_update_document_metadata", extra={"collection": collection, "source_uri": source_uri})
+        return True
+
     def _scroll_documents(self, collection: str) -> dict[str, dict]:
         """Scroll through all points, deduplicate by source_uri to build the
         document list. Fetch the full payload to avoid partial-selector
@@ -398,6 +467,7 @@ class QdrantDB(DBProvider):
                         "uploaded_by": uploaded_by,
                         "uploaded_at": uploaded_at,
                         "chunk_count": 1,
+                        "doc_info": doc_info,
                     }
                 else:
                     docs[source_uri]["chunk_count"] += 1

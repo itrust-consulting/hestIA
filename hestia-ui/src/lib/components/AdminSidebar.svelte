@@ -19,6 +19,12 @@
         { label: 'Collections', href: '/admin/collections' },
       ]
     },
+    {
+      label: 'System',
+      items: [
+        { label: 'Settings', href: '/admin/settings' },
+      ]
+    },
   ];
 
   const moderatorNavGroups = [

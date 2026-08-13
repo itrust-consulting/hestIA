@@ -59,6 +59,14 @@
           </div>
         </div>
       </div>
+      <div class="admin-card">
+        <h2 class="admin-card-header">System</h2>
+        <div class="admin-list">
+          <div class="admin-item" onclick={() => goto('/admin/settings')}>
+            <span>Settings</span><span class="chevron">›</span>
+          </div>
+        </div>
+      </div>
     {:else}
       <div class="admin-card">
         <h2 class="admin-card-header">My Tenants</h2>

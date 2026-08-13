@@ -261,6 +261,21 @@ def get_collection(
     return result
 
 
+@router.get("/collections/{name}/documents")
+def get_document(
+    name: str,
+    source_uri: str,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_collection_moderator(user, name, h)
+    doc = h.container.providers["db"].get_document(name, source_uri)
+    if doc is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Document '{source_uri}' not found in '{name}'.")
+    return doc
+
+
 @router.delete("/collections/{name}/documents")
 def delete_document(
     name: str,
@@ -299,6 +314,34 @@ def delete_document(
 
     sync_repo.delete_entry(name, source_uri)
     return {"ok": True, "deleted": source_uri}
+
+
+class UpdateDocumentMetadataRequest(BaseModel):
+    source_uri: str
+    metadata: dict
+
+
+@router.patch("/collections/{name}/documents")
+def update_document_metadata(
+    name: str,
+    body: UpdateDocumentMetadataRequest,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_collection_moderator(user, name, h)
+
+    matched_levels = [
+        c.level
+        for v in body.metadata.values()
+        if isinstance(v, str) and (c := Classification.from_label(v)) is not None
+    ]
+    level = max(matched_levels) if matched_levels else None
+
+    ok = h.container.providers["db"].update_document_metadata(name, body.source_uri, body.metadata, level)
+    if not ok:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Document '{body.source_uri}' not found in '{name}'.")
+    return {"ok": True}
 
 
 class SyncManifestEntry(BaseModel):

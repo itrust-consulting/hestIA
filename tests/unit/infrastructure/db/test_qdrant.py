@@ -293,6 +293,97 @@ class TestRenameSource:
 
 
 # ---------------------------------------------------------------------------
+# get_document
+# ---------------------------------------------------------------------------
+
+class TestGetDocument:
+
+    def test_returns_none_when_document_not_found(self, db, mock_client):
+        mock_client.scroll.return_value = ([], None)
+
+        assert db.get_document("col", "missing.pdf") is None
+
+    def test_returns_doc_info_and_ordered_chunks(self, db, mock_client):
+        def _point(pid, position, content, header="H"):
+            p = MagicMock()
+            p.id = pid
+            p.payload = {
+                "id": pid,
+                "doc_info": {"title": "T"},
+                "info": {"header": header, "path": header, "level": 1, "position": position},
+                "content": content,
+                "token_count": 5,
+            }
+            return p
+
+        mock_client.scroll.return_value = (
+            [_point("c2", 10, "second"), _point("c1", 0, "first")], None
+        )
+
+        result = db.get_document("col", "doc.pdf")
+
+        assert result["doc_info"] == {"title": "T"}
+        assert [c["id"] for c in result["chunks"]] == ["c1", "c2"]
+        assert result["chunks"][0]["content"] == "first"
+
+    def test_paginates_across_scroll_pages(self, db, mock_client):
+        def _point(pid, position):
+            p = MagicMock()
+            p.id = pid
+            p.payload = {
+                "id": pid, "doc_info": {}, "info": {"position": position}, "content": "x", "token_count": 1,
+            }
+            return p
+
+        mock_client.scroll.side_effect = [
+            ([_point("a", 0)], "offset-2"),
+            ([_point("b", 1)], None),
+        ]
+
+        result = db.get_document("col", "doc.pdf")
+
+        assert [c["id"] for c in result["chunks"]] == ["a", "b"]
+        assert mock_client.scroll.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# update_document_metadata
+# ---------------------------------------------------------------------------
+
+class TestUpdateDocumentMetadata:
+
+    def test_returns_false_when_document_not_found(self, db, mock_client):
+        mock_client.scroll.return_value = ([], None)
+
+        result = db.update_document_metadata("col", "missing.pdf", {"title": "New"}, 1)
+
+        assert result is False
+        mock_client.set_payload.assert_not_called()
+
+    def test_merges_over_existing_doc_info(self, db, mock_client):
+        point = MagicMock(payload={"doc_info": {"title": "Old", "document_id": "org-doc", "author": "A"}})
+        mock_client.scroll.return_value = ([point], None)
+
+        result = db.update_document_metadata("col", "doc.pdf", {"title": "New"}, 2)
+
+        assert result is True
+        mock_client.set_payload.assert_called_once()
+        kwargs = mock_client.set_payload.call_args.kwargs
+        assert kwargs["payload"]["doc_info"] == {"title": "New", "document_id": "org-doc", "author": "A"}
+        assert kwargs["payload"]["access"] == {"classification": 2}
+
+    def test_preserves_document_id_when_client_omits_it(self, db, mock_client):
+        point = MagicMock(payload={"doc_info": {"document_id": "org-doc"}})
+        mock_client.scroll.return_value = ([point], None)
+
+        db.update_document_metadata("col", "doc.pdf", {"title": "New"}, None)
+
+        kwargs = mock_client.set_payload.call_args.kwargs
+        assert kwargs["payload"]["doc_info"]["document_id"] == "org-doc"
+        assert kwargs["payload"]["access"] == {"classification": None}
+
+
+# ---------------------------------------------------------------------------
 # _build_filter
 # ---------------------------------------------------------------------------
 

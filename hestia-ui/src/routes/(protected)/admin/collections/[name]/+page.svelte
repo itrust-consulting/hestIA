@@ -195,7 +195,7 @@
           <tr><td colspan="5" class="empty-cell">No documents found.</td></tr>
         {:else}
           {#each c.documents as doc (doc.source_uri)}
-            <tr>
+            <tr class="clickable-row" onclick={() => goto(`/admin/collections/${encodeURIComponent(c.id)}/documents/${encodeURIComponent(doc.source_uri)}`)}>
               <td class="filename">{doc.source}</td>
               <td>{doc.uploaded_by || '—'}</td>
               <td class="timestamp">
@@ -207,8 +207,8 @@
               </td>
               <td class="right">{doc.chunk_count}</td>
               <td class="actions-cell">
-                <button class="replace-btn" onclick={() => (confirmingReplace = doc)}>Replace</button>
-                <button class="del-btn" onclick={() => (confirmDeleteDoc = doc.source_uri)}>Delete</button>
+                <button class="replace-btn" onclick={(e) => { e.stopPropagation(); confirmingReplace = doc; }}>Replace</button>
+                <button class="del-btn" onclick={(e) => { e.stopPropagation(); confirmDeleteDoc = doc.source_uri; }}>Delete</button>
               </td>
             </tr>
           {/each}
@@ -511,7 +511,8 @@
   font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em;
   box-shadow: 0 1px 0 var(--color-neutral-200);
 }
-.doc-table tbody tr:hover { background: var(--color-neutral-50); }
+.doc-table tbody tr.clickable-row { cursor: pointer; transition: background 100ms ease; }
+.doc-table tbody tr.clickable-row:hover { background: var(--color-gray-700); }
 .doc-table td.filename { font-weight: 500; word-break: break-all; }
 .doc-table td.right, .doc-table th.right { text-align: right; }
 .doc-table td.timestamp { color: var(--color-neutral-600); font-size: var(--text-xs); white-space: nowrap; }

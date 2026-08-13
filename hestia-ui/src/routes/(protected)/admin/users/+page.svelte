@@ -157,8 +157,8 @@
   font-weight: 600;
   box-shadow: 0 1px 0 var(--color-neutral-200);
 }
-.data-table tbody tr:hover { background: var(--color-neutral-50); }
-.clickable-row { cursor: pointer; }
+.clickable-row { cursor: pointer; transition: background 100ms ease; }
+.clickable-row:hover { background: var(--color-gray-700); }
 
 td.num { width: 4rem; text-align: right; color: var(--color-neutral-400); }
 td.name { font-weight: 500; }

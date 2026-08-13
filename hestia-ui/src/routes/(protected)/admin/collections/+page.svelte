@@ -171,8 +171,8 @@
   box-shadow: 0 1px 0 var(--color-neutral-200);
 }
 
-.data-table tbody tr:hover { background: var(--color-neutral-50); }
-.clickable-row { cursor: pointer; }
+.clickable-row { cursor: pointer; transition: background 100ms ease; }
+.clickable-row:hover { background: var(--color-gray-700); }
 
 td.col-name { font-weight: 500; color: var(--color-neutral-800); }
 td.muted { color: var(--color-neutral-500); font-size: var(--text-sm); }

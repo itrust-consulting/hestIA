@@ -9,6 +9,11 @@
   import { sha256Hex } from '$lib/upload/hash';
   import { DOCUMENT_CLASSIFICATION_OPTIONS } from '$lib/classification';
   import { LANGUAGE_OPTIONS, guessLanguage } from '$lib/language';
+  import {
+    META_FIELDS, ALL_METADATA_KEYS,
+    customFieldKeyError as _customFieldKeyError, toCustomFieldsRecord,
+    type CustomField,
+  } from '$lib/upload/documentMetadata';
 
   // Fixed pseudo sync_id for plain (non-Sync-Folder) uploads — lets these
   // participate in the same collection-wide content-hash dedup as Sync
@@ -32,28 +37,6 @@
     defaultTenants = [],
     onSuccess,
   }: Props = $props();
-
-  // Free-text fields rendered in the "Document information" step, in the
-  // fixed layout: Title (full width), then Author/Publisher, then
-  // Classification/Language (rendered separately, see template), then
-  // Version/Year.
-  const META_FIELDS: { key: string; label: string }[] = [
-    { key: 'title',     label: 'Title' },
-    { key: 'author',    label: 'Author' },
-    { key: 'publisher', label: 'Publisher' },
-    { key: 'version',   label: 'Version' },
-    { key: 'year',      label: 'Year' },
-  ];
-
-  // Full set of keys the parse endpoint may populate / that get sent as
-  // metadata overrides on upload.
-  const ALL_METADATA_KEYS = [...META_FIELDS.map(({ key }) => key), 'classification', 'lang'];
-
-  // Field names a power user's custom metadata field may not use — they're
-  // already owned by a fixed form field or computed server-side.
-  const RESERVED_METADATA_KEYS = [...ALL_METADATA_KEYS, 'source', 'source_uri', 'document_id'];
-
-  type CustomField = { key: string; value: string };
 
   type BatchItem = {
     file: File;
@@ -103,27 +86,15 @@
   const isBatch     = $derived(batchFiles.length > 1);
   const isLastFile  = $derived(batchIndex >= batchFiles.length - 1);
 
-  // Blank-key rows are just in-progress additions, not errors — they're
-  // ignored on upload rather than blocked.
   function customFieldKeyError(key: string, index: number): string | null {
-    const trimmed = key.trim().toLowerCase();
-    if (!trimmed) return null;
-    if (RESERVED_METADATA_KEYS.includes(trimmed)) return 'Reserved field name';
-    if (customFields.some((f, i) => i !== index && f.key.trim().toLowerCase() === trimmed)) return 'Duplicate field name';
-    return null;
+    return _customFieldKeyError(customFields, key, index);
   }
 
   const hasCustomFieldErrors = $derived(
     customFields.some((f, i) => customFieldKeyError(f.key, i) !== null)
   );
 
-  const customFieldsRecord = $derived(
-    Object.fromEntries(
-      customFields
-        .filter((f, i) => f.key.trim() && !customFieldKeyError(f.key, i))
-        .map((f) => [f.key.trim(), f.value])
-    )
-  );
+  const customFieldsRecord = $derived(toCustomFieldsRecord(customFields));
 
   let customFieldsListEl: HTMLDivElement | null = $state(null);
 
