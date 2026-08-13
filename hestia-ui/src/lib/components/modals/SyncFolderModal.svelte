@@ -4,6 +4,7 @@
   import { fromFileList, type SelectedFile } from '$lib/upload/folderSelect';
   import { sha256Hex } from '$lib/upload/hash';
   import { DOCUMENT_CLASSIFICATION_OPTIONS } from '$lib/classification';
+  import { LANGUAGE_OPTIONS } from '$lib/language';
 
   type Props = {
     open: boolean;
@@ -38,10 +39,22 @@
   let lastSyncedAt: number | null = $state(null);
   let hashByPath: Map<string, string> = new Map();
 
-  // Per-document classification overrides, keyed by relPath. Empty/absent
-  // means "auto-detect" — no override sent, parser behavior unchanged.
+  // Per-document classification, keyed by relPath. Required for every added
+  // or modified document before syncing can proceed.
   let classificationByPath: Record<string, string> = $state({});
-  let bulkClassification = $state('');
+  let bulkClassification = $state('public');
+
+  // Per-document stemmer language, keyed by relPath. Defaults to English for
+  // every changed document, matching the hardcoded value sent previously.
+  // Also required before syncing can proceed.
+  let languageByPath: Record<string, string> = $state({});
+  let bulkLanguage = $state('english');
+
+  const hasMissingRequiredFields = $derived(
+    [...addedItems, ...modifiedItems].some(
+      (item) => !classificationByPath[item.relPath] || !languageByPath[item.relPath]
+    )
+  );
 
   function slugify(name: string): string {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'sync';
@@ -77,7 +90,9 @@
     lastSyncedAt = null;
     hashByPath = new Map();
     classificationByPath = {};
-    bulkClassification = '';
+    bulkClassification = 'public';
+    languageByPath = {};
+    bulkLanguage = 'english';
   }
 
   async function markSynced() {
@@ -109,13 +124,18 @@
     syncId = getOrCreateSyncId(files[0].relPath.split('/')[0]);
     lastSyncedAt = null;
     classificationByPath = {};
-    bulkClassification = '';
+    bulkClassification = 'public';
+    languageByPath = {};
+    bulkLanguage = 'english';
     computeDiff();
   }
 
-  function applyBulkClassification() {
-    if (!bulkClassification) return;
-    for (const item of [...addedItems, ...modifiedItems]) classificationByPath[item.relPath] = bulkClassification;
+  function applyBulkValues() {
+    if (!bulkClassification || !bulkLanguage) return;
+    for (const item of [...addedItems, ...modifiedItems]) {
+      classificationByPath[item.relPath] = bulkClassification;
+      languageByPath[item.relPath] = bulkLanguage;
+    }
   }
 
   async function computeDiff() {
@@ -154,6 +174,9 @@
     // content only changed slightly. Added files have no prior classification.
     for (const [relPath, classification] of Object.entries(diff.previous_classifications ?? {})) {
       classificationByPath[relPath] = classification;
+    }
+    for (const item of [...addedItems, ...modifiedItems]) {
+      languageByPath[item.relPath] = 'english';
     }
 
     if (addedItems.length + modifiedItems.length > 0) {
@@ -198,7 +221,7 @@
         tenants: defaultTenants,
         itrTemplate: false,
         metadata: classification ? { classification } : {},
-        language: 'english',
+        language: languageByPath[item.relPath] || 'english',
         syncId,
         contentHash,
         onDone: (_n_chunks, info) => {
@@ -274,23 +297,27 @@
   {:else if phase === 'classify' || phase === 'syncing' || phase === 'confirmDelete' || phase === 'done'}
     <p class="mode-intro">
       {#if lastSyncedAt}Last synced: {new Date(lastSyncedAt * 1000).toLocaleString()}
-      {:else}First sync for this folder{/if}
+      {/if}
     </p>
     <p class="mode-intro">
-      {addedItems.length} added, {modifiedItems.length} modified, {deleteItems.length} to remove, {unmodifiedCount} unchanged.
+      {addedItems.length} added, {modifiedItems.length} modified, {deleteItems.length} deleted, {unmodifiedCount} unchanged.
     </p>
 
     {#if phase === 'classify'}
       <div class="review-header-row">
-        <p class="mode-intro">Assign a classification to the changed documents:</p>
-        <div class="classification-header">Classification</div>
+        <div class="column-header">Language<span class="req">*</span></div>
+        <div class="column-header">Classification<span class="req">*</span></div>
       </div>
       <div class="bulk-classify">
-        <button class="secondary-btn" disabled={!bulkClassification} onclick={applyBulkClassification}>
+        <button class="secondary-btn" disabled={!bulkClassification || !bulkLanguage} onclick={applyBulkValues}>
           Apply to all
         </button>
+        <select class="classification-select" bind:value={bulkLanguage}>
+          {#each LANGUAGE_OPTIONS as opt}
+            <option value={opt.value}>{opt.label}</option>
+          {/each}
+        </select>
         <select class="classification-select" bind:value={bulkClassification}>
-          <option value="">— Auto-detect —</option>
           {#each DOCUMENT_CLASSIFICATION_OPTIONS as opt}
             <option value={opt.value}>{opt.label}</option>
           {/each}
@@ -302,8 +329,12 @@
       <div class="batch-row" class:done={item.status === 'done'} class:error={item.status === 'error'}>
         <span class="batch-filename">{item.relPath}</span>
         {#if phase === 'classify'}
-          <select class="classification-select" bind:value={classificationByPath[item.relPath]}>
-            <option value="">— Auto-detect —</option>
+          <select class="classification-select" bind:value={languageByPath[item.relPath]} required>
+            {#each LANGUAGE_OPTIONS as opt}
+              <option value={opt.value}>{opt.label}</option>
+            {/each}
+          </select>
+          <select class="classification-select" bind:value={classificationByPath[item.relPath]} required>
             {#each DOCUMENT_CLASSIFICATION_OPTIONS as opt}
               <option value={opt.value}>{opt.label}</option>
             {/each}
@@ -360,7 +391,7 @@
     {#if phase === 'review'}
       <button class="action-btn" onclick={computeDiff}>Start sync</button>
     {:else if phase === 'classify'}
-      <button class="action-btn" onclick={confirmClassifications}>
+      <button class="action-btn" onclick={confirmClassifications} disabled={hasMissingRequiredFields}>
         Upload {addedItems.length + modifiedItems.length} document(s)
       </button>
     {:else if phase === 'syncing'}
@@ -425,14 +456,14 @@
   to { transform: rotate(360deg); }
 }
 .review-header-row {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;
   padding-right: 0.75rem; margin-bottom: 0.35rem;
 }
-.review-header-row .mode-intro { margin-bottom: 0; }
-.classification-header {
-  width: 150px; text-align: center;
+.column-header {
+  width: 120px; text-align: center;
   font-size: var(--text-xs); font-weight: 600; color: var(--color-neutral-500);
 }
+.req { color: var(--color-red-500); }
 .bulk-classify { 
   display: flex; 
   align-items: center; 
@@ -444,6 +475,7 @@
 .classification-select {
   width: 120px; padding: 0.35rem 0.6rem; border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md); font-size: var(--text-sm); background: var(--color-white);
+  text-align: center; text-align-last: center;
 }
 .batch-summary {
   display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem;
