@@ -62,6 +62,7 @@
   let uploadTenants: string[]   = $state([...defaultTenants]);
   let uploadITR                 = $state(false);
   let uploadLanguage            = $state('');
+  let uploadChunkingStrategy    = $state('auto');
   let docStep: 'select' | 'details' = $state('select');
   let parsing                   = $state(false);
   let parseError: string | null = $state(null);
@@ -218,9 +219,10 @@
     batchMode        = null;
     autoRunning      = false;
     uploadTenants    = [...defaultTenants];
-    uploadITR        = false;
-    uploadLanguage   = '';
-    uploadDone       = false;
+    uploadITR              = false;
+    uploadLanguage         = '';
+    uploadChunkingStrategy = 'auto';
+    uploadDone             = false;
     resetFileState();
   }
 
@@ -291,6 +293,7 @@
         itrTemplate: uploadITR,
         metadata: parsedMeta,
         language: uploadLanguage,
+        chunkingStrategy: uploadChunkingStrategy,
         syncId: MANUAL_SYNC_ID,
         contentHash,
         onDone: (n_chunks, info) => {
@@ -383,6 +386,7 @@
       itrTemplate: uploadITR,
       metadata: { ...metadata, ...customFieldsRecord },
       language: uploadLanguage,
+      chunkingStrategy: uploadChunkingStrategy,
       selectedSheets: isExcel && selectedSheets.length > 0 && selectedSheets.length < allSheets.length
         ? [...selectedSheets] : undefined,
       syncId: MANUAL_SYNC_ID,
@@ -702,6 +706,19 @@
           <label class="field">
             <span>Year</span>
             <input type="text" bind:value={metadata.year} placeholder="—" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Chunking
+              <span class="info-icon" use:tooltip={"How the document is split for retrieval. Auto uses section headings when present, otherwise falls back to paragraph/table-based chunking."}><InfoIcon/></span>
+            </span>
+            <select bind:value={uploadChunkingStrategy}>
+              <option value="auto">Auto (recommended)</option>
+              <option value="section">Sections only (by heading)</option>
+              <option value="block">Paragraphs &amp; tables</option>
+            </select>
           </label>
         </div>
 

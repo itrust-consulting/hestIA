@@ -9,6 +9,7 @@ import pytest
 
 from hestia.application.ingestion import IngestionPipeline, IngestionRequest
 from hestia.domain.rag.chunk import Chunk
+from hestia.domain.rag.classification import Classification
 from hestia.domain.rag.types import DenseVector, SparseVector
 from hestia.domain.exceptions import ValidationError
 
@@ -215,3 +216,173 @@ class TestIngest:
                 pipeline.ingest(req)
 
         mock_parser.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# IngestionPipeline chunking strategy selection ("auto" / "section" / "block")
+# ---------------------------------------------------------------------------
+
+class TestChunkingStrategySelection:
+
+    def _req(self, tmp_path, **overrides):
+        md_file = tmp_path / "doc.md"
+        md_file.write_text("placeholder")
+        defaults = dict(file_path=str(md_file), collection="test-col", tenants=["org1"])
+        defaults.update(overrides)
+        return IngestionRequest(**defaults)
+
+    def _mock_parser(self, body):
+        mock_parser = MagicMock()
+        mock_parser.to_markdown.return_value = body
+        mock_parser.get_metadata.return_value = {"source": "doc", "source_uri": "doc.md"}
+        mock_parser.close.return_value = None
+        return mock_parser
+
+    def _doc_info_from_upsert(self, pipeline):
+        points = pipeline.db.upsert.call_args[0][1]
+        return points[0]["payload"]["doc_info"]
+
+    def test_auto_falls_back_to_block_for_headingless_document(self, pipeline, tmp_path):
+        mock_parser = self._mock_parser("Dear Sir,\n\nThank you for your letter.")
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])]
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])]
+        req = self._req(tmp_path)
+
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            result = pipeline.ingest(req)
+
+        assert result.n_chunks > 0
+        assert self._doc_info_from_upsert(pipeline)["chunking_strategy"] == "block"
+
+    def test_auto_keeps_section_strategy_when_headings_present(self, pipeline, tmp_path):
+        mock_parser = self._mock_parser("# Section\nSome content.")
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])]
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])]
+        req = self._req(tmp_path)
+
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            result = pipeline.ingest(req)
+
+        assert result.n_chunks > 0
+        assert self._doc_info_from_upsert(pipeline)["chunking_strategy"] == "section"
+
+    def test_forced_section_strategy_yields_zero_for_headingless_document(self, pipeline, tmp_path):
+        mock_parser = self._mock_parser("Dear Sir,\n\nThank you for your letter.")
+        req = self._req(tmp_path, chunking_strategy="section")
+
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            result = pipeline.ingest(req)
+
+        assert result.n_chunks == 0
+
+    def test_forced_block_strategy_used_even_when_headings_present(self, pipeline, tmp_path):
+        mock_parser = self._mock_parser("# Section\nSome content.")
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])]
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])]
+        req = self._req(tmp_path, chunking_strategy="block")
+
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            result = pipeline.ingest(req)
+
+        assert result.n_chunks > 0
+        assert self._doc_info_from_upsert(pipeline)["chunking_strategy"] == "block"
+
+    def test_invalid_strategy_raises_validation_error(self, pipeline, tmp_path):
+        req = self._req(tmp_path, chunking_strategy="nope")
+        with pytest.raises(ValidationError, match="Unknown chunking strategy"):
+            pipeline.ingest(req)
+
+
+# ---------------------------------------------------------------------------
+# IngestionPipeline.ingest — default classification when unresolved
+# ---------------------------------------------------------------------------
+
+class TestClassificationDefault:
+    """A Qdrant range filter (access.classification <= max_cls) excludes
+    points where the field is null, so a document with no resolvable
+    classification label must never be stored with classification=None --
+    it would become silently invisible to every classification-filtered
+    search. It defaults to Internal (not Public) so unclassified content
+    isn't exposed until someone consciously marks it Public. doc_info.
+    classification (read by the metadata overview) must carry the same
+    default, since it's a separate string field from access.classification."""
+
+    def _req(self, tmp_path, **overrides):
+        md_file = tmp_path / "doc.md"
+        md_file.write_text("placeholder")
+        defaults = dict(file_path=str(md_file), collection="test-col", tenants=["org1"])
+        defaults.update(overrides)
+        return IngestionRequest(**defaults)
+
+    def _ingest(self, pipeline, tmp_path, metadata, req=None):
+        mock_parser = MagicMock()
+        mock_parser.to_markdown.return_value = "# Section\nSome content."
+        mock_parser.get_metadata.return_value = metadata
+        mock_parser.close.return_value = None
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])]
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])]
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            pipeline.ingest(req or self._req(tmp_path))
+        return pipeline.db.upsert.call_args[0][1][0]["payload"]
+
+    def test_defaults_to_internal_when_no_label_matches(self, pipeline, tmp_path):
+        metadata = {"source": "doc", "source_uri": "doc.md", "title": "Untitled"}
+        payload = self._ingest(pipeline, tmp_path, metadata)
+        assert payload["access"]["classification"] == Classification.INTERNAL.level
+        assert payload["doc_info"]["classification"] == "internal"
+
+    def test_explicit_label_still_wins_over_default(self, pipeline, tmp_path):
+        metadata = {"source": "doc", "source_uri": "doc.md", "classification": "confidential"}
+        payload = self._ingest(pipeline, tmp_path, metadata)
+        assert payload["access"]["classification"] == Classification.CONFIDENTIAL.level
+        assert payload["doc_info"]["classification"] == "confidential"
+
+    def test_explicit_public_label_is_respected(self, pipeline, tmp_path):
+        metadata = {"source": "doc", "source_uri": "doc.md", "classification": "public"}
+        payload = self._ingest(pipeline, tmp_path, metadata)
+        assert payload["access"]["classification"] == Classification.PUBLIC.level
+        assert payload["doc_info"]["classification"] == "public"
+
+
+# ---------------------------------------------------------------------------
+# IngestionPipeline.ingest — default language when unresolved
+# ---------------------------------------------------------------------------
+
+class TestLanguageDefault:
+    """The interactive upload flow always resolves a language (required
+    field); Sync Folder auto-ingestion can send an empty one. Both the
+    sparse-encoder stemmer language and doc_info.lang (read by the metadata
+    overview) must default to 'english' rather than staying blank."""
+
+    def _req(self, tmp_path, **overrides):
+        md_file = tmp_path / "doc.md"
+        md_file.write_text("placeholder")
+        defaults = dict(file_path=str(md_file), collection="test-col", tenants=["org1"])
+        defaults.update(overrides)
+        return IngestionRequest(**defaults)
+
+    def _ingest(self, pipeline, tmp_path, metadata, req=None):
+        mock_parser = MagicMock()
+        mock_parser.to_markdown.return_value = "# Section\nSome content."
+        mock_parser.get_metadata.return_value = metadata
+        mock_parser.close.return_value = None
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])]
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])]
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            pipeline.ingest(req or self._req(tmp_path))
+        return pipeline.db.upsert.call_args[0][1][0]["payload"]
+
+    def test_defaults_doc_info_lang_when_request_language_empty(self, pipeline, tmp_path):
+        metadata = {"source": "doc", "source_uri": "doc.md"}
+        payload = self._ingest(pipeline, tmp_path, metadata, req=self._req(tmp_path, language=""))
+        assert payload["doc_info"]["lang"] == "english"
+
+    def test_passes_default_language_to_sparse_encoder(self, pipeline, tmp_path):
+        metadata = {"source": "doc", "source_uri": "doc.md"}
+        self._ingest(pipeline, tmp_path, metadata, req=self._req(tmp_path, language=""))
+        assert pipeline.sparse_encoder.encode_documents.call_args.kwargs["language"] == "english"
+
+    def test_parsed_lang_metadata_is_not_overridden(self, pipeline, tmp_path):
+        metadata = {"source": "doc", "source_uri": "doc.md", "lang": "german"}
+        payload = self._ingest(pipeline, tmp_path, metadata, req=self._req(tmp_path, language=""))
+        assert payload["doc_info"]["lang"] == "german"

@@ -2,10 +2,94 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 _HEADING_RE = re.compile(r"^(#{1,5})\s+(.*)$")
+_TABLE_SEP_RE = re.compile(r"^\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?$")
+
+# ~100 k chars ≈ 25 k tokens at 4 chars/token — well within 32 768-token limits.
+_DEFAULT_MAX_CHARS = 100_000
+
+
+class ChunkingStrategy(Protocol):
+    """Common interface for splitting a parsed document's markdown body into
+    chunk-shaped dicts (see ``SectionSplitter.split`` / ``BlockSplitter.split``
+    for the exact shape)."""
+
+    def split(self, text: str) -> list[dict[str, Any]]: ...
+
+
+def _pack_blocks(blocks: list[str], max_chars: int) -> list[str]:
+    """Pack already-split ``blocks`` into parts up to ``max_chars``, joined
+    with blank lines. A single block that alone exceeds ``max_chars`` is
+    hard-cut at that limit as a last resort."""
+    parts: list[str] = []
+    current_parts: list[str] = []
+    current_len = 0
+
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        if current_len + len(block) + 2 > max_chars and current_parts:
+            parts.append("\n\n".join(current_parts))
+            current_parts = []
+            current_len = 0
+        if len(block) > max_chars:
+            for i in range(0, len(block), max_chars):
+                parts.append(block[i:i + max_chars])
+            continue
+        current_parts.append(block)
+        current_len += len(block) + 2
+
+    if current_parts:
+        parts.append("\n\n".join(current_parts))
+    return parts
+
+
+def _is_table_block(block: str) -> bool:
+    """True if ``block`` looks like a markdown table: a header row followed
+    by a separator row (e.g. ``|---|---|``)."""
+    lines = [line for line in block.splitlines() if line.strip()]
+    if len(lines) < 2 or not lines[0].lstrip().startswith("|"):
+        return False
+    return bool(_TABLE_SEP_RE.match(lines[1].strip()))
+
+
+def _split_table_rows(block: str, max_chars: int) -> list[str]:
+    """Split a markdown table by row groups, repeating the header + separator
+    row as a prefix on each part so every chunk stays a valid, self-contained
+    table."""
+    lines = block.splitlines()
+    header, sep, rows = lines[0], lines[1], lines[2:]
+    prefix = f"{header}\n{sep}\n"
+
+    parts: list[str] = []
+    current_rows: list[str] = []
+    current_len = len(prefix)
+
+    for row in rows:
+        row_len = len(row) + 1
+        if current_len + row_len > max_chars and current_rows:
+            parts.append(prefix + "\n".join(current_rows))
+            current_rows = []
+            current_len = len(prefix)
+        current_rows.append(row)
+        current_len += row_len
+
+    if current_rows:
+        parts.append(prefix + "\n".join(current_rows))
+    return parts or [block]
+
+
+# doc_info keys computed by the ingestion pipeline itself (never sent by the
+# post-ingestion metadata-edit endpoint). update_document_metadata must
+# always preserve these when the edit payload omits them, while treating
+# every other key (fixed fields like title/author, plus any custom key) as
+# fully replaced by the payload -- so removing a custom field client-side
+# actually deletes it instead of leaving it stranded forever.
+RESERVED_DOC_INFO_KEYS = frozenset({"document_id", "source", "source_uri", "chunking_strategy"})
 
 
 @dataclass
@@ -49,8 +133,7 @@ class SectionSplitter:
     excessively large.
     """
 
-    # ~100 k chars ≈ 25 k tokens at 4 chars/token — well within 32 768-token limits.
-    DEFAULT_MAX_CHARS = 100_000
+    DEFAULT_MAX_CHARS = _DEFAULT_MAX_CHARS
 
     # @MRS-019
     def __init__(self, max_depth: int = 5, max_chars: int = DEFAULT_MAX_CHARS):
@@ -127,27 +210,80 @@ class SectionSplitter:
         """Split ``text`` at blank-line boundaries, keeping each part under
         ``max_chars``.  A single paragraph that still exceeds ``max_chars`` is
         hard-cut at that limit as a last resort."""
-        paragraphs = re.split(r"\n{2,}", text)
-        parts: list[str] = []
-        current_parts: list[str] = []
-        current_len = 0
+        return _pack_blocks(re.split(r"\n{2,}", text), self._max_chars)
 
-        for para in paragraphs:
-            para = para.strip()
-            if not para:
-                continue
-            if current_len + len(para) + 2 > self._max_chars and current_parts:
-                parts.append("\n\n".join(current_parts))
-                current_parts = []
-                current_len = 0
-            # Single paragraph still too large — hard cut
-            if len(para) > self._max_chars:
-                for i in range(0, len(para), self._max_chars):
-                    parts.append(para[i:i + self._max_chars])
-                continue
-            current_parts.append(para)
-            current_len += len(para) + 2
 
-        if current_parts:
-            parts.append("\n\n".join(current_parts))
-        return parts
+class BlockSplitter:
+    """Fallback chunking strategy for documents with no heading structure
+    (letters, invoices, CSV/plain-text uploads) — anything ``SectionSplitter``
+    would otherwise turn into zero chunks.
+
+    Splits the markdown body into blank-line-delimited blocks, classifies
+    each as prose or a markdown table, packs consecutive prose blocks up to
+    ``max_chars``, and keeps tables row-intact (splitting only by row group,
+    repeating the header, if a single table alone exceeds ``max_chars``).
+    """
+
+    DEFAULT_MAX_CHARS = _DEFAULT_MAX_CHARS
+
+    def __init__(self, max_chars: int = DEFAULT_MAX_CHARS):
+        self._max_chars = max_chars
+
+    def split(self, text: str) -> list[dict[str, Any]]:
+        """
+        Returns a list of chunk dicts, each with:
+          header, path, level (always 0), position, content, block_type
+        (+ optional part for a row-split table).
+        """
+        blocks = [b for b in re.split(r"\n{2,}", text) if b.strip()]
+        if not blocks:
+            return []
+
+        result: list[dict[str, Any]] = []
+        position = 0
+        para_count = 0
+        table_count = 0
+        pending_prose: list[str] = []
+
+        def flush_prose():
+            nonlocal position, para_count
+            if not pending_prose:
+                return
+            for part in _pack_blocks(pending_prose, self._max_chars):
+                para_count += 1
+                label = f"Paragraph {para_count}"
+                result.append({
+                    "header": label, "path": label, "level": 0,
+                    "position": position, "content": part, "block_type": "prose",
+                })
+                position += 1
+            pending_prose.clear()
+
+        for block in blocks:
+            if not _is_table_block(block):
+                pending_prose.append(block)
+                continue
+
+            flush_prose()
+            table_count += 1
+            table_label = f"Table {table_count}"
+            parts = (
+                [block] if len(block) <= self._max_chars
+                else _split_table_rows(block, self._max_chars)
+            )
+            for part_idx, part in enumerate(parts):
+                if len(parts) == 1:
+                    label = table_label
+                else:
+                    label = f"{table_label} (rows {part_idx + 1}/{len(parts)})"
+                entry = {
+                    "header": label, "path": label, "level": 0,
+                    "position": position, "content": part.strip(), "block_type": "table",
+                }
+                if len(parts) > 1:
+                    entry["part"] = part_idx
+                result.append(entry)
+                position += 1
+
+        flush_prose()
+        return result

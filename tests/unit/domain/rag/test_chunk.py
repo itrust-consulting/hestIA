@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from hestia.domain.rag.chunk import Chunk, SectionSplitter
+from hestia.domain.rag.chunk import BlockSplitter, Chunk, SectionSplitter
 
 
 # ---------------------------------------------------------------------------
@@ -139,3 +139,67 @@ class TestSplitParagraphs:
         parts = splitter._split_paragraphs(text)
         assert all(len(p) <= 5 for p in parts)
         assert "".join(parts) == text
+
+
+# ---------------------------------------------------------------------------
+# BlockSplitter.split — fallback strategy for heading-less documents
+# ---------------------------------------------------------------------------
+
+class TestBlockSplitter:
+
+    _TABLE = "| Item | Qty |\n|------|-----|\n| Widget | 3 |"
+
+    def test_empty_text_returns_empty(self):
+        assert BlockSplitter().split("") == []
+
+    def test_plain_prose_single_chunk(self):
+        text = "Dear Sir,\n\nThank you for your letter."
+        chunks = BlockSplitter(max_chars=1000).split(text)
+        assert len(chunks) == 1
+        assert chunks[0]["block_type"] == "prose"
+        assert "Dear Sir" in chunks[0]["content"]
+
+    def test_packs_prose_blocks_up_to_max_chars(self):
+        text = "AAAAAAAAAA\n\nBBBBBBBBBB"
+        chunks = BlockSplitter(max_chars=15).split(text)
+        assert len(chunks) == 2
+        assert all(c["block_type"] == "prose" for c in chunks)
+
+    def test_small_table_stays_intact(self):
+        chunks = BlockSplitter(max_chars=1000).split(self._TABLE)
+        assert len(chunks) == 1
+        assert chunks[0]["block_type"] == "table"
+        assert "| Widget | 3 |" in chunks[0]["content"]
+
+    def test_oversized_table_splits_by_rows_with_repeated_header(self):
+        header, sep = "| Col1 | Col2 |", "|------|------|"
+        rows = [f"| r{i} | v{i} |" for i in range(10)]
+        table = "\n".join([header, sep, *rows])
+
+        chunks = BlockSplitter(max_chars=60).split(table)
+
+        assert len(chunks) > 1
+        assert all(c["block_type"] == "table" for c in chunks)
+        for c in chunks:
+            assert c["content"].startswith(header)
+            assert sep in c["content"]
+        all_content = "\n".join(c["content"] for c in chunks)
+        for row in rows:
+            assert row in all_content
+
+    def test_mixed_prose_and_table_content_ordered(self):
+        text = (
+            "Dear Customer,\n\nPlease find your invoice below.\n\n"
+            f"{self._TABLE}\n\nThank you for your business."
+        )
+        chunks = BlockSplitter(max_chars=1000).split(text)
+
+        assert [c["block_type"] for c in chunks] == ["prose", "table", "prose"]
+        positions = [c["position"] for c in chunks]
+        assert positions == list(range(len(chunks)))
+
+    def test_all_chunks_have_nonempty_header_and_path(self):
+        text = f"Some prose.\n\n{self._TABLE}\n\nMore prose."
+        chunks = BlockSplitter(max_chars=1000).split(text)
+        assert chunks
+        assert all(c["header"] and c["path"] for c in chunks)

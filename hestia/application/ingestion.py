@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from hestia.domain.exceptions import ConfigurationError, ValidationError
-from hestia.domain.rag.chunk import Chunk, SectionSplitter
+from hestia.domain.rag.chunk import BlockSplitter, Chunk, SectionSplitter
 from hestia.domain.rag.classification import Classification
 from hestia.infrastructure.db.protocol import DBProvider
 from hestia.infrastructure.parsers.base import BaseParser
@@ -16,6 +16,8 @@ from hestia.infrastructure.parsers.base import BaseParser
 _log = logging.getLogger("hestia.system")
 
 _EMBED_TEMPLATE = "# {title}\n\n## {path}\n\n{content}"
+
+CHUNKING_STRATEGIES = ("auto", "section", "block")
 
 SUPPORTED_EXTENSIONS: dict[str, str] = {
     ".docx": "docx",
@@ -44,6 +46,7 @@ class IngestionRequest:
     metadata_overrides: dict | None = None
     language: str = "english"
     selected_sheets: list[str] | None = None
+    chunking_strategy: str = "auto"
 
 
 @dataclass
@@ -67,6 +70,12 @@ class IngestionPipeline:
     # ------------------------------------------------------------------
 
     def ingest(self, req: IngestionRequest) -> IngestionResult:
+        if req.chunking_strategy not in CHUNKING_STRATEGIES:
+            raise ValidationError(
+                f"Unknown chunking strategy '{req.chunking_strategy}'. "
+                f"Supported: {', '.join(CHUNKING_STRATEGIES)}"
+            )
+
         t0 = time.perf_counter()
         file_path = Path(req.file_path)
 
@@ -100,7 +109,28 @@ class IngestionPipeline:
             for v in metadata.values()
             if isinstance(v, str) and (c := Classification.from_label(v)) is not None
         ]
-        access = {"classification": max(matched_levels) if matched_levels else None}
+        # Documents with no resolvable classification label default to
+        # Internal, not Public: a Qdrant range filter (access.classification
+        # <= max_cls) excludes points where the field is null, so an
+        # unclassified document would otherwise be silently invisible to
+        # every classification-filtered search. Internal keeps it out of
+        # Public view until someone consciously marks it Public. doc_info
+        # (the metadata overview) reads its own "classification" string
+        # separately from access.classification, so it needs the same
+        # default -- otherwise the overview shows "—" while access
+        # control silently treats the document as Internal.
+        if not matched_levels:
+            metadata["classification"] = Classification.INTERNAL.aliases[0]
+        access = {"classification": max(matched_levels) if matched_levels else Classification.INTERNAL.level}
+
+        # The interactive upload flow always resolves a language (required
+        # field); Sync Folder auto-ingestion can send an empty one. Default
+        # both the stemmer language and the displayed doc_info.lang so
+        # neither ends up silently blank.
+        language = req.language or "english"
+        metadata["lang"] = metadata.get("lang") or language
+
+        sections, strategy_used = self._split_document(body, req.chunking_strategy)
 
         source = metadata["source"]
         source_uri = metadata["source_uri"]
@@ -108,10 +138,9 @@ class IngestionPipeline:
         doc_info = {
             **metadata,
             "document_id": f"{req.tenants[0] if req.tenants else 'unknown'}-{metadata['source']}",
+            "chunking_strategy": strategy_used,
         }
 
-        splitter = SectionSplitter()
-        sections = splitter.split(body)
         if not sections:
             _log.warning("ingestion_no_sections", extra={"file": str(file_path)})
             return IngestionResult(
@@ -128,7 +157,7 @@ class IngestionPipeline:
 
         sparse_vecs = self.sparse_encoder.encode_documents(
             [c.content for c in chunks], req.collection,
-            source_uri=source_uri, language=req.language,
+            source_uri=source_uri, language=language,
         )
 
         self.db.initialize(req.collection, {"dense_dim": dense_dim, "create_indexes": True})
@@ -200,6 +229,21 @@ class IngestionPipeline:
             from hestia.infrastructure.parsers.pptx import PPTXParser
             return PPTXParser(file=str(file_path))
         raise ConfigurationError(f"No parser registered for '{ext}'")
+
+    def _split_document(self, body: str, strategy: str) -> tuple[list[dict[str, Any]], str]:
+        """Chunk ``body`` per ``strategy`` ('auto' | 'section' | 'block').
+
+        'auto' tries section-based (heading) chunking first — unchanged
+        behavior for every document that already chunks correctly — and
+        only falls back to the block-based strategy when that yields no
+        chunks (documents with no heading structure: letters, invoices,
+        CSV/plain-text uploads, etc.).
+        """
+        if strategy in ("auto", "section"):
+            sections = SectionSplitter().split(body)
+            if sections or strategy == "section":
+                return sections, "section"
+        return BlockSplitter().split(body), "block"
 
     def _build_chunks(
         self,
