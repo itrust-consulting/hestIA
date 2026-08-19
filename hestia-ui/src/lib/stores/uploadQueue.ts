@@ -32,6 +32,8 @@ export type UploadJob = {
   metadata: Record<string, string>;
   language: string;
   chunkingStrategy?: string;
+  maxChars?: number;
+  maxDepth?: number;
   selectedSheets?: string[];
   /** Content-hash tracking — sent for every upload (Sync Folder uses a
    *  per-folder id; the plain upload modal uses a fixed 'manual' id) so
@@ -102,6 +104,12 @@ async function _processNext() {
     form.append('language', job.language);
     if (job.chunkingStrategy) {
       form.append('chunking_strategy', job.chunkingStrategy);
+    }
+    if (job.maxChars != null) {
+      form.append('max_chars', String(job.maxChars));
+    }
+    if (job.maxDepth != null) {
+      form.append('max_depth', String(job.maxDepth));
     }
     if (job.selectedSheets && job.selectedSheets.length > 0) {
       form.append('selected_sheets', JSON.stringify(job.selectedSheets));

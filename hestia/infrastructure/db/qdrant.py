@@ -404,8 +404,8 @@ class QdrantDB(DBProvider):
         omitted from `doc_info` is deleted, not preserved. Only
         RESERVED_DOC_INFO_KEYS (computed at ingestion time, never sent by
         the edit endpoint) are carried over from the existing payload when
-        missing from `doc_info`, so document_id/source/source_uri/
-        chunking_strategy always survive untouched."""
+        missing from `doc_info`, so document_id/source/source_uri always
+        survive untouched."""
         results, _ = _qdrant_call(
             self.client.scroll,
             collection_name=collection,

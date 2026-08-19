@@ -128,7 +128,12 @@ class TestBuildChunks:
     def test_consecutive_chunks_linked(self, pipeline):
         chunks = pipeline._build_chunks(self._sections(3), "s", "s.pdf", {}, {})
         assert chunks[0].next == chunks[1].id
-        assert chunks[1].previous == chunks[0].id
+
+    def test_chunking_strategy_included_in_chunk_info_not_doc_info(self, pipeline):
+        doc_info = {"title": "Doc"}
+        chunks = pipeline._build_chunks(self._sections(1), "s", "s.pdf", doc_info, {}, chunking_strategy="block")
+        assert chunks[0].info["chunking_strategy"] == "block"
+        assert "chunking_strategy" not in chunks[0].doc_info
 
 
 # ---------------------------------------------------------------------------
@@ -238,9 +243,9 @@ class TestChunkingStrategySelection:
         mock_parser.close.return_value = None
         return mock_parser
 
-    def _doc_info_from_upsert(self, pipeline):
+    def _first_chunk_info_from_upsert(self, pipeline):
         points = pipeline.db.upsert.call_args[0][1]
-        return points[0]["payload"]["doc_info"]
+        return points[0]["payload"]["info"]
 
     def test_auto_falls_back_to_block_for_headingless_document(self, pipeline, tmp_path):
         mock_parser = self._mock_parser("Dear Sir,\n\nThank you for your letter.")
@@ -252,7 +257,7 @@ class TestChunkingStrategySelection:
             result = pipeline.ingest(req)
 
         assert result.n_chunks > 0
-        assert self._doc_info_from_upsert(pipeline)["chunking_strategy"] == "block"
+        assert self._first_chunk_info_from_upsert(pipeline)["chunking_strategy"] == "block"
 
     def test_auto_keeps_section_strategy_when_headings_present(self, pipeline, tmp_path):
         mock_parser = self._mock_parser("# Section\nSome content.")
@@ -264,7 +269,7 @@ class TestChunkingStrategySelection:
             result = pipeline.ingest(req)
 
         assert result.n_chunks > 0
-        assert self._doc_info_from_upsert(pipeline)["chunking_strategy"] == "section"
+        assert self._first_chunk_info_from_upsert(pipeline)["chunking_strategy"] == "section"
 
     def test_forced_section_strategy_yields_zero_for_headingless_document(self, pipeline, tmp_path):
         mock_parser = self._mock_parser("Dear Sir,\n\nThank you for your letter.")
@@ -285,12 +290,93 @@ class TestChunkingStrategySelection:
             result = pipeline.ingest(req)
 
         assert result.n_chunks > 0
-        assert self._doc_info_from_upsert(pipeline)["chunking_strategy"] == "block"
+        assert self._first_chunk_info_from_upsert(pipeline)["chunking_strategy"] == "block"
 
     def test_invalid_strategy_raises_validation_error(self, pipeline, tmp_path):
         req = self._req(tmp_path, chunking_strategy="nope")
         with pytest.raises(ValidationError, match="Unknown chunking strategy"):
             pipeline.ingest(req)
+
+
+# ---------------------------------------------------------------------------
+# IngestionPipeline.ingest — configurable chunk size (max_chars) / heading
+# depth (max_depth)
+# ---------------------------------------------------------------------------
+
+class TestChunkSizeConfig:
+
+    def _req(self, tmp_path, **overrides):
+        md_file = tmp_path / "doc.md"
+        md_file.write_text("placeholder")
+        defaults = dict(file_path=str(md_file), collection="test-col", tenants=["org1"])
+        defaults.update(overrides)
+        return IngestionRequest(**defaults)
+
+    def _mock_parser(self, body):
+        mock_parser = MagicMock()
+        mock_parser.to_markdown.return_value = body
+        mock_parser.get_metadata.return_value = {"source": "doc", "source_uri": "doc.md"}
+        mock_parser.close.return_value = None
+        return mock_parser
+
+    def _ingest(self, pipeline, tmp_path, body, req, n_vectors=1):
+        mock_parser = self._mock_parser(body)
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])] * n_vectors
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])] * n_vectors
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            return pipeline.ingest(req)
+
+    def test_max_chars_below_minimum_raises_validation_error(self, pipeline, tmp_path):
+        req = self._req(tmp_path, max_chars=100)
+        with pytest.raises(ValidationError, match="max_chars"):
+            pipeline.ingest(req)
+
+    def test_max_chars_above_maximum_raises_validation_error(self, pipeline, tmp_path):
+        req = self._req(tmp_path, max_chars=1_000_000)
+        with pytest.raises(ValidationError, match="max_chars"):
+            pipeline.ingest(req)
+
+    def test_max_depth_below_minimum_raises_validation_error(self, pipeline, tmp_path):
+        req = self._req(tmp_path, max_depth=0)
+        with pytest.raises(ValidationError, match="max_depth"):
+            pipeline.ingest(req)
+
+    def test_max_depth_above_maximum_raises_validation_error(self, pipeline, tmp_path):
+        req = self._req(tmp_path, max_depth=7)
+        with pytest.raises(ValidationError, match="max_depth"):
+            pipeline.ingest(req)
+
+    def test_small_max_chars_forces_additional_split(self, pipeline, tmp_path):
+        body = "# Section\n" + ("A" * 150 + "\n\n" + "B" * 150)
+        req = self._req(tmp_path, max_chars=210)
+
+        result = self._ingest(pipeline, tmp_path, body, req, n_vectors=2)
+
+        assert result.n_chunks == 2
+
+    def test_default_max_chars_keeps_single_chunk(self, pipeline, tmp_path):
+        body = "# Section\n" + ("A" * 150 + "\n\n" + "B" * 150)
+        req = self._req(tmp_path)
+
+        result = self._ingest(pipeline, tmp_path, body, req)
+
+        assert result.n_chunks == 1
+
+    def test_max_depth_override_collapses_nested_section(self, pipeline, tmp_path):
+        body = "# H1\ncontent\n## H2\ncontent2"
+        req = self._req(tmp_path, max_depth=1)
+
+        result = self._ingest(pipeline, tmp_path, body, req)
+
+        assert result.n_chunks == 1
+
+    def test_default_max_depth_keeps_nested_sections_separate(self, pipeline, tmp_path):
+        body = "# H1\ncontent\n## H2\ncontent2"
+        req = self._req(tmp_path)
+
+        result = self._ingest(pipeline, tmp_path, body, req, n_vectors=2)
+
+        assert result.n_chunks == 2
 
 
 # ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ export const ALL_METADATA_KEYS = [...META_FIELDS.map(({ key }) => key), 'classif
 
 // Field names a power user's custom metadata field may not use — they're
 // already owned by a fixed form field or computed server-side.
-export const RESERVED_METADATA_KEYS = [...ALL_METADATA_KEYS, 'source', 'source_uri', 'document_id', 'chunking_strategy'];
+export const RESERVED_METADATA_KEYS = [...ALL_METADATA_KEYS, 'source', 'source_uri', 'document_id'];
 
 export type CustomField = { key: string; value: string };
 

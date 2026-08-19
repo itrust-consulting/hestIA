@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 from uuid import UUID, uuid4
 
 _HEADING_RE = re.compile(r"^(#{1,5})\s+(.*)$")
@@ -15,7 +15,9 @@ _DEFAULT_MAX_CHARS = 100_000
 class ChunkingStrategy(Protocol):
     """Common interface for splitting a parsed document's markdown body into
     chunk-shaped dicts (see ``SectionSplitter.split`` / ``BlockSplitter.split``
-    for the exact shape)."""
+    for the exact shape). Every chunk carries a ``block_type`` ("prose" or
+    "table") and an optional 0-based ``part`` index when its source unit
+    (a section or the whole document) produced more than one chunk."""
 
     def split(self, text: str) -> list[dict[str, Any]]: ...
 
@@ -83,13 +85,57 @@ def _split_table_rows(block: str, max_chars: int) -> list[str]:
     return parts or [block]
 
 
+class _TypedBlock(NamedTuple):
+    """One semantic unit within a body of text, in source order. ``parts``
+    has length 1 for an intact unit, and length > 1 only when that unit
+    alone exceeded ``max_chars`` (a prose run got packed/hard-cut, or a
+    table got split by row group)."""
+    block_type: str  # "prose" | "table"
+    parts: list[str]
+
+
+def _split_typed_blocks(text: str, max_chars: int) -> list[_TypedBlock]:
+    """Split ``text`` into blank-line-delimited blocks, classify each as
+    prose or a markdown table, pack consecutive prose blocks into runs up to
+    ``max_chars``, and keep tables row-intact (splitting a single table by
+    row group, header repeated, only if it alone exceeds ``max_chars``).
+    Shared by ``SectionSplitter`` (applied within one section's body) and
+    ``BlockSplitter`` (applied to a whole headerless document)."""
+    blocks = [b.strip() for b in re.split(r"\n{2,}", text)]
+    blocks = [b for b in blocks if b]
+    if not blocks:
+        return []
+
+    result: list[_TypedBlock] = []
+    pending_prose: list[str] = []
+
+    def flush_prose():
+        if not pending_prose:
+            return
+        packed = _pack_blocks(pending_prose, max_chars)
+        if packed:
+            result.append(_TypedBlock("prose", packed))
+        pending_prose.clear()
+
+    for block in blocks:
+        if not _is_table_block(block):
+            pending_prose.append(block)
+            continue
+        flush_prose()
+        parts = [block] if len(block) <= max_chars else _split_table_rows(block, max_chars)
+        result.append(_TypedBlock("table", [p.strip() for p in parts]))
+
+    flush_prose()
+    return result
+
+
 # doc_info keys computed by the ingestion pipeline itself (never sent by the
 # post-ingestion metadata-edit endpoint). update_document_metadata must
 # always preserve these when the edit payload omits them, while treating
 # every other key (fixed fields like title/author, plus any custom key) as
 # fully replaced by the payload -- so removing a custom field client-side
 # actually deletes it instead of leaving it stranded forever.
-RESERVED_DOC_INFO_KEYS = frozenset({"document_id", "source", "source_uri", "chunking_strategy"})
+RESERVED_DOC_INFO_KEYS = frozenset({"document_id", "source", "source_uri"})
 
 
 @dataclass
@@ -97,7 +143,7 @@ class Chunk:
     content: str
     source: str
     source_uri: str
-    info: dict[str, Any]       # {header, path, level, position}
+    info: dict[str, Any]       # {header, path, level, position, block_type, chunking_strategy, [part]}
     doc_info: dict[str, Any]   # {title, version, document_id, ...}
     access: dict[str, Any]     # {classification}
     uploaded_by: str = ""
@@ -128,26 +174,33 @@ class Chunk:
 class SectionSplitter:
     """Splits markdown text into sections at heading boundaries.
 
-    Sections whose body exceeds ``max_chars`` are further split at paragraph
-    boundaries so that no single chunk sent to the embedding model is
-    excessively large.
+    Within a section, prose and markdown tables are differentiated rather
+    than treated as one blob: a section mixing a paragraph and a table
+    yields separate ``block_type``-tagged chunks (sharing the section's
+    header/path/level/position, distinguished by a 0-based ``part`` index),
+    and a table is only ever split row-safe (by row group, header repeated)
+    instead of being hard-cut by character count. A pure-prose section that
+    fits under ``max_chars`` stays a single chunk with its content
+    unchanged, exactly as before.
     """
 
     DEFAULT_MAX_CHARS = _DEFAULT_MAX_CHARS
+    DEFAULT_MAX_DEPTH = 5
 
     # @MRS-019
-    def __init__(self, max_depth: int = 5, max_chars: int = DEFAULT_MAX_CHARS):
+    def __init__(self, max_depth: int = DEFAULT_MAX_DEPTH, max_chars: int = DEFAULT_MAX_CHARS):
         if not 1 <= max_depth <= 6:
             raise ValueError("max_depth must be between 1 and 6")
         self._max_depth = max_depth
         self._max_chars = max_chars
 
-    # @MRS-015, @MRS-016
+    # @MRS-015, @MRS-016, @MRS-019
     def split(self, text: str) -> list[dict[str, Any]]:
         """
-        Returns a list of section dicts, each with:
-          header, path, level, position, content (str).
-        Empty sections are dropped.
+        Returns a list of chunk dicts, each with:
+          header, path, level, position, content, block_type
+        (+ optional 0-based part when a section produced more than one
+        chunk). Empty sections are dropped.
         """
         lines = text.splitlines()
         sections: list[dict] = []
@@ -185,32 +238,34 @@ class SectionSplitter:
             body = "\n".join(s["content"]).strip()
             if not body:
                 continue
-            if len(body) <= self._max_chars:
+
+            units = _split_typed_blocks(body, self._max_chars)
+            flat = [(u.block_type, part) for u in units for part in u.parts] or [("prose", body)]
+
+            if len(flat) == 1:
+                block_type, content = flat[0]
+                if len(body) <= self._max_chars:
+                    content = body
                 result.append({
                     "header": s["header"],
                     "path": s["path"],
                     "level": s["level"],
                     "position": s["position"],
-                    "content": body,
+                    "content": content,
+                    "block_type": block_type,
                 })
             else:
-                for part_idx, part in enumerate(self._split_paragraphs(body)):
+                for part_idx, (block_type, content) in enumerate(flat):
                     result.append({
                         "header": s["header"],
                         "path": s["path"],
                         "level": s["level"],
                         "position": s["position"],
                         "part": part_idx,
-                        "content": part,
+                        "content": content,
+                        "block_type": block_type,
                     })
         return result
-
-    # @MRS-020
-    def _split_paragraphs(self, text: str) -> list[str]:
-        """Split ``text`` at blank-line boundaries, keeping each part under
-        ``max_chars``.  A single paragraph that still exceeds ``max_chars`` is
-        hard-cut at that limit as a last resort."""
-        return _pack_blocks(re.split(r"\n{2,}", text), self._max_chars)
 
 
 class BlockSplitter:
@@ -235,55 +290,35 @@ class BlockSplitter:
           header, path, level (always 0), position, content, block_type
         (+ optional part for a row-split table).
         """
-        blocks = [b for b in re.split(r"\n{2,}", text) if b.strip()]
-        if not blocks:
-            return []
-
         result: list[dict[str, Any]] = []
         position = 0
         para_count = 0
         table_count = 0
-        pending_prose: list[str] = []
 
-        def flush_prose():
-            nonlocal position, para_count
-            if not pending_prose:
-                return
-            for part in _pack_blocks(pending_prose, self._max_chars):
-                para_count += 1
-                label = f"Paragraph {para_count}"
-                result.append({
-                    "header": label, "path": label, "level": 0,
-                    "position": position, "content": part, "block_type": "prose",
-                })
-                position += 1
-            pending_prose.clear()
-
-        for block in blocks:
-            if not _is_table_block(block):
-                pending_prose.append(block)
+        for unit in _split_typed_blocks(text, self._max_chars):
+            if unit.block_type == "prose":
+                for part in unit.parts:
+                    para_count += 1
+                    label = f"Paragraph {para_count}"
+                    result.append({
+                        "header": label, "path": label, "level": 0,
+                        "position": position, "content": part, "block_type": "prose",
+                    })
+                    position += 1
                 continue
 
-            flush_prose()
             table_count += 1
             table_label = f"Table {table_count}"
-            parts = (
-                [block] if len(block) <= self._max_chars
-                else _split_table_rows(block, self._max_chars)
-            )
-            for part_idx, part in enumerate(parts):
-                if len(parts) == 1:
-                    label = table_label
-                else:
-                    label = f"{table_label} (rows {part_idx + 1}/{len(parts)})"
+            n = len(unit.parts)
+            for part_idx, part in enumerate(unit.parts):
+                label = table_label if n == 1 else f"{table_label} (rows {part_idx + 1}/{n})"
                 entry = {
                     "header": label, "path": label, "level": 0,
-                    "position": position, "content": part.strip(), "block_type": "table",
+                    "position": position, "content": part, "block_type": "table",
                 }
-                if len(parts) > 1:
+                if n > 1:
                     entry["part"] = part_idx
                 result.append(entry)
                 position += 1
 
-        flush_prose()
         return result

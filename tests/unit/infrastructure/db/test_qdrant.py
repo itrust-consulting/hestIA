@@ -393,7 +393,11 @@ class TestUpdateDocumentMetadata:
         kwargs = mock_client.set_payload.call_args.kwargs
         assert kwargs["payload"]["doc_info"] == {"title": "New", "document_id": "org-doc"}
 
-    def test_preserves_chunking_strategy_when_omitted(self, db, mock_client):
+    def test_legacy_chunking_strategy_in_doc_info_is_not_special_cased(self, db, mock_client):
+        # chunking_strategy now lives in per-chunk info, not doc_info -- an
+        # already-ingested document that still has it in doc_info from
+        # before that change is treated as an ordinary (droppable) custom
+        # key, not a reserved one.
         point = MagicMock(payload={
             "doc_info": {"document_id": "org-doc", "chunking_strategy": "block"},
         })
@@ -402,7 +406,7 @@ class TestUpdateDocumentMetadata:
         db.update_document_metadata("col", "doc.pdf", {"title": "New"}, 1)
 
         kwargs = mock_client.set_payload.call_args.kwargs
-        assert kwargs["payload"]["doc_info"]["chunking_strategy"] == "block"
+        assert "chunking_strategy" not in kwargs["payload"]["doc_info"]
 
     def test_new_custom_key_is_kept(self, db, mock_client):
         point = MagicMock(payload={"doc_info": {"title": "Old", "document_id": "org-doc"}})

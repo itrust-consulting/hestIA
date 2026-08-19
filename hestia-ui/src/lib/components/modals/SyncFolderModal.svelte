@@ -1,5 +1,7 @@
 <script lang="ts">
   import Modal from '$lib/components/Modal.svelte';
+  import InfoIcon from '../icons/infoIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
   import { enqueueUpload, createBatchToast } from '$lib/stores/uploadQueue';
   import { fromFileList, type SelectedFile } from '$lib/upload/folderSelect';
   import { sha256Hex } from '$lib/upload/hash';
@@ -50,6 +52,12 @@
   let languageByPath: Record<string, string> = $state({});
   let bulkLanguage = $state('english');
 
+  // Chunking config applies once to the whole sync run, not per-file --
+  // matches how tenants/itrust-template are already applied uniformly here.
+  let syncChunkingStrategy = $state('auto');
+  let syncMaxChars: number | undefined = $state(undefined);
+  let syncMaxDepth: number | undefined = $state(undefined);
+
   const hasMissingRequiredFields = $derived(
     [...addedItems, ...modifiedItems].some(
       (item) => !classificationByPath[item.relPath] || !languageByPath[item.relPath]
@@ -93,6 +101,9 @@
     bulkClassification = 'public';
     languageByPath = {};
     bulkLanguage = 'english';
+    syncChunkingStrategy = 'auto';
+    syncMaxChars = undefined;
+    syncMaxDepth = undefined;
   }
 
   async function markSynced() {
@@ -222,6 +233,9 @@
         itrTemplate: false,
         metadata: classification ? { classification } : {},
         language: languageByPath[item.relPath] || 'english',
+        chunkingStrategy: syncChunkingStrategy,
+        maxChars: syncMaxChars,
+        maxDepth: syncMaxDepth,
         syncId,
         contentHash,
         onDone: (_n_chunks, info) => {
@@ -275,6 +289,38 @@
       <span>Select a folder to sync</span>
       <input type="file" multiple {...{ webkitdirectory: true }} onchange={onFolderInputChange} />
     </label>
+
+    <details class="advanced-settings">
+      <summary>Advanced settings</summary>
+
+      <div class="field-row">
+        <label class="field">
+          <span>Chunking
+            <span class="info-icon" use:tooltip={"How each document is split for retrieval. Auto uses section headings when present, otherwise falls back to paragraph/table-based chunking. Applies to every file in this sync."}><InfoIcon/></span>
+          </span>
+          <select bind:value={syncChunkingStrategy}>
+            <option value="auto">Auto (recommended)</option>
+            <option value="section">Sections only (by heading)</option>
+            <option value="block">Paragraphs &amp; tables</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="field-row">
+        <label class="field">
+          <span>Max chunk size
+            <span class="info-icon" use:tooltip={"Maximum characters per chunk before it's split further. Leave blank to use the default (100,000)."}><InfoIcon/></span>
+          </span>
+          <input type="number" min="200" max="500000" step="100" placeholder="100,000 (default)" bind:value={syncMaxChars} />
+        </label>
+        <label class="field">
+          <span>Section depth
+            <span class="info-icon" use:tooltip={"How many heading levels (# through ######) start a new section. Only applies when splitting by headings, not to \"Paragraphs & tables\". Leave blank to use the default (5)."}><InfoIcon/></span>
+          </span>
+          <input type="number" min="1" max="6" step="1" placeholder="5 (default)" disabled={syncChunkingStrategy === 'block'} bind:value={syncMaxDepth} />
+        </label>
+      </div>
+    </details>
 
   {:else if phase === 'review'}
     <p class="mode-intro">{selected.length} document(s) found:</p>
@@ -422,10 +468,29 @@
   font-size: var(--text-sm); font-weight: 500; color: var(--color-neutral-700);
   margin-bottom: 0.875rem;
 }
-.field input[type="file"] {
+.field input[type="file"],
+.field input[type="number"],
+.field select {
   padding: 0.5rem 0.75rem; border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md); font-size: var(--text-sm); background: var(--color-white);
 }
+.field input[type="number"]:focus,
+.field select:focus {
+  outline: none; border-color: var(--color-blue-500);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-blue-500) 15%, transparent);
+}
+.field-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
+}
+.info-icon {
+  display: inline-block; vertical-align: middle; margin-left: 0.25rem; cursor: pointer;
+}
+.advanced-settings { display: flex; flex-direction: column; gap: 1.25rem; margin-bottom: 0.875rem; }
+.advanced-settings summary {
+  cursor: pointer; font-size: var(--text-sm); font-weight: 500;
+  color: var(--color-neutral-500); user-select: none;
+}
+.advanced-settings summary:hover { color: var(--color-neutral-700); }
 .mode-intro { color: var(--color-neutral-600); font-size: var(--text-sm); margin-bottom: 1rem; }
 .group-label { font-size: var(--text-sm); font-weight: 600; color: var(--color-neutral-700); margin-bottom: 0.35rem; }
 .scan-status {

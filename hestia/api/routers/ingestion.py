@@ -124,6 +124,8 @@ async def upload_document(
     language: str = Form("english"),
     selected_sheets: str = Form("[]"),
     chunking_strategy: str = Form("auto"),
+    max_chars: int | None = Form(None),
+    max_depth: int | None = Form(None),
     sync_id: str | None = Form(None),
     content_hash: str | None = Form(None),
     h: RequestHandler = Depends(get_handler),
@@ -165,6 +167,8 @@ async def upload_document(
         language=language,
         selected_sheets=sheets_list,
         chunking_strategy=chunking_strategy,
+        max_chars=max_chars,
+        max_depth=max_depth,
     )
     result = None
     deduped = False

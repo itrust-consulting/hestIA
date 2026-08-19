@@ -19,6 +19,12 @@ _EMBED_TEMPLATE = "# {title}\n\n## {path}\n\n{content}"
 
 CHUNKING_STRATEGIES = ("auto", "section", "block")
 
+# Guardrails on the user-configurable chunk-size override: below MIN_CHUNK_CHARS
+# a chunk is barely useful content for retrieval; above MAX_CHUNK_CHARS mostly
+# just wastes embedding truncation headroom (see _MAX_EMBED_CHARS below).
+MIN_CHUNK_CHARS = 200
+MAX_CHUNK_CHARS = 500_000
+
 SUPPORTED_EXTENSIONS: dict[str, str] = {
     ".docx": "docx",
     ".pdf": "pdf",
@@ -47,6 +53,8 @@ class IngestionRequest:
     language: str = "english"
     selected_sheets: list[str] | None = None
     chunking_strategy: str = "auto"
+    max_chars: int | None = None
+    max_depth: int | None = None
 
 
 @dataclass
@@ -75,6 +83,10 @@ class IngestionPipeline:
                 f"Unknown chunking strategy '{req.chunking_strategy}'. "
                 f"Supported: {', '.join(CHUNKING_STRATEGIES)}"
             )
+        if req.max_chars is not None and not (MIN_CHUNK_CHARS <= req.max_chars <= MAX_CHUNK_CHARS):
+            raise ValidationError(f"max_chars must be between {MIN_CHUNK_CHARS} and {MAX_CHUNK_CHARS}.")
+        if req.max_depth is not None and not (1 <= req.max_depth <= 6):
+            raise ValidationError("max_depth must be between 1 and 6.")
 
         t0 = time.perf_counter()
         file_path = Path(req.file_path)
@@ -130,7 +142,9 @@ class IngestionPipeline:
         language = req.language or "english"
         metadata["lang"] = metadata.get("lang") or language
 
-        sections, strategy_used = self._split_document(body, req.chunking_strategy)
+        max_chars = req.max_chars if req.max_chars is not None else SectionSplitter.DEFAULT_MAX_CHARS
+        max_depth = req.max_depth if req.max_depth is not None else SectionSplitter.DEFAULT_MAX_DEPTH
+        sections, strategy_used = self._split_document(body, req.chunking_strategy, max_chars, max_depth)
 
         source = metadata["source"]
         source_uri = metadata["source_uri"]
@@ -138,7 +152,6 @@ class IngestionPipeline:
         doc_info = {
             **metadata,
             "document_id": f"{req.tenants[0] if req.tenants else 'unknown'}-{metadata['source']}",
-            "chunking_strategy": strategy_used,
         }
 
         if not sections:
@@ -149,7 +162,9 @@ class IngestionPipeline:
                 elapsed_ms=round((time.perf_counter() - t0) * 1000, 1),
             )
 
-        chunks = self._build_chunks(sections, source, source_uri, doc_info, access, req.uploaded_by, uploaded_at)
+        chunks = self._build_chunks(
+            sections, source, source_uri, doc_info, access, req.uploaded_by, uploaded_at, strategy_used,
+        )
         _log.debug("ingestion_chunks", extra={"n": len(chunks), "collection": req.collection})
 
         dense_vecs = self._embed_chunks(chunks, doc_info)
@@ -230,20 +245,23 @@ class IngestionPipeline:
             return PPTXParser(file=str(file_path))
         raise ConfigurationError(f"No parser registered for '{ext}'")
 
-    def _split_document(self, body: str, strategy: str) -> tuple[list[dict[str, Any]], str]:
+    def _split_document(
+        self, body: str, strategy: str, max_chars: int, max_depth: int,
+    ) -> tuple[list[dict[str, Any]], str]:
         """Chunk ``body`` per ``strategy`` ('auto' | 'section' | 'block').
 
         'auto' tries section-based (heading) chunking first — unchanged
         behavior for every document that already chunks correctly — and
         only falls back to the block-based strategy when that yields no
         chunks (documents with no heading structure: letters, invoices,
-        CSV/plain-text uploads, etc.).
+        CSV/plain-text uploads, etc.). ``max_depth`` is inapplicable to the
+        block strategy and silently ignored there.
         """
         if strategy in ("auto", "section"):
-            sections = SectionSplitter().split(body)
+            sections = SectionSplitter(max_depth=max_depth, max_chars=max_chars).split(body)
             if sections or strategy == "section":
                 return sections, "section"
-        return BlockSplitter().split(body), "block"
+        return BlockSplitter(max_chars=max_chars).split(body), "block"
 
     def _build_chunks(
         self,
@@ -254,13 +272,17 @@ class IngestionPipeline:
         access: dict,
         uploaded_by: str = "",
         uploaded_at: str = "",
+        chunking_strategy: str = "",
     ) -> list[Chunk]:
         chunks = [
             Chunk(
                 content=s["content"],
                 source=source,
                 source_uri=source_uri,
-                info={k: v for k, v in s.items() if k != "content"},
+                info={
+                    **{k: v for k, v in s.items() if k != "content"},
+                    "chunking_strategy": chunking_strategy,
+                },
                 doc_info=doc_info,
                 access=access,
                 uploaded_by=uploaded_by,
