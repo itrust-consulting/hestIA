@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from hestia.domain.exceptions import ConfigurationError, ValidationError
-from hestia.domain.rag.chunk import Chunk, SectionSplitter
+from hestia.domain.rag.chunk import BlockSplitter, Chunk, SectionSplitter
 from hestia.domain.rag.classification import Classification
 from hestia.infrastructure.db.protocol import DBProvider
 from hestia.infrastructure.parsers.base import BaseParser
@@ -16,6 +16,14 @@ from hestia.infrastructure.parsers.base import BaseParser
 _log = logging.getLogger("hestia.system")
 
 _EMBED_TEMPLATE = "# {title}\n\n## {path}\n\n{content}"
+
+CHUNKING_STRATEGIES = ("auto", "section", "block")
+
+# Guardrails on the user-configurable chunk-size override: below MIN_CHUNK_CHARS
+# a chunk is barely useful content for retrieval; above MAX_CHUNK_CHARS mostly
+# just wastes embedding truncation headroom (see _MAX_EMBED_CHARS below).
+MIN_CHUNK_CHARS = 200
+MAX_CHUNK_CHARS = 500_000
 
 SUPPORTED_EXTENSIONS: dict[str, str] = {
     ".docx": "docx",
@@ -44,6 +52,9 @@ class IngestionRequest:
     metadata_overrides: dict | None = None
     language: str = "english"
     selected_sheets: list[str] | None = None
+    chunking_strategy: str = "auto"
+    max_chars: int | None = None
+    max_depth: int | None = None
 
 
 @dataclass
@@ -67,6 +78,16 @@ class IngestionPipeline:
     # ------------------------------------------------------------------
 
     def ingest(self, req: IngestionRequest) -> IngestionResult:
+        if req.chunking_strategy not in CHUNKING_STRATEGIES:
+            raise ValidationError(
+                f"Unknown chunking strategy '{req.chunking_strategy}'. "
+                f"Supported: {', '.join(CHUNKING_STRATEGIES)}"
+            )
+        if req.max_chars is not None and not (MIN_CHUNK_CHARS <= req.max_chars <= MAX_CHUNK_CHARS):
+            raise ValidationError(f"max_chars must be between {MIN_CHUNK_CHARS} and {MAX_CHUNK_CHARS}.")
+        if req.max_depth is not None and not (1 <= req.max_depth <= 6):
+            raise ValidationError("max_depth must be between 1 and 6.")
+
         t0 = time.perf_counter()
         file_path = Path(req.file_path)
 
@@ -100,7 +121,30 @@ class IngestionPipeline:
             for v in metadata.values()
             if isinstance(v, str) and (c := Classification.from_label(v)) is not None
         ]
-        access = {"classification": max(matched_levels) if matched_levels else None}
+        # Documents with no resolvable classification label default to
+        # Internal, not Public: a Qdrant range filter (access.classification
+        # <= max_cls) excludes points where the field is null, so an
+        # unclassified document would otherwise be silently invisible to
+        # every classification-filtered search. Internal keeps it out of
+        # Public view until someone consciously marks it Public. doc_info
+        # (the metadata overview) reads its own "classification" string
+        # separately from access.classification, so it needs the same
+        # default -- otherwise the overview shows "—" while access
+        # control silently treats the document as Internal.
+        if not matched_levels:
+            metadata["classification"] = Classification.INTERNAL.aliases[0]
+        access = {"classification": max(matched_levels) if matched_levels else Classification.INTERNAL.level}
+
+        # The interactive upload flow always resolves a language (required
+        # field); Sync Folder auto-ingestion can send an empty one. Default
+        # both the stemmer language and the displayed doc_info.lang so
+        # neither ends up silently blank.
+        language = req.language or "english"
+        metadata["lang"] = metadata.get("lang") or language
+
+        max_chars = req.max_chars if req.max_chars is not None else SectionSplitter.DEFAULT_MAX_CHARS
+        max_depth = req.max_depth if req.max_depth is not None else SectionSplitter.DEFAULT_MAX_DEPTH
+        sections, strategy_used = self._split_document(body, req.chunking_strategy, max_chars, max_depth)
 
         source = metadata["source"]
         source_uri = metadata["source_uri"]
@@ -110,8 +154,6 @@ class IngestionPipeline:
             "document_id": f"{req.tenants[0] if req.tenants else 'unknown'}-{metadata['source']}",
         }
 
-        splitter = SectionSplitter()
-        sections = splitter.split(body)
         if not sections:
             _log.warning("ingestion_no_sections", extra={"file": str(file_path)})
             return IngestionResult(
@@ -120,7 +162,9 @@ class IngestionPipeline:
                 elapsed_ms=round((time.perf_counter() - t0) * 1000, 1),
             )
 
-        chunks = self._build_chunks(sections, source, source_uri, doc_info, access, req.uploaded_by, uploaded_at)
+        chunks = self._build_chunks(
+            sections, source, source_uri, doc_info, access, req.uploaded_by, uploaded_at, strategy_used,
+        )
         _log.debug("ingestion_chunks", extra={"n": len(chunks), "collection": req.collection})
 
         dense_vecs = self._embed_chunks(chunks, doc_info)
@@ -128,7 +172,7 @@ class IngestionPipeline:
 
         sparse_vecs = self.sparse_encoder.encode_documents(
             [c.content for c in chunks], req.collection,
-            source_uri=source_uri, language=req.language,
+            source_uri=source_uri, language=language,
         )
 
         self.db.initialize(req.collection, {"dense_dim": dense_dim, "create_indexes": True})
@@ -201,6 +245,24 @@ class IngestionPipeline:
             return PPTXParser(file=str(file_path))
         raise ConfigurationError(f"No parser registered for '{ext}'")
 
+    def _split_document(
+        self, body: str, strategy: str, max_chars: int, max_depth: int,
+    ) -> tuple[list[dict[str, Any]], str]:
+        """Chunk ``body`` per ``strategy`` ('auto' | 'section' | 'block').
+
+        'auto' tries section-based (heading) chunking first — unchanged
+        behavior for every document that already chunks correctly — and
+        only falls back to the block-based strategy when that yields no
+        chunks (documents with no heading structure: letters, invoices,
+        CSV/plain-text uploads, etc.). ``max_depth`` is inapplicable to the
+        block strategy and silently ignored there.
+        """
+        if strategy in ("auto", "section"):
+            sections = SectionSplitter(max_depth=max_depth, max_chars=max_chars).split(body)
+            if sections or strategy == "section":
+                return sections, "section"
+        return BlockSplitter(max_chars=max_chars).split(body), "block"
+
     def _build_chunks(
         self,
         sections: list[dict[str, Any]],
@@ -210,13 +272,17 @@ class IngestionPipeline:
         access: dict,
         uploaded_by: str = "",
         uploaded_at: str = "",
+        chunking_strategy: str = "",
     ) -> list[Chunk]:
         chunks = [
             Chunk(
                 content=s["content"],
                 source=source,
                 source_uri=source_uri,
-                info={k: v for k, v in s.items() if k != "content"},
+                info={
+                    **{k: v for k, v in s.items() if k != "content"},
+                    "chunking_strategy": chunking_strategy,
+                },
                 doc_info=doc_info,
                 access=access,
                 uploaded_by=uploaded_by,

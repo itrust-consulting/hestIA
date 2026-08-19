@@ -9,6 +9,7 @@ from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
 from hestia.domain.exceptions import ProviderError
+from hestia.domain.rag.chunk import RESERVED_DOC_INFO_KEYS
 from hestia.domain.rag.types import DenseVector, HybridQuery, Query, SparseVector
 from hestia.infrastructure.db.protocol import DBProvider
 
@@ -395,12 +396,16 @@ class QdrantDB(DBProvider):
     def update_document_metadata(
         self, collection: str, source_uri: str, doc_info: dict, classification_level: int | None
     ) -> bool:
-        """Overwrite a document's stored doc_info fields (and derived
+        """Replace a document's stored doc_info fields (and derived
         classification) across all its chunks, without touching vectors.
-        Returns False if no chunks exist for source_uri. `doc_info` is merged
-        over the existing payload rather than replacing it outright, so
-        reserved fields the caller never sends (document_id, source,
-        source_uri) survive untouched."""
+        Returns False if no chunks exist for source_uri. `doc_info` is
+        treated as the full, authoritative set of editable fields (fixed
+        fields plus whatever custom keys the caller still wants) -- a key
+        omitted from `doc_info` is deleted, not preserved. Only
+        RESERVED_DOC_INFO_KEYS (computed at ingestion time, never sent by
+        the edit endpoint) are carried over from the existing payload when
+        missing from `doc_info`, so document_id/source/source_uri always
+        survive untouched."""
         results, _ = _qdrant_call(
             self.client.scroll,
             collection_name=collection,
@@ -414,7 +419,8 @@ class QdrantDB(DBProvider):
         if not results:
             return False
         existing = (results[0].payload or {}).get("doc_info") or {}
-        merged = {**existing, **doc_info}
+        preserved = {k: v for k, v in existing.items() if k in RESERVED_DOC_INFO_KEYS and k not in doc_info}
+        merged = {**doc_info, **preserved}
         self.client.set_payload(
             collection_name=collection,
             payload={"doc_info": merged, "access": {"classification": classification_level}},

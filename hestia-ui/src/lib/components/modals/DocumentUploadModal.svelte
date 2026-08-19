@@ -62,6 +62,9 @@
   let uploadTenants: string[]   = $state([...defaultTenants]);
   let uploadITR                 = $state(false);
   let uploadLanguage            = $state('');
+  let uploadChunkingStrategy    = $state('auto');
+  let uploadMaxChars: number | undefined = $state(undefined);
+  let uploadMaxDepth: number | undefined = $state(undefined);
   let docStep: 'select' | 'details' = $state('select');
   let parsing                   = $state(false);
   let parseError: string | null = $state(null);
@@ -218,9 +221,12 @@
     batchMode        = null;
     autoRunning      = false;
     uploadTenants    = [...defaultTenants];
-    uploadITR        = false;
-    uploadLanguage   = '';
-    uploadDone       = false;
+    uploadITR              = false;
+    uploadLanguage         = '';
+    uploadChunkingStrategy = 'auto';
+    uploadMaxChars         = undefined;
+    uploadMaxDepth         = undefined;
+    uploadDone             = false;
     resetFileState();
   }
 
@@ -291,6 +297,9 @@
         itrTemplate: uploadITR,
         metadata: parsedMeta,
         language: uploadLanguage,
+        chunkingStrategy: uploadChunkingStrategy,
+        maxChars: uploadMaxChars,
+        maxDepth: uploadMaxDepth,
         syncId: MANUAL_SYNC_ID,
         contentHash,
         onDone: (n_chunks, info) => {
@@ -383,6 +392,9 @@
       itrTemplate: uploadITR,
       metadata: { ...metadata, ...customFieldsRecord },
       language: uploadLanguage,
+      chunkingStrategy: uploadChunkingStrategy,
+      maxChars: uploadMaxChars,
+      maxDepth: uploadMaxDepth,
       selectedSheets: isExcel && selectedSheets.length > 0 && selectedSheets.length < allSheets.length
         ? [...selectedSheets] : undefined,
       syncId: MANUAL_SYNC_ID,
@@ -582,6 +594,35 @@
               </div>
             </div>
           {/if}
+
+          <details class="advanced-settings">
+            <summary>Advanced settings</summary>
+
+            <label class="field">
+              <span>Chunking
+                <span class="info-icon" use:tooltip={"How the document is split for retrieval. Auto uses section headings when present, otherwise falls back to paragraph/table-based chunking."}><InfoIcon/></span>
+              </span>
+              <select bind:value={uploadChunkingStrategy}>
+                <option value="auto">Auto (recommended)</option>
+                <option value="section">Sections only (by heading)</option>
+                <option value="block">Paragraphs &amp; tables</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Max chunk size
+                <span class="info-icon" use:tooltip={"Maximum characters per chunk before it's split further. Leave blank to use the default (100,000)."}><InfoIcon/></span>
+              </span>
+              <input type="number" min="200" max="500000" step="100" placeholder="100,000 (default)" bind:value={uploadMaxChars} />
+            </label>
+
+            <label class="field">
+              <span>Section depth
+                <span class="info-icon" use:tooltip={"How many heading levels (# through ######) start a new section. Only applies when splitting by headings, not to \"Paragraphs & tables\". Leave blank to use the default (5)."}><InfoIcon/></span>
+              </span>
+              <input type="number" min="1" max="6" step="1" placeholder="5 (default)" disabled={uploadChunkingStrategy === 'block'} bind:value={uploadMaxDepth} />
+            </label>
+          </details>
         </div>
 
         <div class="upload-right"
@@ -837,6 +878,12 @@
 }
 .upload-left  { display: flex; flex-direction: column; gap: 0.875rem; overflow-y: auto; min-height: 0; }
 .upload-right { display: flex; flex-direction: column; gap: 0.5rem; position: relative; overflow: hidden; }
+.advanced-settings { display: flex; flex-direction: column; gap: 0.875rem; }
+.advanced-settings summary {
+  cursor: pointer; font-size: var(--text-sm); font-weight: 500;
+  color: var(--color-neutral-500); user-select: none;
+}
+.advanced-settings summary:hover { color: var(--color-neutral-700); }
 
 /* ── Document information (step 2) ── */
 .upload-details {
@@ -919,12 +966,14 @@
   font-size: var(--text-sm); font-weight: 500; color: var(--color-neutral-700);
 }
 .field input[type="text"],
+.field input[type="number"],
 .field input[type="file"],
 .field select {
   padding: 0.5rem 0.75rem; border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md); font-size: var(--text-sm); background: var(--color-white);
 }
 .field input[type="text"]:focus,
+.field input[type="number"]:focus,
 .field select:focus {
   outline: none; border-color: var(--color-blue-500);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-blue-500) 15%, transparent);
