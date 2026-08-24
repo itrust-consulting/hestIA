@@ -26,9 +26,10 @@ _log = logging.getLogger("hestia.system")
 
 class Generator:
 
-    def __init__(self, provider: LLMProvider, model: str = ""):
+    def __init__(self, provider: LLMProvider, model: str = "", default_options: Optional[Dict[str, Any]] = None):
         self.provider = provider
         self.default_model = model
+        self.default_options = default_options
 
     @overload
     async def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[False] = False) -> str: ...
@@ -37,8 +38,9 @@ class Generator:
 
     async def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: bool = False):
         _m = model or self.default_model
+        _opts = {**(self.default_options or {}), **(options or {})}
         _log.debug("generator_generate", extra={"model": _m, "prompt_len": len(prompt), "stream": stream})
-        return await self.provider.generate(prompt, model=_m, options=options, stream=stream)
+        return await self.provider.generate(prompt, model=_m, options=_opts or None, stream=stream)
 
     @overload
     async def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[False] = False) -> str: ...
@@ -47,16 +49,18 @@ class Generator:
 
     async def chat(self, messages: List[Message], *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: bool = False):
         _m = model or self.default_model
+        _opts = {**(self.default_options or {}), **(options or {})}
         _log.debug("generator_chat", extra={"model": _m, "n_messages": len(messages), "stream": stream})
-        return await self.provider.chat(messages, model=_m, options=options, stream=stream)
+        return await self.provider.chat(messages, model=_m, options=_opts or None, stream=stream)
 
 
 # @MRS-030
 class DenseEncoder:
 
-    def __init__(self, provider: LLMProvider, model: str = ""):
+    def __init__(self, provider: LLMProvider, model: str = "", default_options: Optional[Dict[str, Any]] = None):
         self.provider = provider
         self.default_model = model
+        self.default_options = default_options
         self._vector_dim: int | None = None
 
     @property
@@ -69,16 +73,18 @@ class DenseEncoder:
     async def encode(self, inputs: str | List[str], model: str | None = None, options: Optional[Dict[str, Any]] = None) -> DenseVector:
         inputs = [inputs] if isinstance(inputs, str) else inputs
         _m = model or self.default_model
+        _opts = {**(self.default_options or {}), **(options or {})}
         _log.debug("dense_encode", extra={"model": _m, "n_inputs": len(inputs)})
-        resp = await self.provider.embed(inputs, model=_m, options=options)
+        resp = await self.provider.embed(inputs, model=_m, options=_opts or None)
         vec = DenseVector(vector=resp[0])
         _log.debug("dense_encode_done", extra={"model": _m, "vector_dim": len(vec.vector)})
         return vec
 
     def encode_batch(self, inputs: List[str], model: str | None = None, options: Optional[Dict[str, Any]] = None) -> List[DenseVector]:
         _m = model or self.default_model
+        _opts = {**(self.default_options or {}), **(options or {})}
         _log.debug("dense_encode_batch", extra={"model": _m, "n_inputs": len(inputs)})
-        resp = self.provider.embed_blocking(inputs, model=_m, options=options)
+        resp = self.provider.embed_blocking(inputs, model=_m, options=_opts or None)
         vecs = [DenseVector(vector=emb) for emb in resp]
         _log.debug("dense_encode_batch_done", extra={"model": _m, "n_vectors": len(vecs), "vector_dim": len(vecs[0].vector) if vecs else 0})
         return vecs

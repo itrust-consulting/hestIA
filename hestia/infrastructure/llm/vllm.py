@@ -44,9 +44,9 @@ class vLLMProvider(LLMProvider):
         _m = model or self.model
         _inputs = list(inputs) if isinstance(inputs, str) else inputs
         _log.debug("vllm_embed", extra={"model": _m, "n_inputs": len(_inputs)})
-        payload: Dict[str, Any] = {"model": _m, "input": _inputs}
-        if options:
-            payload["options"] = options
+        # see generate()/chat() -- params go top-level (OpenAI-compatible
+        # /v1/embeddings contract), not nested under an "options" key.
+        payload: Dict[str, Any] = {"model": _m, "input": _inputs, **(options or {})}
         j = await self.http_embed.post("/v1/embeddings", payload)
         data = j.json().get("data") or []
         result = [item.get("embedding") for item in data]
@@ -62,9 +62,7 @@ class vLLMProvider(LLMProvider):
     ) -> List[List[float]]:
         _m = model or self.model
         _inputs = list(inputs) if isinstance(inputs, str) else inputs
-        payload: Dict[str, Any] = {"model": _m, "input": _inputs}
-        if options:
-            payload["options"] = options
+        payload: Dict[str, Any] = {"model": _m, "input": _inputs, **(options or {})}
         j = self.http_embed.post_blocking("/v1/embeddings", payload)
         data = j.json().get("data") or []
         return [item.get("embedding") for item in data]

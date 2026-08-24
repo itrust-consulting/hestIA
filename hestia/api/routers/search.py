@@ -25,7 +25,7 @@ def search(
             perm = allowed.get(req.collection)
             if not perm or not perm.access:
                 raise HTTPException(403, "Access to this collection is not permitted.")
-    retriever = c.services["search"]
+    retriever = c.require_service("search")
 
     if req.mode == "semantic":
         query = DenseVector(vector=req.query)

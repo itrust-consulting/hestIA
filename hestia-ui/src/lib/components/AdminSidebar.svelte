@@ -22,7 +22,7 @@
     {
       label: 'System',
       items: [
-        { label: 'Settings', href: '/admin/settings' },
+        { label: 'Connections', href: '/admin/settings/connections' },
       ]
     },
   ];

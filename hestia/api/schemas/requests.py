@@ -107,3 +107,35 @@ class CreateOrgRequest(Request):
 class UpdateOrgRequest(Request):
     name: str
     abbreviation: str
+
+
+# ---- LLM settings ----
+# A connection backs one purpose (generation/embedding/reranking/vector_db);
+# a purpose may have several connections but at most one active at a time.
+# purpose and backend_type are fixed at creation and can't be edited
+# afterward (delete + recreate under the other section to change them).
+
+class LLMConnectionCreateRequest(Request):
+    purpose: Literal["generation", "embedding", "reranking", "vector_db"]
+    backend_type: Literal["ollama", "openai", "qdrant"]
+    base_url: str
+    api_key: Optional[str] = None
+
+
+class LLMConnectionUpdateRequest(Request):
+    base_url: str
+    api_key: Optional[str] = None  # blank/omitted means "keep existing key"
+    model: str = ""
+    params: Dict[str, Any] = {}
+
+
+class LLMConnectionTestRequest(Request):
+    backend_type: Literal["ollama", "openai", "qdrant"]
+    base_url: str
+    api_key: Optional[str] = None
+    # Present only when testing an edit to an existing connection. A blank
+    # api_key there means "keep the existing key" (see
+    # LLMConnectionUpdateRequest) -- the raw key is never sent to the
+    # client, so the backend looks it up by id to test what will actually
+    # be saved/used.
+    connection_id: Optional[int] = None

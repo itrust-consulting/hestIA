@@ -434,7 +434,7 @@ class RequestHandler:
         streaming path can emit a "compacting" status frame right before
         calling this, once it already knows a fold is needed but before the
         slow part actually starts."""
-        generator = self.container.services.get("generate")
+        generator = self.container.require_service("generate")
         before_tokens = check.tokens
         new_history = await run_compaction(
             generator, self.container.settings, users, conversation_id,

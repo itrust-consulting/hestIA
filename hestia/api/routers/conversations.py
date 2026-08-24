@@ -113,7 +113,7 @@ async def compact_conversation(
         return CompactOut(
             status="not_needed", used_tokens=check.tokens, max_tokens=settings.max_context_tokens,
         )
-    generator = h.container.services.get("generate")
+    generator = h.container.require_service("generate")
     await run_compaction(
         generator, settings, users, conversation_id, prior_summary, check.fold, check.keep,
     )
