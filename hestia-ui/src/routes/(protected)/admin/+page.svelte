@@ -38,7 +38,7 @@
   <div class="admin-grid">
     {#if data.isAdmin}
       <div class="admin-card">
-        <h2 class="admin-card-header">Users & Authentication</h2>
+        <h2 class="admin-card-header">Identity & Access</h2>
         <div class="admin-list">
           <div class="admin-item" onclick={() => goto('/admin/users')}>
             <span>User Management</span><span class="chevron">›</span>
@@ -62,8 +62,17 @@
       <div class="admin-card">
         <h2 class="admin-card-header">System</h2>
         <div class="admin-list">
-          <div class="admin-item" onclick={() => goto('/admin/settings')}>
-            <span>Settings</span><span class="chevron">›</span>
+          <div class="admin-item" onclick={() => goto('/admin/settings/connections')}>
+            <span>Connections</span><span class="chevron">›</span>
+          </div>
+          <div class="admin-item" onclick={() => goto('/admin/settings/connections')}>
+            <span>Workflows</span><span class="chevron">›</span>
+          </div>
+          <div class="admin-item" onclick={() => goto('/admin/settings/authentication')}>
+            <span>Authentication</span><span class="chevron">›</span>
+          </div>
+          <div class="admin-item" onclick={() => goto('/admin/settings/logging')}>
+            <span>Logging</span><span class="chevron">›</span>
           </div>
         </div>
       </div>
@@ -153,7 +162,6 @@
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  max-width: 720px;
   gap: calc(var(--spacing) * 4);
 }
 

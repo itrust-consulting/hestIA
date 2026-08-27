@@ -76,12 +76,22 @@ def update_connection(
     assert_admin(user)
     if not req.base_url.strip():
         raise HTTPException(400, "Base URL is required")
+    if (
+        req.compaction_enabled
+        and req.compaction_context_window is not None
+        and req.compaction_summary_length is not None
+        and req.compaction_summary_length >= req.compaction_context_window
+    ):
+        raise HTTPException(400, "Compaction summary length must be less than the context window.")
     repo = h.container.services["llm_settings"]
     if repo.get_connection(connection_id) is None:
         raise HTTPException(404, "Connection not found")
     repo.update_connection(
         connection_id=connection_id, base_url=req.base_url.strip(), api_key=req.api_key,
         model=req.model.strip(), params=req.params,
+        compaction_enabled=req.compaction_enabled, compaction_model=req.compaction_model,
+        compaction_context_window=req.compaction_context_window,
+        compaction_summary_length=req.compaction_summary_length,
     )
     h.container.apply_connection_update(connection_id)
     return {"ok": True}

@@ -27,12 +27,29 @@ class AuthenticationService:
         self.oidc = oidc
         self.config = config
 
+    def _audit_auth_attempt(self, **kwargs) -> None:
+        """Gated by AuthSettings.audit_logs -- off by default. config is
+        realistically never None (this service is only built when auth is
+        enabled, always with config=settings.auth), but fails open just in
+        case, matching the previous unconditional behavior."""
+        if self.config is None or self.config.audit_logs:
+            audit.auth_attempt(**kwargs)
+
+    def audit_logout(self, *, user_id: str, username: str, source: str) -> None:
+        """Called from the /logout route (api/routers/auth.py) -- unlike
+        _audit_auth_attempt this is invoked externally, so it's public.
+        Gated by the same AuthSettings.audit_logs toggle as login attempts,
+        keeping the whole auth audit trail (login + logout) governed by one
+        setting."""
+        if self.config is None or self.config.audit_logs:
+            audit.logout(user_id=user_id, username=username, source=source)
+
     def authenticate(self, identifier: str, password: str) -> AuthResult:
         local_result = self.local.authenticate(identifier, password)
 
         if local_result.success:
             local_result.auth_source = "local"
-            audit.auth_attempt(username=identifier, success=True, source="local")
+            self._audit_auth_attempt(username=identifier, success=True, source="local")
             return local_result
 
         if self.ldap:
@@ -49,7 +66,7 @@ class AuthenticationService:
                 if local_result.user_id:
                     local_result.success = True
                     local_result.message = "Login successful."
-                    audit.auth_attempt(username=identifier, success=True, source="ldap")
+                    self._audit_auth_attempt(username=identifier, success=True, source="ldap")
                     return local_result
 
                 new_user_id = self.local.create_user(
@@ -65,8 +82,8 @@ class AuthenticationService:
                 )
 
                 _log.info("ldap_user_provisioned", extra={"username": ldap_result.username})
-                audit.auth_attempt(username=identifier, success=True, source="ldap",
-                                   reason="auto-provisioned")
+                self._audit_auth_attempt(username=identifier, success=True, source="ldap",
+                                          reason="auto-provisioned")
 
                 return AuthResult(
                     success=True,
@@ -82,8 +99,8 @@ class AuthenticationService:
                 )
 
         source = "local+ldap" if self.ldap else "local"
-        audit.auth_attempt(username=identifier, success=False, source=source,
-                           reason="invalid_credentials")
+        self._audit_auth_attempt(username=identifier, success=False, source=source,
+                                  reason="invalid_credentials")
         return AuthResult.nack()
 
     def authenticate_oidc(self, code: str, redirect_uri: str) -> AuthResult:
@@ -130,7 +147,7 @@ class AuthenticationService:
         existing = self.local.repo.get_user_by_email(email)
         if existing:
             user_id = uuid.UUID(bytes=existing["id"])
-            audit.auth_attempt(username=username, success=True, source="oidc")
+            self._audit_auth_attempt(username=username, success=True, source="oidc")
             return AuthResult(
                 success=True,
                 message="Login successful.",
@@ -156,7 +173,7 @@ class AuthenticationService:
         )
 
         _log.info("oidc_user_provisioned", extra={"username": username, "email": email})
-        audit.auth_attempt(username=username, success=True, source="oidc", reason="auto-provisioned")
+        self._audit_auth_attempt(username=username, success=True, source="oidc", reason="auto-provisioned")
 
         return AuthResult(
             success=True,

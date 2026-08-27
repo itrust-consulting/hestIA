@@ -32,6 +32,19 @@ class AuditLogger:
             "ip": ip,
         })
 
+    def logout(
+        self,
+        *,
+        user_id: str,
+        username: str,
+        source: str,
+    ) -> None:
+        _log.info("logout", extra={
+            "user_id": user_id,
+            "username": username,
+            "source": source,
+        })
+
     def policy_decision(
         self,
         *,

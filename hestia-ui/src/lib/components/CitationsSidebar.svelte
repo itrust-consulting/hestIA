@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Citation } from '$lib/types';
   import { renderChatContent } from '$lib/render/renderChatContent';
+  import { tooltip } from '$lib/actions/tooltip';
 
   export let citations: Citation[] = [];
   export let onClose: () => void = () => {};
@@ -12,7 +13,7 @@
 <aside class="citations-sidebar">
   <div class="sidebar-header">
     <h3>Sources</h3>
-    <button class="close-btn" on:click={onClose} aria-label="Close sources">
+    <button class="close-btn" on:click={onClose} aria-label="Close sources" use:tooltip={"Close"}>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2" class="w-4 h-4">
         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>

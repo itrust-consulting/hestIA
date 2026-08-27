@@ -1,0 +1,7 @@
+import type { RequestHandler } from './$types';
+import { backendFetch, proxyResponse } from '$lib/server/backend';
+
+export const POST: RequestHandler = async ({ cookies }) => {
+  const res = await backendFetch('/account/heartbeat', cookies.get('token'), { method: 'POST' });
+  return proxyResponse(res);
+};

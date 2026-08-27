@@ -12,7 +12,7 @@ router = APIRouter()
 
 # @MRS-034, @MRS-085
 @router.post("/search")
-def search(
+async def search(
     req: SearchRequest,
     c: Container = Depends(get_container),
     user: User = Depends(get_current_user),
@@ -42,5 +42,5 @@ def search(
     else:
         query = DenseVector(vector=req.query)
 
-    result = retriever.retrieve(collection=req.collection, query=query, options=req.options)
+    result = await retriever.retrieve(collection=req.collection, query=query, options=req.options)
     return {"data": result}

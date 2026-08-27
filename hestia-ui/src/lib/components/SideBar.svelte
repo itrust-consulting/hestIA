@@ -9,6 +9,7 @@
     import BinIcon from './icons/binIcon.svelte';
     import BookIcon from './icons/bookIcon.svelte';
     import ItrustIcon from './icons/itrustIcon.svelte';
+    import { tooltip } from '$lib/actions/tooltip';
 
     import {
         conversations,
@@ -97,7 +98,7 @@
         aria-label="Toggle sidebar"
         aria-expanded={sidebarOpen}
         aria-controls="sidebar-list"
-        title={sidebarOpen ? 'Collapse' : 'Expand'}
+        use:tooltip={sidebarOpen ? 'Collapse' : 'Expand'}
         >
         <SidebarLeft/>
     </button>
@@ -162,8 +163,8 @@
                 </span>
             {/if}
 
-            <button class="delete-btn" 
-            onclick={(e) => deleteConversation(conv.id, e)} aria-label="Delete conversation">
+            <button class="delete-btn"
+            onclick={(e) => deleteConversation(conv.id, e)} aria-label="Delete conversation" use:tooltip={"Delete"}>
                 <BinIcon />
             </button>
             </div>

@@ -23,6 +23,10 @@
     model: string;
     params: Record<string, unknown>;
     is_active: boolean;
+    compaction_enabled: boolean;
+    compaction_model: string | null;
+    compaction_context_window: number | null;
+    compaction_summary_length: number | null;
   };
 
   const PURPOSES: { key: Purpose; label: string }[] = [
@@ -127,6 +131,14 @@
   let settingsError = $state<string | null>(null);
   let confirmDeleteOpen = $state(false);
 
+  // Compaction (purpose === 'generation' only) -- bespoke fields, not routed
+  // through the generic ParamSpec param list, since compaction_model needs a
+  // dropdown fed by settingsModels and the rest is conditionally shown.
+  let settingsCompactionEnabled = $state(false);
+  let settingsCompactionModel = $state('');
+  let settingsCompactionContextWindow = $state('');
+  let settingsCompactionSummaryLength = $state('');
+
   // Every known param for the connection's backend type (see
   // $lib/llmParamSchemas -- a fixed, per-protocol list, not an open-ended
   // set), shown as one searchable list. Values are kept as plain strings
@@ -174,6 +186,11 @@
     settingsParamValues = values;
     settingsParamSearch = '';
     settingsParamJsonErrors = {};
+
+    settingsCompactionEnabled = c.compaction_enabled;
+    settingsCompactionModel = c.compaction_model ?? c.model;
+    settingsCompactionContextWindow = c.compaction_context_window != null ? String(c.compaction_context_window) : '';
+    settingsCompactionSummaryLength = c.compaction_summary_length != null ? String(c.compaction_summary_length) : '';
 
     settingsModels = [];
     settingsModelsError = null;
@@ -238,6 +255,18 @@
         return;
       }
 
+      const compactionContextWindow = settingsCompactionContextWindow.trim() ? parseInt(settingsCompactionContextWindow, 10) : null;
+      const compactionSummaryLength = settingsCompactionSummaryLength.trim() ? parseInt(settingsCompactionSummaryLength, 10) : null;
+      if (
+        settingsCompactionEnabled &&
+        compactionContextWindow !== null &&
+        compactionSummaryLength !== null &&
+        compactionSummaryLength >= compactionContextWindow
+      ) {
+        settingsError = 'Compaction summary length must be less than the context window.';
+        return;
+      }
+
       const testRes = await fetch('/api/admin/llm-connections/test', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -262,6 +291,10 @@
           api_key: settingsApiKey.trim() || null,
           model: settingsModel.trim(),
           params,
+          compaction_enabled: settingsCompactionEnabled,
+          compaction_model: settingsCompactionModel.trim() || null,
+          compaction_context_window: compactionContextWindow,
+          compaction_summary_length: compactionSummaryLength,
         }),
       });
       if (!res.ok) {
@@ -435,9 +468,47 @@
       <span class="hint">Fetches against the last saved URL/API key &mdash; save first if you just changed them.</span>
       {#if settingsModelsError}<div class="field-error">{settingsModelsError}</div>{/if}
     </label>
+    {/if}
 
+    {#if settingsConn?.purpose === 'generation'}
     <div class="field">
-      <span>LLM parameters <span class="hint">&mdash; leave a field blank to use the provider's default</span></span>
+      <label class="checkbox-row">
+        <input type="checkbox" bind:checked={settingsCompactionEnabled} />
+        <span>Enable auto-compaction</span>
+      </label>
+      <span class="hint">Automatically summarizes older conversation history once it exceeds the context window below, freeing up space for new turns.</span>
+
+      {#if settingsCompactionEnabled}
+        <div class="compaction-subfields">
+          <label class="field">
+            <span>Compaction model</span>
+            {#if settingsModels.length > 0}
+              <select bind:value={settingsCompactionModel}>
+                <option value="" disabled>Select a model…</option>
+                {#each settingsModels as m}
+                  <option value={m}>{m}</option>
+                {/each}
+              </select>
+            {:else}
+              <input type="text" bind:value={settingsCompactionModel} placeholder="Model name" />
+            {/if}
+          </label>
+          <label class="field">
+            <span>Context window (tokens)</span>
+            <input type="text" inputmode="numeric" bind:value={settingsCompactionContextWindow} placeholder="unset (falls back to the server default)" />
+          </label>
+          <label class="field">
+            <span>Summary length (tokens)</span>
+            <input type="text" inputmode="numeric" bind:value={settingsCompactionSummaryLength} placeholder="unset (falls back to the server default)" />
+          </label>
+        </div>
+      {/if}
+    </div>
+    {/if}
+
+    <details class="parameter-settings">
+      <summary>Parameter settings</summary>
+      <div class="field">
       <input type="text" class="param-search" bind:value={settingsParamSearch} placeholder="Search settings… (e.g. temperature, num_ctx)" />
 
       <div class="param-list">
@@ -455,7 +526,7 @@
                       <option value="false">False</option>
                     </select>
                   {:else if field.type === 'number' || field.type === 'integer'}
-                    <input id={`param-${row.key}-${field.key}`} type="number" step={field.step ?? (field.type === 'integer' ? 1 : 'any')} bind:value={settingsParamValues[`${row.key}.${field.key}`]} placeholder={unsetHint(field, 'unset')} />
+                    <input id={`param-${row.key}-${field.key}`} type="text" inputmode={field.type === 'integer' ? 'numeric' : 'decimal'} bind:value={settingsParamValues[`${row.key}.${field.key}`]} placeholder={unsetHint(field, 'unset')} />
                   {:else if field.type === 'string-list'}
                     <input id={`param-${row.key}-${field.key}`} type="text" bind:value={settingsParamValues[`${row.key}.${field.key}`]} placeholder={unsetHint(field, 'comma-separated, unset')} />
                   {:else}
@@ -490,7 +561,7 @@
                   <option value="false">False</option>
                 </select>
               {:else if row.type === 'number' || row.type === 'integer'}
-                <input id={`param-${row.key}`} type="number" step={row.step ?? (row.type === 'integer' ? 1 : 'any')} bind:value={settingsParamValues[row.key]} placeholder={unsetHint(row, 'unset')} />
+                <input id={`param-${row.key}`} type="text" inputmode={row.type === 'integer' ? 'numeric' : 'decimal'} bind:value={settingsParamValues[row.key]} placeholder={unsetHint(row, 'unset')} />
               {:else if row.type === 'string-list'}
                 <input id={`param-${row.key}`} type="text" bind:value={settingsParamValues[row.key]} placeholder={unsetHint(row, 'comma-separated, unset')} />
               {:else}
@@ -502,8 +573,8 @@
           <p class="hint">No settings match "{settingsParamSearch}".</p>
         {/each}
       </div>
-    </div>
-    {/if}
+      </div>
+    </details>
 
     {#if settingsError}<div class="field-error">{settingsError}</div>{/if}
   </div>
@@ -653,6 +724,28 @@ td.status-cell { width: 6rem; }
 .fetch-btn:hover:not(:disabled) { background: var(--color-neutral-100); }
 .fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.checkbox-row input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.compaction-subfields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.75rem 0 0.25rem 0.9rem;
+  margin-top: 0.25rem;
+  border-left: 2px solid var(--color-neutral-200);
+}
+
 .form-stack {
   display: flex;
   flex-direction: column;
@@ -669,7 +762,6 @@ td.status-cell { width: 6rem; }
 }
 .field input[type="text"],
 .field input[type="password"],
-.field input[type="number"],
 .field select {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-neutral-300);
@@ -690,6 +782,14 @@ td.status-cell { width: 6rem; }
 
 .password-row, .model-row { display: flex; gap: 0.5rem; align-items: stretch; }
 .password-row input, .model-row select, .model-row input { flex: 1; min-width: 0; }
+
+.parameter-settings { display: flex; flex-direction: column; gap: 0.6rem; }
+.parameter-settings summary {
+  cursor: pointer; font-size: var(--text-sm); font-weight: 500;
+  color: var(--color-neutral-500); user-select: none;
+}
+.parameter-settings summary:hover { color: var(--color-neutral-700); }
+.parameter-settings .field { margin-top: 0.6rem; }
 
 .param-search { margin-bottom: 0.25rem; }
 

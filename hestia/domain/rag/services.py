@@ -26,10 +26,21 @@ _log = logging.getLogger("hestia.system")
 
 class Generator:
 
-    def __init__(self, provider: LLMProvider, model: str = "", default_options: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, provider: LLMProvider, model: str = "", default_options: Optional[Dict[str, Any]] = None,
+        compaction_enabled: bool = False, compaction_model: Optional[str] = None,
+        compaction_context_window: Optional[int] = None, compaction_summary_length: Optional[int] = None,
+    ):
         self.provider = provider
         self.default_model = model
         self.default_options = default_options
+        # Per-connection conversation-compaction config (see context_budget.py)
+        # -- compaction_enabled gates automatic triggering; the others fall
+        # back to global Settings values when unset.
+        self.compaction_enabled = compaction_enabled
+        self.compaction_model = compaction_model
+        self.compaction_context_window = compaction_context_window
+        self.compaction_summary_length = compaction_summary_length
 
     @overload
     async def generate(self, prompt: str, *, model: str | None = None, options: Optional[Dict[str, Any]] = None, stream: Literal[False] = False) -> str: ...
@@ -407,13 +418,15 @@ class SparseEncoder:
 
 class Retriever:
 
-    def __init__(self, provider: DBProvider):
+    def __init__(self, provider: DBProvider, default_options: Optional[Dict[str, Any]] = None):
         self.provider = provider
+        self.default_options = default_options
 
     # @MRS-030
     async def retrieve(self, collection: str, query: Query, options: Dict[str, Any] = None):
+        _opts = {**(self.default_options or {}), **(options or {})}
         _log.debug("retriever_query", extra={"collection": collection, "query_type": type(query).__name__})
-        result = await asyncio.to_thread(self.provider.search, collection, query, options=options)
+        result = await asyncio.to_thread(self.provider.search, collection, query, options=_opts or None)
         n_hits = len(result.points) if hasattr(result, "points") else 0
         _log.debug("retriever_done", extra={"collection": collection, "n_hits": n_hits})
         return result

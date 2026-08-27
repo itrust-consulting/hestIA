@@ -127,6 +127,14 @@ class LLMConnectionUpdateRequest(Request):
     api_key: Optional[str] = None  # blank/omitted means "keep existing key"
     model: str = ""
     params: Dict[str, Any] = {}
+    # Only meaningful for a purpose='generation' connection -- ignored for
+    # any other. compaction_model blank means "use this connection's own
+    # model"; compaction_context_window/compaction_summary_length blank
+    # fall back to the global Settings.max_context_tokens/summary_target_tokens.
+    compaction_enabled: bool = False
+    compaction_model: Optional[str] = None
+    compaction_context_window: Optional[int] = None
+    compaction_summary_length: Optional[int] = None
 
 
 class LLMConnectionTestRequest(Request):
@@ -139,3 +147,65 @@ class LLMConnectionTestRequest(Request):
     # client, so the backend looks it up by id to test what will actually
     # be saved/used.
     connection_id: Optional[int] = None
+
+
+# ---- Logging settings ----
+
+class LogSettingsUpdateRequest(Request):
+    log_level: str
+
+
+# ---- Auth settings ----
+# Global, single-row config (mode, password policy, JWT signing, OIDC,
+# LDAP). Secret fields (token_secret_key, oidc_client_secret,
+# ldap_bind_password) are Optional[str] = None -- blank/omitted means "keep
+# the existing value", never sent back to the client in GET responses.
+
+class AuthSettingsUpdateRequest(Request):
+    auth_mode: Literal["local", "ldap", "oidc"]
+    password_min_length: int
+    max_failed_attempts: int
+    lockout_duration_minutes: int
+    token_lifetime_minutes: int
+    token_secret_key: Optional[str] = None
+    audit_logs: bool = False
+    ldap_group_mapping: Optional[Dict[str, List[str]]] = None
+
+    oidc_provider_url: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: Optional[str] = None
+    oidc_scopes: List[str] = []
+    oidc_role_claim: str = "roles"
+    oidc_role_mapping: Optional[Dict[str, List[str]]] = None
+    oidc_org_claim: str = "organization"
+    oidc_org_mapping: Optional[Dict[str, str]] = None
+
+    ldap_host: str = ""
+    ldap_port: int = 636
+    ldap_search_base: str = ""
+    ldap_user_attribute: str = "uid"
+    ldap_mail_attribute: str = "mail"
+    ldap_use_ssl: bool = True
+    ldap_validate_cert: bool = True
+    ldap_bind_dn: Optional[str] = None
+    ldap_bind_password: Optional[str] = None
+    ldap_user_dn_template: Optional[str] = None
+    ldap_allowed_groups: Optional[List[str]] = None
+
+
+class AuthSettingsTestRequest(Request):
+    auth_mode: Literal["local", "ldap", "oidc"]
+
+    oidc_provider_url: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: Optional[str] = None  # blank means "use the currently-saved secret"
+
+    ldap_host: str = ""
+    ldap_port: int = 636
+    ldap_search_base: str = ""
+    ldap_user_attribute: str = "uid"
+    ldap_mail_attribute: str = "mail"
+    ldap_use_ssl: bool = True
+    ldap_validate_cert: bool = True
+    ldap_bind_dn: Optional[str] = None
+    ldap_bind_password: Optional[str] = None  # blank means "use the currently-saved password"

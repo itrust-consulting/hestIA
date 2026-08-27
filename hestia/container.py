@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-from hestia.config.settings import Settings
+from hestia.config.settings import AuthSettings, LDAPSettings, OIDCSettings, Settings
 from hestia.domain.exceptions import ConfigurationError
 
 _log = logging.getLogger("hestia.system")
@@ -13,6 +13,7 @@ from hestia.domain.auth.oidc import OIDCService
 from hestia.domain.auth.service import AuthenticationService
 from hestia.domain.auth.users import LDAPService, UserService
 from hestia.domain.rag.services import DenseEncoder, Generator, Retriever, SparseEncoder
+from hestia.infrastructure.db.auth_settings_repository import AuthSettingsRepository
 from hestia.infrastructure.db.llm_settings_repository import LLMSettingsRepository
 from hestia.infrastructure.db.qdrant import QdrantDB
 from hestia.infrastructure.db.sync_repository import SyncManifestRepository
@@ -52,6 +53,57 @@ def _provider_http_client(provider: LLMProvider) -> HttpClient:
     return provider.http if isinstance(provider, OllamaProvider) else provider.http_chat
 
 
+def _auth_settings_from_row(row: Dict[str, Any]) -> tuple[AuthSettings, OIDCSettings, LDAPSettings]:
+    auth = AuthSettings(
+        auth_mode=row["auth_mode"], ldap_group_mapping=row["ldap_group_mapping"],
+        password_min_length=row["password_min_length"], max_failed_attempts=row["max_failed_attempts"],
+        lockout_duration_minutes=row["lockout_duration_minutes"], token_secret_key=row["token_secret_key"],
+        token_encoding_alg=row["token_encoding_alg"], token_lifetime_minutes=row["token_lifetime_minutes"],
+        audit_logs=row["audit_logs"],
+    )
+    oidc = OIDCSettings(
+        provider_url=row["oidc_provider_url"], client_id=row["oidc_client_id"], client_secret=row["oidc_client_secret"],
+        scopes=row["oidc_scopes"], role_claim=row["oidc_role_claim"], role_mapping=row["oidc_role_mapping"],
+        org_claim=row["oidc_org_claim"], org_mapping=row["oidc_org_mapping"],
+    )
+    ldap = LDAPSettings(
+        host=row["ldap_host"], port=row["ldap_port"], search_base=row["ldap_search_base"],
+        user_attribute=row["ldap_user_attribute"], mail_attribute=row["ldap_mail_attribute"],
+        use_ssl=row["ldap_use_ssl"], validate_cert=row["ldap_validate_cert"], bind_dn=row["ldap_bind_dn"],
+        bind_password=row["ldap_bind_password"], user_dn_template=row["ldap_user_dn_template"],
+        allowed_groups=set(row["ldap_allowed_groups"]) if row["ldap_allowed_groups"] is not None else None,
+        mode=row["ldap_mode"],
+    )
+    return auth, oidc, ldap
+
+
+def _build_auth_stack(settings: Settings, user_repo: UserRepository) -> tuple[UserService, AuthenticationService]:
+    """Shared by build_container (first boot) and Container.apply_auth_update
+    (live hot-reload after an admin edits auth settings) so both construct
+    the service stack identically."""
+    user_service = UserService(user_repo, password_min_length=settings.auth.password_min_length)
+
+    ldap: LDAPService | None = None
+    if settings.auth.auth_mode == "ldap" and settings.ldap:
+        ldap = LDAPService(
+            host=settings.ldap.host, port=settings.ldap.port, search_base=settings.ldap.search_base,
+            user_attribute=settings.ldap.user_attribute, mail_attribute=settings.ldap.mail_attribute,
+            bind_dn=settings.ldap.bind_dn, bind_password=settings.ldap.bind_password,
+            user_dn_template=settings.ldap.user_dn_template, allowed_groups=settings.ldap.allowed_groups,
+            use_ssl=settings.ldap.use_ssl, validate_cert=settings.ldap.validate_cert, mode=settings.ldap.mode,
+        )
+        _log.info("service_init", extra={"service": "ldap", "host": settings.ldap.host})
+
+    oidc: OIDCService | None = None
+    if settings.auth.auth_mode == "oidc" and settings.oidc:
+        oidc = OIDCService(settings.oidc)
+        _log.info("service_init", extra={"service": "oidc", "provider": settings.oidc.provider_url})
+
+    auth_service = AuthenticationService(user_service, ldap, oidc, config=settings.auth)
+    _log.info("service_init", extra={"service": "auth", "mode": settings.auth.auth_mode})
+    return user_service, auth_service
+
+
 @dataclass
 class Container:
     settings: Settings
@@ -81,6 +133,11 @@ class Container:
                 svc.provider = provider
                 svc.default_model = row["model"]
                 svc.default_options = row["params"] or None
+                if purpose == "generation":
+                    svc.compaction_enabled = bool(row["compaction_enabled"])
+                    svc.compaction_model = row["compaction_model"]
+                    svc.compaction_context_window = row["compaction_context_window"]
+                    svc.compaction_summary_length = row["compaction_summary_length"]
 
     def apply_connection_update(self, connection_id: int) -> None:
         """A connection's row changed (URL/API key/model/params). Since each
@@ -109,11 +166,38 @@ class Container:
         QdrantDB bakes its URL/api_key into a QdrantClient built once in
         __init__. Rebuild that client in place on the same QdrantDB instance
         already held by Retriever/IngestionPipeline, so they pick up the
-        change without themselves being rewired."""
+        change without themselves being rewired. Also refresh the live
+        Retriever's default_options, mirroring what _rewire_purpose does for
+        Generator/DenseEncoder."""
         db = self.providers.get("db")
         if db is None:
             return
         db.client = build_db_provider(row["backend_type"], row["base_url"], row["api_key"]).client
+        search_svc = self.services.get("search")
+        if search_svc is not None:
+            search_svc.default_options = row["params"] or None
+
+    def apply_auth_update(self) -> None:
+        """Auth settings row changed (mode/password policy/token lifetime/
+        signing key/OIDC/LDAP config). Rebuilds the auth service stack from
+        the DB row and swaps services["auth"]/services["users"] in place --
+        get_current_user/_issue_token (api/security.py) read auth_svc.config
+        fresh on every request, so this takes effect on the very next
+        request. No restart needed. If the signing key or auth_mode changed,
+        every previously-issued token becomes invalid on the next request
+        that uses it (by design -- the caller is responsible for warning the
+        admin before triggering this)."""
+        repo: Optional[AuthSettingsRepository] = self.services.get("auth_settings")
+        user_repo: Optional[UserRepository] = self.services.get("user_repository")
+        if repo is None or user_repo is None:
+            return
+        row = repo.get_settings()
+        if row is None:
+            return
+        self.settings.auth, self.settings.oidc, self.settings.ldap = _auth_settings_from_row(row)
+        user_service, auth_service = _build_auth_stack(self.settings, user_repo)
+        self.services["auth"] = auth_service
+        self.services["users"] = user_service
 
     def apply_connection_delete(self, connection_id: int, purpose: Optional[str] = None) -> None:
         """Drops a no-longer-needed provider from the cache, and unwires
@@ -155,6 +239,15 @@ def build_container(settings: Settings) -> Container:
     llm_settings_repo.initialize(settings)
     c.services["llm_settings"] = llm_settings_repo
 
+    # --- Auth settings (global, single row; overlays env-sourced settings.auth/.oidc/.ldap before the auth stack below is built) ---
+    auth_settings_repo = AuthSettingsRepository(get_conn, lock)
+    auth_settings_repo.initialize(settings)
+    c.services["auth_settings"] = auth_settings_repo
+    if settings.enable_auth:
+        auth_row = auth_settings_repo.get_settings()
+        if auth_row is not None:
+            settings.auth, settings.oidc, settings.ldap = _auth_settings_from_row(auth_row)
+
     # --- DB provider ---
     db_cfg = llm_settings_repo.get_connection_by_purpose("vector_db")
     if db_cfg is not None:
@@ -171,35 +264,11 @@ def build_container(settings: Settings) -> Container:
     if settings.enable_auth:
         repo = UserRepository(get_conn, lock)
         repo.initialize()
+        c.services["user_repository"] = repo
 
-        user_service = UserService(repo, password_min_length=settings.auth.password_min_length)
-
-        ldap: LDAPService | None = None
-        if settings.auth and settings.auth.auth_mode == "ldap" and settings.ldap:
-            ldap = LDAPService(
-                host=settings.ldap.host,
-                port=settings.ldap.port,
-                search_base=settings.ldap.search_base,
-                user_attribute=settings.ldap.user_attribute,
-                mail_attribute=settings.ldap.mail_attribute,
-                bind_dn=settings.ldap.bind_dn,
-                bind_password=settings.ldap.bind_password,
-                user_dn_template=settings.ldap.user_dn_template,
-                allowed_groups=settings.ldap.allowed_groups,
-                use_ssl=settings.ldap.use_ssl,
-                validate_cert=settings.ldap.validate_cert,
-                mode=settings.ldap.mode,
-            )
-            _log.info("service_init", extra={"service": "ldap", "host": settings.ldap.host})
-
-        oidc: OIDCService | None = None
-        if settings.auth and settings.auth.auth_mode == "oidc" and settings.oidc:
-            oidc = OIDCService(settings.oidc)
-            _log.info("service_init", extra={"service": "oidc", "provider": settings.oidc.provider_url})
-
-        c.services["auth"] = AuthenticationService(user_service, ldap, oidc, config=settings.auth)
+        user_service, auth_service = _build_auth_stack(settings, repo)
+        c.services["auth"] = auth_service
         c.services["users"] = user_service
-        _log.info("service_init", extra={"service": "auth", "mode": settings.auth.auth_mode})
 
     close()
 
@@ -212,7 +281,12 @@ def build_container(settings: Settings) -> Container:
     gen_cfg = llm_settings_repo.get_connection_by_purpose("generation")
     generator: Optional[Generator] = None
     if gen_cfg is not None:
-        generator = Generator(provider=_provider_for(gen_cfg), model=gen_cfg["model"], default_options=gen_cfg["params"] or None)
+        generator = Generator(
+            provider=_provider_for(gen_cfg), model=gen_cfg["model"], default_options=gen_cfg["params"] or None,
+            compaction_enabled=bool(gen_cfg["compaction_enabled"]), compaction_model=gen_cfg["compaction_model"],
+            compaction_context_window=gen_cfg["compaction_context_window"],
+            compaction_summary_length=gen_cfg["compaction_summary_length"],
+        )
         _log.info("provider_init", extra={"provider": "llm", "purpose": "generation", "connection_id": gen_cfg["id"]})
     else:
         _log.warning("provider_init_skipped", extra={"provider": "llm", "purpose": "generation"})
@@ -246,7 +320,7 @@ def build_container(settings: Settings) -> Container:
 
     if "search" in requested:
         if "db" in c.providers:
-            c.services["search"] = Retriever(provider=c.providers["db"])
+            c.services["search"] = Retriever(provider=c.providers["db"], default_options=db_cfg["params"] or None)
             _log.info("service_init", extra={"service": "search", "backend": db_cfg["backend_type"] if db_cfg else None})
         else:
             _log.warning("service_init_skipped", extra={"service": "search", "reason": "no 'vector_db' connection configured"})

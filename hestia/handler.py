@@ -332,11 +332,12 @@ class PersistChat:
         must never break the chat stream."""
         try:
             settings = self.runner.container.settings
+            generator = self.runner.container.require_service("generate")
             prior_summary, tail = fetch_budget_inputs(self.users, req.user.id, c_id)
-            check = check_context_budget(prior_summary, tail, settings)
+            check = check_context_budget(prior_summary, tail, settings, generator)
             fields = {
                 "used_tokens": check.tokens,
-                "max_tokens": settings.max_context_tokens,
+                "max_tokens": generator.compaction_context_window or settings.max_context_tokens,
                 "needs_compaction": check.needs_compaction,
             }
             if getattr(req, "freed_tokens", None):
@@ -419,7 +420,8 @@ class RequestHandler:
         surface the same notification manual compaction shows. Raises on
         failure -- callers are responsible for failing open."""
         users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
-        check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
+        generator = self.container.require_service("generate")
+        check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings, generator)
         if not check.needs_compaction:
             req.history = check.history
             return
@@ -524,7 +526,8 @@ class RequestHandler:
             _log.debug("context_budget_stream_start", extra={"conversation_id": req.conversation_id})
             try:
                 users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
-                check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
+                generator = self.container.require_service("generate")
+                check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings, generator)
                 if check.needs_compaction:
                     yield (json.dumps({"status": "compacting"}) + "\n").encode("utf-8")
                     await self._compact(req, users, conversation_id, prior_summary, check)

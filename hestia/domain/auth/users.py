@@ -157,9 +157,22 @@ class UserService:
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
                 "expires_at": r["expires_at"],
+                "last_seen_at": r["last_seen_at"],
             }
             for r in self.repo.list_users()
         ]
+
+    def get_user_activity(self, user_id: uuid.UUID) -> dict:
+        """Backs the admin user-detail page's "Additional info" section."""
+        r = self.repo.get_user_activity(user_id)
+        if r is None:
+            return {"last_login_at": None, "last_seen_at": None, "conversation_count": 0, "message_count": 0}
+        return {
+            "last_login_at": r["last_login_at"],
+            "last_seen_at": r["last_seen_at"],
+            "conversation_count": r["conversation_count"],
+            "message_count": r["message_count"],
+        }
 
     def create_user(
         self,
@@ -311,6 +324,7 @@ class UserService:
                 "last_name": r["last_name"],
                 "classification_level": r["classification_level"],
                 "tenant_role": r["tenant_role"],
+                "last_seen_at": r["last_seen_at"],
             }
             for r in self.repo.get_organization_users(org_id)
         ]

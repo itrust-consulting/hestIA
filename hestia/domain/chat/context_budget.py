@@ -84,16 +84,26 @@ def fetch_budget_inputs(users, user_id: uuid.UUID, conversation_id: uuid.UUID) -
     return prior_summary, tail
 
 
-def check_context_budget(prior_summary: str | None, tail: list[dict], settings, *, force: bool = False) -> BudgetCheck:
+def check_context_budget(
+    prior_summary: str | None, tail: list[dict], settings, generator, *, force: bool = False,
+) -> BudgetCheck:
     """Cheap, synchronous, no I/O. Decides whether the given tail (plus any
     prior summary) fits the configured budget, and if not, how to split it
     into a fold (oldest, to be summarized) / keep (newest, kept verbatim).
 
-    force=True skips the budget check entirely and always folds down to
-    MIN_KEEP_MESSAGES (via _split_force_fold) as long as there's anything
-    productive to fold — used for user-initiated manual compaction, which
-    should always do real work when clicked, not only when the auto-trigger
-    budget is exceeded.
+    `generator` is the active generation connection's Generator, carrying its
+    own compaction_enabled/compaction_context_window/compaction_summary_length
+    (falling back to the global settings.max_context_tokens/summary_target_tokens
+    when unset). Token counts are always computed regardless of
+    compaction_enabled, since usage-display endpoints need them too — only
+    needs_compaction itself is gated on the toggle.
+
+    force=True skips both the enabled check and the budget check, and always
+    folds down to MIN_KEEP_MESSAGES (via _split_force_fold) as long as
+    there's anything productive to fold — used for user-initiated manual
+    compaction, which should always do real work when clicked (regardless of
+    whether auto-compaction is enabled for this connection), not only when
+    the auto-trigger budget is exceeded.
 
     Concurrency note: this function and update_conversation_context_summary
     are not used atomically as a pair — two overlapping requests for the same
@@ -104,7 +114,9 @@ def check_context_budget(prior_summary: str | None, tail: list[dict], settings, 
     updates being discarded — self-healing on the next turn.
     """
     candidate = build_history(prior_summary, tail)
-    effective_budget = int(settings.max_context_tokens * SAFETY_MARGIN)
+    context_window = generator.compaction_context_window or settings.max_context_tokens
+    summary_target = generator.compaction_summary_length or settings.summary_target_tokens
+    effective_budget = int(context_window * SAFETY_MARGIN)
     candidate_tokens = count_message_tokens(candidate)
     _log.debug("context_budget_check", extra={
         "tail_len": len(tail),
@@ -112,18 +124,19 @@ def check_context_budget(prior_summary: str | None, tail: list[dict], settings, 
         "prior_summary_tokens": count_tokens(prior_summary) if prior_summary else 0,
         "candidate_tokens": candidate_tokens,
         "effective_budget": effective_budget,
+        "compaction_enabled": generator.compaction_enabled,
         "force": force,
     })
 
     if not tail:
         return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
-    if not force and candidate_tokens <= effective_budget:
+    if not force and (not generator.compaction_enabled or candidate_tokens <= effective_budget):
         return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
 
     if force:
         fold, keep = _split_force_fold(tail)
     else:
-        keep_budget = max(effective_budget - settings.summary_target_tokens - RESERVE_FOR_NEW_TURN, 0)
+        keep_budget = max(effective_budget - summary_target - RESERVE_FOR_NEW_TURN, 0)
         fold, keep = _split_oldest_to_fold(tail, keep_budget, effective_budget)
     if not fold:
         # Nothing productive to fold (e.g. a single message alone exceeds
@@ -224,13 +237,16 @@ async def run_compaction(
         if prior_summary
         else "No summary exists yet — this is the first summarization for this conversation."
     )
+    target_tokens = generator.compaction_summary_length or settings.summary_target_tokens
     turns_text = "\n".join(f"{m['role']}: {m['content']}" for m in fold)
     prompt = _SUMMARIZE_PROMPT.format(
         existing_summary_block=existing_summary_block,
-        target_tokens=settings.summary_target_tokens,
+        target_tokens=target_tokens,
         turns=turns_text,
     )
-    model = settings.summary_model or settings.default_gen_model
+    # 3-tier fallback: this connection's own compaction model override, then
+    # the global summary-model preference, then the connection's normal model.
+    model = generator.compaction_model or settings.summary_model or generator.default_model
     _log.debug("context_compaction_prompt_built", extra={
         "conversation_id": str(conversation_id), "prompt_tokens": count_tokens(prompt), "model": model,
     })
@@ -246,7 +262,7 @@ async def run_compaction(
     new_summary = await generator.chat(
         messages=[{"role": "user", "content": prompt}],
         model=model,
-        options={"temperature": 0.0, "max_tokens": int(settings.summary_target_tokens * 1.5)},
+        options={"temperature": 0.0, "max_tokens": int(target_tokens * 1.5)},
         stream=False,
     )
 

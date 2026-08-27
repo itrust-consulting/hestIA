@@ -5,6 +5,7 @@ import time
 from typing import Any, Callable, Dict
 
 import httpx
+from pydantic import ValidationError
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
@@ -144,6 +145,18 @@ class QdrantDB(DBProvider):
         with_vectors = False
         score_threshold = 0
         filter_ = None
+        hybrid_sparse_limit = 200
+        hybrid_dense_limit = 100
+        fusion = models.Fusion.RRF
+        offset = None
+        consistency = None
+        timeout = None
+        shard_key_selector = None
+        hnsw_ef = None
+        exact = False
+        indexed_only = False
+        quantization = None
+        acorn = None
 
         if options:
             limit = options.get("limit", 50)
@@ -151,6 +164,26 @@ class QdrantDB(DBProvider):
             with_vectors = options.get("with_vectors", False)
             score_threshold = options.get("score_threshold", 0)
             filter_ = self._build_filter(options.get("filters"))
+            hybrid_sparse_limit = options.get("hybrid_sparse_limit", 200)
+            hybrid_dense_limit = options.get("hybrid_dense_limit", 100)
+            fusion = models.Fusion.DBSF if str(options.get("fusion", "rrf")).lower() == "dbsf" else models.Fusion.RRF
+            offset = options.get("offset")
+            consistency = options.get("consistency")
+            timeout = options.get("timeout")
+            shard_key_selector = options.get("shard_key_selector")
+            hnsw_ef = options.get("hnsw_ef")
+            exact = options.get("exact", False)
+            indexed_only = options.get("indexed_only", False)
+            quantization = options.get("quantization")
+            acorn = options.get("acorn")
+
+        try:
+            search_params = models.SearchParams(
+                hnsw_ef=hnsw_ef, exact=exact, indexed_only=indexed_only,
+                quantization=quantization, acorn=acorn,
+            )
+        except ValidationError as e:
+            raise ProviderError(f"Invalid search parameter options: {e}") from e
 
         query_type = type(query).__name__
         _log.debug("qdrant_search", extra={
@@ -170,19 +203,28 @@ class QdrantDB(DBProvider):
                         models.Prefetch(
                             query=models.SparseVector(indices=query.sparse.indices, values=query.sparse.values),
                             using="sparse",
-                            limit=200,
+                            limit=hybrid_sparse_limit,
                             filter=filter_,
+                            params=search_params,
+                            score_threshold=score_threshold,
                         ),
                         models.Prefetch(
                             query=query.dense.vector,
                             using="dense",
-                            limit=100,
+                            limit=hybrid_dense_limit,
                             filter=filter_,
+                            params=search_params,
+                            score_threshold=score_threshold,
                         ),
                     ],
-                    query=models.FusionQuery(fusion=models.Fusion.RRF),
+                    query=models.FusionQuery(fusion=fusion),
                     limit=limit,
-                    with_payload=True,
+                    with_payload=with_payload,
+                    with_vectors=with_vectors,
+                    offset=offset,
+                    consistency=consistency,
+                    timeout=timeout,
+                    shard_key_selector=shard_key_selector,
                 )
             elif isinstance(query, SparseVector):
                 result = _retry_on_transient_error(
@@ -195,6 +237,11 @@ class QdrantDB(DBProvider):
                     with_vectors=with_vectors,
                     score_threshold=score_threshold,
                     query_filter=filter_,
+                    offset=offset,
+                    consistency=consistency,
+                    timeout=timeout,
+                    search_params=search_params,
+                    shard_key_selector=shard_key_selector,
                 )
             # @MRS-030
             elif isinstance(query, DenseVector):
@@ -208,6 +255,11 @@ class QdrantDB(DBProvider):
                     with_vectors=with_vectors,
                     score_threshold=score_threshold,
                     query_filter=filter_,
+                    offset=offset,
+                    consistency=consistency,
+                    timeout=timeout,
+                    search_params=search_params,
+                    shard_key_selector=shard_key_selector,
                 )
             else:
                 raise TypeError(f"Unsupported query type: {type(query)}")

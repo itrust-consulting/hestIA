@@ -3,6 +3,8 @@
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
   import type { PageData } from './$types';
   import { addToast } from '$lib/stores/toast';
+  import EditIcon from '$lib/components/icons/editIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   const { data }: { data: PageData } = $props();
 
@@ -13,6 +15,13 @@
   let allRoles: Role[] = $derived(data.allRoles ?? []);
   let allOrgs:  Org[]  = $derived(data.allOrgs  ?? []);
 
+  const formatDateTime = (ts: number | null) => {
+    if (!ts) return 'Never';
+    return new Date(ts).toLocaleString(undefined, {
+      year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+  };
+
   // ── Profile form ─────────────────────────────────────────────────────────
   let firstName   = $state('');
   let lastName    = $state('');
@@ -20,15 +29,27 @@
   let username    = $state('');
   let expiresAt   = $state('');        // ISO date string for <input type="date">
   let selectedRoleIds = $state<number[]>([]);
+  let editing = $state(false);
 
-  $effect(() => {
+  function syncFieldsFromUser() {
     firstName = user.first_name ?? '';
     lastName  = user.last_name  ?? '';
     email     = user.email      ?? '';
     username  = user.username   ?? '';
     expiresAt = user.expires_at ? new Date(user.expires_at).toISOString().slice(0, 10) : '';
     selectedRoleIds = (user.roles ?? []).map((r: Role) => r.id);
-  });
+  }
+
+  $effect(() => { syncFieldsFromUser(); });
+
+  function startEdit() {
+    syncFieldsFromUser();
+    editing = true;
+  }
+
+  function cancelEdit() {
+    editing = false;
+  }
 
   let saving = $state(false);
 
@@ -51,6 +72,7 @@
         const d = await res.json().catch(() => ({}));
         throw new Error(d.detail ?? `${res.status}`);
       }
+      editing = false;
       addToast('Changes saved.', 'success');
       await invalidateAll();
     } catch (e: any) {
@@ -166,56 +188,122 @@
         <span class="auth-badge">{user.auth_source ?? 'local'}</span>
       </div>
     </div>
-    <div class="danger-zone">
-      <button class="btn-danger" onclick={() => (confirmDeleteOpen = true)}>Delete User</button>
-    </div>
   </div>
 
   <!-- ── Profile section ───────────────────────────────────────────────── -->
   <section class="card">
-    <h2 class="section-title">Profile</h2>
-    <div class="form-grid">
-      <label class="field">
-        <span>First name</span>
-        <input type="text" bind:value={firstName} />
-      </label>
-      <label class="field">
-        <span>Last name</span>
-        <input type="text" bind:value={lastName} />
-      </label>
-      <label class="field">
-        <span>Email</span>
-        <input type="email" bind:value={email} />
-      </label>
-      <label class="field">
-        <span>Username</span>
-        <input type="text" bind:value={username} />
-      </label>
-      <label class="field">
-        <span>Expires</span>
-        <input type="date" bind:value={expiresAt} />
-        {#if expiresAt}
-          <button class="clear-btn" onclick={() => (expiresAt = '')}>Never expires</button>
-        {/if}
-      </label>
+    <div class="section-header">
+      <h2 class="section-title">Profile</h2>
+      {#if !editing}
+        <button class="icon-btn" aria-label="Edit" use:tooltip={"Edit"} onclick={startEdit}>
+          <EditIcon />
+        </button>
+      {/if}
     </div>
 
-    <h2 class="section-title" style="margin-top:1.5rem">Roles</h2>
-    <div class="role-list">
-      {#each allRoles as role}
-        <label class="role-option">
-          <input type="checkbox" checked={selectedRoleIds.includes(role.id)}
-            onchange={() => toggleRole(role.id)} />
-          <span class="role-name">{role.name}</span>
-          {#if role.description}<span class="role-desc">{role.description}</span>{/if}
+    {#if editing}
+      <div class="form-grid">
+        <label class="field">
+          <span>First name</span>
+          <input type="text" bind:value={firstName} />
         </label>
-      {/each}
-    </div>
+        <label class="field">
+          <span>Last name</span>
+          <input type="text" bind:value={lastName} />
+        </label>
+        <label class="field">
+          <span>Email</span>
+          <input type="email" bind:value={email} />
+        </label>
+        <label class="field">
+          <span>Expires</span>
+          <input type="date" bind:value={expiresAt} />
+          {#if expiresAt}
+            <button class="clear-btn" onclick={() => (expiresAt = '')}>Never expires</button>
+          {/if}
+        </label>
+      </div>
 
-    <div class="card-footer">
-      <button class="btn-primary" onclick={handleSave} disabled={saving}>
-        {saving ? 'Saving…' : 'Save changes'}
-      </button>
+      <div class="field" style="margin-top:1.25rem">
+        <span>Roles</span>
+        <div class="role-list">
+          {#each allRoles as role}
+            <label class="role-option">
+              <input type="checkbox" checked={selectedRoleIds.includes(role.id)}
+                onchange={() => toggleRole(role.id)} />
+              <span class="role-name">{role.name}</span>
+              {#if role.description}<span class="role-desc">{role.description}</span>{/if}
+            </label>
+          {/each}
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <button class="btn-secondary" onclick={cancelEdit} disabled={saving}>Cancel</button>
+        <button class="btn-primary" onclick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+    {:else}
+      <div class="profile-fields">
+        <div class="profile-row">
+          <div class="info-item">
+            <span class="info-label">First name</span>
+            <span class="info-value">{user.first_name || '—'}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Last name</span>
+            <span class="info-value">{user.last_name || '—'}</span>
+          </div>
+        </div>
+        <div class="profile-row">
+          <div class="info-item">
+            <span class="info-label">Email</span>
+            <span class="info-value">{user.email}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Expires</span>
+            <span class="info-value">{user.expires_at ? formatDateTime(user.expires_at) : 'Never'}</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Roles</span>
+          {#if (user.roles ?? []).length > 0}
+            <div class="role-chips">
+              {#each user.roles as role}
+                <span class="role-chip">{role.name}</span>
+              {/each}
+            </div>
+          {:else}
+            <span class="info-value">No roles assigned.</span>
+          {/if}
+        </div>
+      </div>
+    {/if}
+  </section>
+
+  <!-- ── Additional info section ──────────────────────────────────────── -->
+  <section class="card">
+    <h2 class="section-title">Activity</h2>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="info-label">Last Login</span>
+        <span class="info-value">{formatDateTime(user.last_login_at)}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Activity</span>
+        <span class="info-value">{user.conversation_count} conversation{user.conversation_count === 1 ? '' : 's'} · {user.message_count} message{user.message_count === 1 ? '' : 's'}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Failed Logins (7d)</span>
+        <span class="info-value">
+          {#if user.failed_logins_7d > 0}
+            <span class="failed-logins-badge">{user.failed_logins_7d}</span>
+          {:else}
+            0
+          {/if}
+        </span>
+      </div>
     </div>
   </section>
 
@@ -273,6 +361,19 @@
         disabled={pwSaving || !newPassword || pwMismatch}>
         {pwSaving ? 'Saving…' : 'Reset password'}
       </button>
+    </div>
+  </section>
+
+  <!-- ── Danger zone ────────────────────────────────────────────────────── -->
+  <section class="card danger-card">
+    <div class="danger-row">
+      <div>
+        <p class="danger-title">Delete this user</p>
+        <p class="danger-desc">
+          Permanently delete <strong>{user.username}</strong>.
+        </p>
+      </div>
+      <button class="danger-btn" onclick={() => (confirmDeleteOpen = true)}>Delete user</button>
     </div>
   </section>
 </div>
@@ -334,14 +435,31 @@
   background: var(--color-neutral-100);
   color: var(--color-neutral-600);
 }
-.danger-zone { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
-
 /* ── Cards ── */
 .card {
   background: var(--color-neutral-50);
   padding: 1.5rem 1.75rem;
   border-radius: var(--radius-2xl);
   box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+.danger-card {
+  border: 1px solid var(--color-red-200);
+}
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.danger-title {
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  margin-bottom: 0.2rem;
+}
+.danger-desc {
+  font-size: var(--text-sm);
+  color: var(--color-neutral-500);
+  max-width: 40rem;
 }
 .section-title {
   font-size: var(--text-base);
@@ -357,10 +475,31 @@
   margin-bottom: 1rem;
   margin-top: -0.5rem;
 }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.section-header .section-title { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
 .card-footer {
   margin-top: 1.25rem;
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.role-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.role-chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-blue-50);
+  color: var(--color-blue-700);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
 /* ── Form ── */
@@ -420,6 +559,51 @@
 .role-name { font-size: var(--text-sm); font-weight: 500; }
 .role-desc { font-size: var(--text-xs); color: var(--color-neutral-500); margin-left: 0.25rem; }
 
+
+/* ── Additional info ── */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem;
+}
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.info-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-neutral-500);
+}
+.info-value {
+  font-size: var(--text-sm);
+  color: var(--color-neutral-800);
+}
+
+/* ── Read-only profile view ── */
+.profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.profile-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.failed-logins-badge {
+  display: inline-block;
+  background: var(--color-red-100);
+  color: var(--color-red-700);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
 
 /* ── Organisations ── */
 .org-list {
@@ -483,12 +667,21 @@
 .btn-primary:hover:not(:disabled) { background: var(--color-blue-700); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-danger {
-  background: var(--color-red-600); color: white;
-  padding: 0.4rem 0.9rem; border-radius: var(--radius-md);
-  font-size: var(--text-sm); font-weight: 500; border: none; cursor: pointer;
+.btn-secondary {
+  background: var(--color-neutral-100); color: var(--color-neutral-800);
+  padding: 0.5rem 1.25rem; border-radius: var(--radius-lg);
+  font-size: var(--text-sm); font-weight: 500; border: 1px solid var(--color-neutral-300); cursor: pointer;
 }
-.btn-danger:hover:not(:disabled) { background: var(--color-red-700); }
-.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-secondary:hover:not(:disabled) { background: var(--color-neutral-200); }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.danger-btn {
+  background: var(--color-red-600); color: white;
+  padding: 0.5rem 1.25rem; border-radius: var(--radius-lg);
+  font-weight: 600; font-size: var(--text-sm); border: none; cursor: pointer;
+  white-space: nowrap;
+}
+.danger-btn:hover:not(:disabled) { background: var(--color-red-700); }
+.danger-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 </style>

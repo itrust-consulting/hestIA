@@ -9,6 +9,8 @@
   import { api } from '$lib/api/client';
   import { marked } from '$lib/render/markdown';
   import { addToast } from '$lib/stores/toast';
+  import EditIcon from '$lib/components/icons/editIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   let { data } = $props();
 
@@ -273,7 +275,9 @@
     {:else}
       <div class="content-card">
         {#if isAdmin}
-          <button class="edit-btn" onclick={startEdit} title="Edit this section">Edit</button>
+          <button class="edit-btn" aria-label="Edit this section" use:tooltip={"Edit"} onclick={startEdit}>
+            <EditIcon />
+          </button>
         {/if}
         <div class="help-section" bind:this={contentEl} onclick={handleContentClick}>
           {@html rendered}
@@ -537,9 +541,10 @@
     position: absolute;
     top: 1.25rem;
     right: 1.25rem;
-    padding: 0.3rem 0.9rem;
-    font-size: var(--text-sm);
-    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem;
     border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-md);
     background: var(--color-white);

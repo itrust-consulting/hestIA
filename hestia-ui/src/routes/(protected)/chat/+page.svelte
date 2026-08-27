@@ -28,6 +28,7 @@
   import ArrowUpIcon from '$lib/components/icons/arrowUpIcon.svelte';
   import SquareFilledIcon from '$lib/components/icons/squareFilledIcon.svelte';
   import AttachmentPreviewModal from '$lib/components/modals/AttachmentPreviewModal.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   onMount(() => {
     const handler = (e: Event) => {
@@ -367,13 +368,13 @@
               {#each images as img}
                 <span class="attachment-chip image-chip-compose">
                   <img src={img.dataUrl} alt={img.name} class="compose-thumb" />
-                  <button class="chip-remove" on:click={() => removeImage(img.name)} aria-label="Remove {img.name}">×</button>
+                  <button class="chip-remove" on:click={() => removeImage(img.name)} aria-label="Remove {img.name}" use:tooltip={`Remove ${img.name}`}>×</button>
                 </span>
               {/each}
               {#each attachments as a}
                 <span class="attachment-chip">
                   <Paperclip />{a.name}
-                  <button class="chip-remove" on:click={() => removeAttachment(a.name)} aria-label="Remove {a.name}">×</button>
+                  <button class="chip-remove" on:click={() => removeAttachment(a.name)} aria-label="Remove {a.name}" use:tooltip={`Remove ${a.name}`}>×</button>
                 </span>
               {/each}
               {#if parsing}
@@ -405,18 +406,18 @@
         />
 
         <div class="action-row">
-          <button class="input-action attach" on:click={pickFile} aria-label="Attach file" disabled={parsing}>
+          <button class="input-action attach" on:click={pickFile} aria-label="Attach file" use:tooltip={"Attach file"} disabled={parsing}>
             <PlusLgIcon />
           </button>
 
           <ContextUsageRing />
 
           {#if $sending}
-            <button class="input-action stop" on:click={stop} aria-label="Stop">
+            <button class="input-action stop" on:click={stop} aria-label="Stop" use:tooltip={"Stop"}>
               <SquareFilledIcon />
             </button>
           {:else}
-            <button class="input-action send" on:click={send} aria-label="Send">
+            <button class="input-action send" on:click={send} aria-label="Send" use:tooltip={"Send"}>
               <ArrowUpIcon />
             </button>
           {/if}

@@ -28,6 +28,11 @@ services:
       - 'AUTH_SECRET_KEY=${AUTH_SECRET_KEY}'
       - 'AUTH_TOKEN_LIFETIME=360'
       - 'LOG_LEVEL=INFO'
+      # Relative to app_data.parent (see Settings.load()) -- resolves to
+      # app_data/logs, i.e. inside the ./app/data volume mount below, so log
+      # files actually survive container recreation. The old default
+      # (app_data.parent/"logs") was a sibling of app/data, outside any mount.
+      - 'LOG_DIR=data/logs'
  
   frontend:
     build:

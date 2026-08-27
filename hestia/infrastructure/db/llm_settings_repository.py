@@ -32,6 +32,10 @@ def _row_to_dict(r: sqlite3.Row, *, include_api_key: bool) -> Dict[str, Any]:
         "model": r["model"],
         "params": json.loads(r["params"] or "{}"),
         "is_active": bool(r["is_active"]),
+        "compaction_enabled": bool(r["compaction_enabled"]),
+        "compaction_model": r["compaction_model"],
+        "compaction_context_window": r["compaction_context_window"],
+        "compaction_summary_length": r["compaction_summary_length"],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -62,18 +66,23 @@ class LLMSettingsRepository:
         self._migrate_legacy_schema(conn)
         self._migrate_add_vector_db_purpose(conn)
         self._migrate_add_multi_backend_support(conn)
+        self._migrate_add_compaction_columns(conn)
 
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS llm_connections (
-              id           INTEGER PRIMARY KEY AUTOINCREMENT,
-              purpose      TEXT NOT NULL CHECK (purpose IN ('generation','embedding','reranking','vector_db')),
-              backend_type TEXT NOT NULL CHECK (backend_type IN ('ollama','openai','qdrant')),
-              base_url     TEXT NOT NULL,
-              api_key      TEXT,
-              model        TEXT NOT NULL DEFAULT '',
-              params       TEXT NOT NULL DEFAULT '{}',
-              is_active    INTEGER NOT NULL DEFAULT 0,
+              id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+              purpose                    TEXT NOT NULL CHECK (purpose IN ('generation','embedding','reranking','vector_db')),
+              backend_type               TEXT NOT NULL CHECK (backend_type IN ('ollama','openai','qdrant')),
+              base_url                   TEXT NOT NULL,
+              api_key                    TEXT,
+              model                      TEXT NOT NULL DEFAULT '',
+              params                     TEXT NOT NULL DEFAULT '{}',
+              is_active                  INTEGER NOT NULL DEFAULT 0,
+              compaction_enabled         INTEGER NOT NULL DEFAULT 0,
+              compaction_model           TEXT,
+              compaction_context_window  INTEGER,
+              compaction_summary_length  INTEGER,
               created_at   INTEGER NOT NULL,
               updated_at   INTEGER NOT NULL
             );
@@ -216,9 +225,29 @@ class LLMSettingsRepository:
         )
         conn.execute("DROP TABLE llm_connections_pre_multi_backend")
 
+    def _migrate_add_compaction_columns(self, conn: sqlite3.Connection) -> None:
+        """One-time migration adding per-connection compaction settings
+        (only meaningful for purpose='generation' rows, same as `model`
+        already being unused for 'vector_db'). Plain ADD COLUMN suffices --
+        unlike the earlier migrations, no constraint changes are needed.
+        compaction_enabled defaults to 0 for every existing connection too
+        (an intentional behavior change: auto-compaction, previously always
+        on via global env-var defaults, now requires explicit opt-in per
+        connection). No-op if llm_connections doesn't exist yet, or already
+        has `compaction_enabled`."""
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(llm_connections)")}
+        if not cols or "compaction_enabled" in cols:
+            return
+        conn.execute("ALTER TABLE llm_connections ADD COLUMN compaction_enabled INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE llm_connections ADD COLUMN compaction_model TEXT")
+        conn.execute("ALTER TABLE llm_connections ADD COLUMN compaction_context_window INTEGER")
+        conn.execute("ALTER TABLE llm_connections ADD COLUMN compaction_summary_length INTEGER")
+
     def list_connections(self) -> List[Dict[str, Any]]:
         rows = self._get_conn().execute(
-            "SELECT id, purpose, backend_type, base_url, api_key, model, params, is_active, created_at, updated_at "
+            "SELECT id, purpose, backend_type, base_url, api_key, model, params, is_active, "
+            "compaction_enabled, compaction_model, compaction_context_window, compaction_summary_length, "
+            "created_at, updated_at "
             "FROM llm_connections ORDER BY purpose"
         ).fetchall()
         return [_row_to_dict(r, include_api_key=False) for r in rows]
@@ -226,7 +255,9 @@ class LLMSettingsRepository:
     def get_connection(self, connection_id: int) -> Optional[Dict[str, Any]]:
         """Includes the raw api_key -- for internal provider construction only."""
         r = self._get_conn().execute(
-            "SELECT id, purpose, backend_type, base_url, api_key, model, params, is_active, created_at, updated_at "
+            "SELECT id, purpose, backend_type, base_url, api_key, model, params, is_active, "
+            "compaction_enabled, compaction_model, compaction_context_window, compaction_summary_length, "
+            "created_at, updated_at "
             "FROM llm_connections WHERE id = ?",
             (connection_id,),
         ).fetchone()
@@ -238,7 +269,9 @@ class LLMSettingsRepository:
         active. container.py treats "no active connection" (whether from
         zero connections or none of several marked active) identically."""
         r = self._get_conn().execute(
-            "SELECT id, purpose, backend_type, base_url, api_key, model, params, is_active, created_at, updated_at "
+            "SELECT id, purpose, backend_type, base_url, api_key, model, params, is_active, "
+            "compaction_enabled, compaction_model, compaction_context_window, compaction_summary_length, "
+            "created_at, updated_at "
             "FROM llm_connections WHERE purpose = ? AND is_active = 1",
             (purpose,),
         ).fetchone()
@@ -286,19 +319,31 @@ class LLMSettingsRepository:
     @with_txn
     def update_connection(
         self, conn: sqlite3.Connection, *, connection_id: int, base_url: str, api_key: Optional[str],
-        model: str, params: Dict[str, Any],
+        model: str, params: Dict[str, Any], compaction_enabled: bool = False,
+        compaction_model: Optional[str] = None, compaction_context_window: Optional[int] = None,
+        compaction_summary_length: Optional[int] = None,
     ) -> None:
         # A blank/omitted api_key means "keep the existing one" -- there's no
-        # separate "clear the key" affordance in this iteration.
+        # separate "clear the key" affordance in this iteration. The
+        # compaction_* fields are only meaningful for purpose='generation'
+        # connections but are harmlessly written/ignored for any other.
         if api_key:
             conn.execute(
-                "UPDATE llm_connections SET base_url=?, api_key=?, model=?, params=?, updated_at=? WHERE id=?",
-                (base_url, api_key, model, json.dumps(params or {}), _now_ms(), connection_id),
+                "UPDATE llm_connections SET base_url=?, api_key=?, model=?, params=?, "
+                "compaction_enabled=?, compaction_model=?, compaction_context_window=?, compaction_summary_length=?, "
+                "updated_at=? WHERE id=?",
+                (base_url, api_key, model, json.dumps(params or {}),
+                 int(compaction_enabled), compaction_model, compaction_context_window, compaction_summary_length,
+                 _now_ms(), connection_id),
             )
         else:
             conn.execute(
-                "UPDATE llm_connections SET base_url=?, model=?, params=?, updated_at=? WHERE id=?",
-                (base_url, model, json.dumps(params or {}), _now_ms(), connection_id),
+                "UPDATE llm_connections SET base_url=?, model=?, params=?, "
+                "compaction_enabled=?, compaction_model=?, compaction_context_window=?, compaction_summary_length=?, "
+                "updated_at=? WHERE id=?",
+                (base_url, model, json.dumps(params or {}),
+                 int(compaction_enabled), compaction_model, compaction_context_window, compaction_summary_length,
+                 _now_ms(), connection_id),
             )
 
     @with_txn

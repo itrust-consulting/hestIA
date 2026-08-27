@@ -6,6 +6,11 @@
   import Modal from '$lib/components/Modal.svelte';
   import type { AccessGrant, Collection, CollectionDocument, Org } from '$lib/types';
   import { addToast } from '$lib/stores/toast';
+  import BinIcon from '$lib/components/icons/binIcon.svelte';
+  import UploadIcon from '$lib/components/icons/uploadIcon.svelte';
+  import RetryIcon from '$lib/components/icons/retry.svelte';
+  import SettingsIcon from '$lib/components/icons/settingsIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
   import { classificationLabel, CLASSIFICATION_OPTIONS, CLASSIFICATION_LABELS } from '$lib/classification';
 
   const { data }: { data: { collection: Collection; allOrganizations: Org[]; isAdmin: boolean; canManage: boolean } } = $props();
@@ -134,14 +139,6 @@
       <h1 class="title">{c.id}</h1>
       <span class="badge {statusClass(c.status)}">{c.status}</span>
     </div>
-    <div class="page-header-right">
-      <button class="add-btn" onclick={() => (uploadOpen = true)}>Add document</button>
-      <button class="sync-btn" onclick={() => (syncOpen = true)}>Sync folder</button>
-      {#if data.canManage}
-        <button class="secondary-btn" onclick={openManageAccess}>Manage access</button>
-        <button class="danger-btn" onclick={() => (confirmDelete = true)}>Delete collection</button>
-      {/if}
-    </div>
   </div>
 
   <!-- ── Stat cards ─────────────────────────────────────────────────── -->
@@ -178,8 +175,23 @@
 
 
   <!-- ── Documents table ───────────────────────────────────────────────── -->
-  <div class="table-container">
+  <div class="section-header">
     <h2 class="section-title">Documents</h2>
+    <div class="section-header-actions">
+      <button class="icon-btn" aria-label="Add document" use:tooltip={"Add document"} onclick={() => (uploadOpen = true)}>
+        <UploadIcon />
+      </button>
+      <button class="icon-btn" aria-label="Sync folder" use:tooltip={"Sync folder"} onclick={() => (syncOpen = true)}>
+        <RetryIcon />
+      </button>
+      {#if data.canManage}
+        <button class="icon-btn" aria-label="Manage access" use:tooltip={"Manage access"} onclick={openManageAccess}>
+          <SettingsIcon />
+        </button>
+      {/if}
+    </div>
+  </div>
+  <div class="table-container">
     <table class="doc-table">
       <thead>
         <tr>
@@ -187,7 +199,7 @@
           <th>Uploaded by</th>
           <th>Uploaded at</th>
           <th class="right">Chunks</th>
-          <th>Actions</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -207,8 +219,8 @@
               </td>
               <td class="right">{doc.chunk_count}</td>
               <td class="actions-cell">
-                <button class="replace-btn" onclick={(e) => { e.stopPropagation(); confirmingReplace = doc; }}>Replace</button>
-                <button class="del-btn" onclick={(e) => { e.stopPropagation(); confirmDeleteDoc = doc.source_uri; }}>Delete</button>
+                <button class="replace-btn-icon" aria-label="Replace document" use:tooltip={"Replace"} onclick={(e) => { e.stopPropagation(); confirmingReplace = doc; }}><UploadIcon /></button>
+                <button class="del-btn" aria-label="Delete document" use:tooltip={"Delete"} onclick={(e) => { e.stopPropagation(); confirmDeleteDoc = doc.source_uri; }}><BinIcon /></button>
               </td>
             </tr>
           {/each}
@@ -216,6 +228,21 @@
       </tbody>
     </table>
   </div>
+
+  <!-- ── Danger zone ────────────────────────────────────────────────────── -->
+  {#if data.canManage}
+    <div class="table-container danger-card">
+      <div class="danger-row">
+        <div>
+          <p class="danger-title">Delete this collection</p>
+          <p class="danger-desc">
+            Permanently delete <strong>{c.id}</strong> and all its documents.
+          </p>
+        </div>
+        <button class="danger-btn" onclick={() => (confirmDelete = true)}>Delete collection</button>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <!-- ── Upload modal ──────────────────────────────────────────────────── -->
@@ -332,9 +359,17 @@
   gap: 1rem;
 }
 .page-header-left { display: flex; align-items: center; gap: 0.75rem; }
-.page-header-right { display: flex; align-items: center; gap: 0.5rem; }
 
 .title { font-size: var(--text-3xl); font-weight: 700; margin: 0; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+.section-header-actions { display: flex; align-items: center; gap: 0.25rem; }
 
 .badge {
   display: inline-block;
@@ -502,8 +537,8 @@
 
 .doc-table { width: 100%; border-collapse: collapse; }
 .doc-table th, .doc-table td {
-  padding: 0.65rem 0.875rem; border-bottom: 1px solid var(--color-neutral-200);
-  text-align: left; vertical-align: middle; font-size: var(--text-sm);
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-neutral-200);
+  text-align: left; vertical-align: middle;
 }
 .doc-table thead th {
   position: sticky; top: 0; background: var(--color-neutral-50); z-index: 2;
@@ -512,11 +547,11 @@
   box-shadow: 0 1px 0 var(--color-neutral-200);
 }
 .doc-table tbody tr.clickable-row { cursor: pointer; transition: background 100ms ease; }
-.doc-table tbody tr.clickable-row:hover { background: var(--color-gray-700); }
+.doc-table tbody tr.clickable-row:hover { background: var(--color-neutral-100); }
 .doc-table td.filename { font-weight: 500; word-break: break-all; }
 .doc-table td.right, .doc-table th.right { text-align: right; }
 .doc-table td.timestamp { color: var(--color-neutral-600); font-size: var(--text-xs); white-space: nowrap; }
-.doc-table td.actions-cell { width: 9rem; text-align: right; display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; }
+.doc-table td.actions-cell { width: 5rem; text-align: right; display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; }
 .empty-cell { text-align: center; padding: 2rem; color: var(--color-neutral-500); }
 
 /* ── Access modal ────────────────────────────────────────────────────── */
@@ -562,29 +597,6 @@
 .revoke-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────── */
-.add-btn {
-  background: var(--color-blue-600); color: white;
-  padding: 0.5rem 1rem; border-radius: var(--radius-lg);
-  cursor: pointer; font-weight: 600; border: none; font-size: var(--text-sm);
-}
-.add-btn:hover:not(:disabled) { background: var(--color-blue-700); }
-.add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.sync-btn {
-  background: var(--color-green-500); color: white;
-  padding: 0.5rem 1rem; border-radius: var(--radius-lg);
-  cursor: pointer; font-weight: 600; border: none; font-size: var(--text-sm);
-}
-.sync-btn:hover:not(:disabled) { background: var(--color-blue-700); }
-.sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.secondary-btn {
-  background: var(--color-neutral-100); color: var(--color-neutral-800);
-  padding: 0.5rem 1rem; border-radius: var(--radius-lg);
-  font-size: var(--text-sm); font-weight: 500; border: 1px solid var(--color-neutral-300); cursor: pointer;
-}
-.secondary-btn:hover { background: var(--color-neutral-200); }
-
 .danger-btn {
   background: var(--color-red-600); color: white;
   padding: 0.5rem 1rem; border-radius: var(--radius-lg);
@@ -593,15 +605,43 @@
 .danger-btn:hover:not(:disabled) { background: var(--color-red-700); }
 .danger-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.replace-btn {
-  background: transparent; border: 1px solid var(--color-neutral-300); color: var(--color-neutral-600);
-  padding: 0.2rem 0.55rem; border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-xs);
+.danger-card {
+  margin-top: 1rem;
+  border: 1px solid var(--color-red-200);
 }
-.replace-btn:hover { background: var(--color-neutral-100); }
+.danger-card .section-title { margin-bottom: 0.75rem; }
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.danger-title {
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  margin-bottom: 0.2rem;
+}
+.danger-desc {
+  font-size: var(--text-sm);
+  color: var(--color-neutral-500);
+  max-width: 40rem;
+}
+
+.replace-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent; border: 1px solid var(--color-neutral-300); color: var(--color-neutral-600);
+  padding: 0.35rem; border-radius: var(--radius-md); cursor: pointer;
+}
+.replace-btn-icon:hover { background: var(--color-neutral-100); }
 
 .del-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent; border: 1px solid var(--color-red-300); color: var(--color-red-600);
-  padding: 0.2rem 0.55rem; border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-xs);
+  padding: 0.35rem; border-radius: var(--radius-md); cursor: pointer;
 }
 .del-btn:hover { background: var(--color-red-50); }
 

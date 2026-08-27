@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Citation } from '$lib/types';
   import { renderChatContent } from '$lib/render/renderChatContent';
+  import { tooltip } from '$lib/actions/tooltip';
 
   export let citations: Citation[];
   export let x: number;
@@ -33,6 +34,7 @@
         on:click={() => { page = Math.max(0, page - 1); expanded = false; }}
         disabled={page === 0}
         aria-label="Previous source"
+        use:tooltip={"Previous source"}
       >‹</button>
       <span class="page-indicator">{page + 1} / {total}</span>
       <button
@@ -40,6 +42,7 @@
         on:click={() => { page = Math.min(total - 1, page + 1); expanded = false; }}
         disabled={page === total - 1}
         aria-label="Next source"
+        use:tooltip={"Next source"}
       >›</button>
     </div>
   {/if}

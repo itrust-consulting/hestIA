@@ -5,6 +5,7 @@
   import Paperclip from '$lib/components/icons/paperclipIcon.svelte';
   import BinIcon from '$lib/components/icons/binIcon.svelte';
   import Retry from '$lib/components/icons/retry.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   let {
     message,
@@ -117,18 +118,18 @@
       "
     >
       <!-- Copy -->
-      <button class="chat-hover-button" aria-label="Copy message" on:click={onCopy} title="Copy">
+      <button class="chat-hover-button" aria-label="Copy message" on:click={onCopy} use:tooltip={"Copy"}>
         <Clipboard />
       </button>
 
       <!-- Delete -->
-      <button class="chat-hover-button" aria-label="Delete message" on:click={onDelete} title="Delete">
+      <button class="chat-hover-button" aria-label="Delete message" on:click={onDelete} use:tooltip={"Delete"}>
         <BinIcon />
       </button>
 
       <!-- Retry (only for assistant messages) -->
       {#if message.role === 'assistant'}
-        <button class="chat-hover-button" aria-label="Retry answer" on:click={onRetry} title="Retry">
+        <button class="chat-hover-button" aria-label="Retry answer" on:click={onRetry} use:tooltip={"Retry"}>
           <Retry />
         </button>
       {/if}

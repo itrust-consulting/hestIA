@@ -2,6 +2,8 @@
   import { goto, invalidateAll } from '$app/navigation';
   import Modal from '$lib/components/Modal.svelte';
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
+  import BinIcon from '$lib/components/icons/binIcon.svelte';
+  import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
   import { addToast } from '$lib/stores/toast';
 
   const { data } = $props();
@@ -58,16 +60,16 @@
 
 <div class="admin-content">
   <div class="page-header">
-    <div class="page-header-left">
-      <h1 class="title">{data.isAdmin ? 'Tenant Management' : 'My Tenants'}</h1>
-    </div>
-    <div class="page-header-right">
-      {#if data.isAdmin}
-        <button class="action-btn" onclick={openCreate}>Add Tenant</button>
-      {/if}
-    </div>
+    <h1 class="title">{data.isAdmin ? 'Tenant Management' : 'My Tenants'}</h1>
   </div>
-  <p class="subtitle">{data.isAdmin ? 'Manage organisations and their document access.' : 'Organisations you moderate.'}</p>
+  <div class="subtitle-row">
+    <p class="subtitle">{data.isAdmin ? 'Manage organisations and their document access.' : 'Organisations you moderate.'}</p>
+    {#if data.isAdmin}
+      <button class="icon-btn" title="Add tenant" onclick={openCreate}>
+        <PlusLgIcon />
+      </button>
+    {/if}
+  </div>
 
   <div class="table-container">
     <table class="data-table">
@@ -78,7 +80,7 @@
           <th>Abbreviation</th>
           <th>Members</th>
           <th>Created</th>
-          <th>Actions</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -100,10 +102,7 @@
               <td class="muted">{formatDate(t.created_at)}</td>
               <td class="actions-cell">
                 {#if data.isAdmin}
-                  <button class="edit-btn" onclick={(e) => { e.stopPropagation(); goto(`/admin/tenants/${t.id}?edit=true`); }}>Edit</button>
-                  <button class="del-btn" onclick={(e) => { e.stopPropagation(); confirmDelete = t; }}>Delete</button>
-                {:else}
-                  <button class="edit-btn" onclick={(e) => { e.stopPropagation(); goto(`/admin/tenants/${t.id}`); }}>View</button>
+                  <button class="del-btn" aria-label="Delete tenant" title="Delete" onclick={(e) => { e.stopPropagation(); confirmDelete = t; }}><BinIcon /></button>
                 {/if}
               </td>
             </tr>
@@ -155,23 +154,25 @@
 }
 
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 0.25rem;
-  gap: 1rem;
 }
-.page-header-left { flex: 1; }
-.page-header-right { display: flex; gap: 0.5rem; align-items: center; }
 
 .title {
   font-size: var(--text-3xl);
   font-weight: 700;
   margin-bottom: 0;
 }
+
+.subtitle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 .subtitle {
   color: var(--color-neutral-600);
-  margin-bottom: 1.5rem;
 }
 
 .table-container {
@@ -200,15 +201,19 @@
   background: var(--color-neutral-50);
   z-index: 2;
   font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-neutral-600);
   box-shadow: 0 1px 0 var(--color-neutral-200);
 }
 .clickable-row { cursor: pointer; transition: background 100ms ease; }
-.clickable-row:hover { background: var(--color-gray-700); }
+.clickable-row:hover { background: var(--color-neutral-100); }
 
 td.num { width: 4rem; text-align: right; color: var(--color-neutral-400); }
 td.name { font-weight: 500; }
-td.muted { color: var(--color-neutral-500); font-size: var(--text-sm); }
-td.actions-cell { width: 10rem; text-align: right; display: flex; gap: 0.4rem; justify-content: flex-end; align-items: center; }
+td.muted { color: var(--color-neutr-500); font-size: var(--text-sm); }
+td.actions-cell { width: 5rem; text-align: right; }
 
 td.members-cell { width: 6rem; }
 .no-members { color: var(--color-neutral-400); }
@@ -233,25 +238,16 @@ td.members-cell { width: 6rem; }
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
-.edit-btn {
-  background: transparent;
-  border: 1px solid var(--color-neutral-300);
-  color: var(--color-neutral-700);
-  padding: 0.25rem 0.6rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-sm);
-}
-.edit-btn:hover { background: var(--color-neutral-100); }
-
 .del-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid var(--color-red-300);
   color: var(--color-red-600);
-  padding: 0.25rem 0.6rem;
+  padding: 0.35rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: var(--text-sm);
 }
 .del-btn:hover { background: var(--color-red-50); }
 

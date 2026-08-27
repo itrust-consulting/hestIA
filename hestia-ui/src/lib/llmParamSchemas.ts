@@ -106,10 +106,36 @@ export const OPENAI_EMBEDDING_PARAMS: ParamSpec[] = [
 ];
 // AUTO-GENERATED:OPENAI_EMBEDDING_PARAMS END
 
-// A vector DB connection ('qdrant') has no request-time inference params --
-// the Settings modal hides this section entirely for those connections, so
-// getParamSpecs() below returns [] for backendType === 'qdrant' rather than
-// this map needing a 'qdrant' entry.
+// Qdrant's retrieval-time search options (QdrantDB.search(), covering the
+// full QdrantClient.query_points()/SearchParams surface) -- hand-curated,
+// not auto-generated (Qdrant has no OpenAPI-spec generator like OpenAI's).
+// For a hybrid (dense+sparse) query, hybrid_*/fusion/score_threshold/hnsw_ef/
+// exact/indexed_only are all applied per-branch (on each Prefetch, pre-
+// fusion) rather than to the fused result -- a raw threshold or HNSW knob
+// doesn't have clean meaning against a post-fusion RRF/DBSF score.
+// collection_name/query/using/prefetch/query_filter stay out of this list --
+// they're inherent to a specific request, not a sensible per-connection
+// default. quantization/acorn/shard_key_selector are exposed as raw JSON --
+// niche, deeply-nested Qdrant features not worth a dedicated sub-form.
+export const QDRANT_RETRIEVAL_PARAMS: ParamSpec[] = [
+  { key: 'limit', label: 'Result limit (top_k)', type: 'integer', default: 50 },
+  { key: 'score_threshold', label: 'Score threshold', type: 'number', step: 0.01, default: 0 },
+  { key: 'with_payload', label: 'Include payload', type: 'boolean', default: true },
+  { key: 'with_vectors', label: 'Include vectors', type: 'boolean', default: false },
+  { key: 'offset', label: 'Pagination offset', type: 'integer' },
+  { key: 'consistency', label: 'Read consistency', type: 'text' },
+  { key: 'timeout', label: 'Query timeout (seconds)', type: 'integer' },
+  { key: 'hnsw_ef', label: 'HNSW search depth (hnsw_ef)', type: 'integer' },
+  { key: 'exact', label: 'Exact search (no approximation)', type: 'boolean', default: false },
+  { key: 'indexed_only', label: 'Indexed segments only', type: 'boolean', default: false },
+  { key: 'quantization', label: 'Quantization params', type: 'json' },
+  { key: 'acorn', label: 'ACORN search params', type: 'json' },
+  { key: 'shard_key_selector', label: 'Shard key selector', type: 'json' },
+  { key: 'hybrid_sparse_limit', label: 'Hybrid: sparse prefetch limit', type: 'integer', default: 200 },
+  { key: 'hybrid_dense_limit', label: 'Hybrid: dense prefetch limit', type: 'integer', default: 100 },
+  { key: 'fusion', label: 'Hybrid: fusion method (rrf/dbsf)', type: 'text', default: 'rrf' },
+];
+
 const PARAM_SCHEMAS: Record<'ollama' | 'openai', Partial<Record<'generation' | 'embedding' | 'reranking', ParamSpec[]>>> = {
   ollama: {
     generation: OLLAMA_GENERATION_PARAMS,
@@ -129,7 +155,7 @@ export function getParamSpecs(
   backendType: 'ollama' | 'openai' | 'qdrant',
   purpose: 'generation' | 'embedding' | 'reranking' | 'vector_db',
 ): ParamSpec[] {
-  if (backendType === 'qdrant') return [];
+  if (backendType === 'qdrant') return purpose === 'vector_db' ? QDRANT_RETRIEVAL_PARAMS : [];
   return PARAM_SCHEMAS[backendType][purpose as 'generation' | 'embedding' | 'reranking'] ?? [];
 }
 

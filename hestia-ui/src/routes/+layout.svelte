@@ -14,7 +14,7 @@
 
   import { onMount } from 'svelte';
   import { version } from '$app/environment';
-  import { startInactivityWatcher, scheduleTokenExpiration } from '$lib/auth/session';
+  import { startInactivityWatcher, scheduleTokenExpiration, startHeartbeat } from '$lib/auth/session';
   import { clearIsmsState } from '$lib/stores/isms';
   import { page } from '$app/state';
 
@@ -65,6 +65,7 @@
   onMount(() => {
       startInactivityWatcher();
       if (page.data.tokenExp) scheduleTokenExpiration(page.data.tokenExp);
+      if (page.data.user) startHeartbeat();
 
       const saved = localStorage.getItem('theme');
       if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
