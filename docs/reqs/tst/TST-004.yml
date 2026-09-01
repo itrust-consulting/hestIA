@@ -22,7 +22,7 @@ test_data: |
   Valid local user credentials; a set of intentionally wrong credentials (wrong password); AUTH_TOKEN_LIFETIME set to a known value
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running with authentication enabled (ENABLE_AUTH=true)
+  - hestIA is deployed and running
   - At least one local user account exists with known valid credentials
   - Invalid credentials (wrong password for an existing user) are prepared
   - AUTH_TOKEN_LIFETIME is set to a known value for expiry testing

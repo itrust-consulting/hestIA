@@ -27,7 +27,7 @@ class TestEncodeRouter:
         mock_encoder = MagicMock()
         mock_encoder.encode = AsyncMock(return_value=DenseVector(vector=[0.1, 0.2, 0.3]))
         mock_encoder.default_model = "emb-model"
-        container.services = {"encDense": mock_encoder}
+        container.require_service.return_value = mock_encoder
 
         client = TestClient(_app(container=container))
         resp = client.post("/encode", json={"type": "dense", "input": "hello world"})

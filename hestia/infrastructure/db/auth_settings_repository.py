@@ -96,8 +96,6 @@ class AuthSettingsRepository:
         auth = settings.auth
         oidc = settings.oidc or OIDCSettings()
         ldap = settings.ldap or LDAPSettings()
-        if auth is None:
-            return  # enable_auth is False -- nothing to seed; this page is unreachable anyway (no login).
 
         conn.execute(
             """

@@ -420,8 +420,6 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 
 **A-04** — The three authentication modes (local, directory service, federated identity) are mutually exclusive. Exactly one mode is active per deployment. Mixed-mode authentication within a single deployment is not supported.
 
-**A-05** — The authentication-disabled mode (ENABLE_AUTH=false) must not be activated in production deployments. It is provided solely for development and integration testing purposes.
-
 **A-06** — Document ingestion into a collection requires the requesting user to hold the moderator role within the organisation that owns the collection. Members and co-moderators may not ingest documents.
 
 **A-07** — Conversation history supplied to the LLM context window is bounded (default: 10 message pairs). Full conversation history is retained in persistent storage and is not subject to this bound.

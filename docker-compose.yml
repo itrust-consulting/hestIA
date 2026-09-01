@@ -17,7 +17,6 @@ services:
       - 'DB_API_KEY=${DB_API_KEY}'
       - 'DEFAULT_GEN_MODEL=RedHatAI/Qwen3.6-35B-A3B-NVFP4'
       - 'DEFAULT_EMB_MODEL=Qwen/Qwen3-Embedding-0.6B'
-      - 'ENABLE_AUTH=true'
       - 'AUTH_PW_LENGTH=15'
       - 'AUTH_MAX_ATTEMPTS=5'
       - 'AUTH_LOCKOUT_DURATION=15'

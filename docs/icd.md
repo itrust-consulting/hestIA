@@ -259,10 +259,6 @@ On every protected request, the server:
 2. Verifies the JWT signature and expiry using the server-side secret.
 3. Loads the full user profile and computed permissions from the SQLite database. No caching is applied; permissions reflect the current state of the database on every request.
 
-**Auth Disabled Mode**
-
-If the server is started with `ENABLE_AUTH=false`, authentication is globally disabled. This mode is intended for development and testing environments only and must not be used in production deployments.
-
 ### 3.3 Authorization
 
 **System Roles**
@@ -476,7 +472,6 @@ Integrating parties should monitor the `info.version` field from `/openapi.json`
 - No refresh token is issued. Sessions expire after the configured lifetime (default 6 hours) and require re-authentication.
 - Account-level expiry (`expires_at`) is enforced only at login time for local authentication. A token issued before expiry remains valid until its own `exp` claim passes.
 - Role expiry timestamps (`user_roles.expires_at`) are stored in the database but are not currently enforced at runtime.
-- `ENABLE_AUTH=false` disables all authentication and must never be used in production.
 
 **Authorization Constraints**
 

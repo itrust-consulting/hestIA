@@ -270,10 +270,9 @@ def build_container(settings: Settings) -> Container:
     auth_settings_repo = AuthSettingsRepository(get_conn, lock)
     auth_settings_repo.initialize(settings)
     c.services["auth_settings"] = auth_settings_repo
-    if settings.enable_auth:
-        auth_row = auth_settings_repo.get_settings()
-        if auth_row is not None:
-            settings.auth, settings.oidc, settings.ldap = _auth_settings_from_row(auth_row)
+    auth_row = auth_settings_repo.get_settings()
+    if auth_row is not None:
+        settings.auth, settings.oidc, settings.ldap = _auth_settings_from_row(auth_row)
 
     # --- DB provider ---
     db_cfg = llm_settings_repo.get_connection_by_purpose("vector_db")
@@ -288,15 +287,14 @@ def build_container(settings: Settings) -> Container:
     c.services["sync_manifest"] = sync_repo
 
     # --- Auth services ---
-    if settings.enable_auth:
-        repo = UserRepository(get_conn, lock)
-        repo.initialize()
-        c.services["user_repository"] = repo
+    repo = UserRepository(get_conn, lock)
+    repo.initialize()
+    c.services["user_repository"] = repo
 
-        user_service, auth_service = _build_auth_stack(settings, repo)
-        _bootstrap_admin_user(settings, repo, user_service)
-        c.services["auth"] = auth_service
-        c.services["users"] = user_service
+    user_service, auth_service = _build_auth_stack(settings, repo)
+    _bootstrap_admin_user(settings, repo, user_service)
+    c.services["auth"] = auth_service
+    c.services["users"] = user_service
 
     close()
 

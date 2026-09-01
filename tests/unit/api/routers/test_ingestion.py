@@ -87,11 +87,9 @@ class TestListCollections:
     def test_admin_gets_all(self):
         user = _make_user(is_admin=True)
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(collections={"collections": [
-                {"name": "col1"}, {"name": "col2"}
-            ]})
-        }
+        handler.container.require_db_provider.return_value = MagicMock(collections={"collections": [
+            {"name": "col1"}, {"name": "col2"}
+        ]})
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections")
         assert resp.status_code == 200
@@ -102,11 +100,9 @@ class TestListCollections:
             "col1": CollectionPermission(access=True),
         })
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(collections={"collections": [
-                {"name": "col1"}, {"name": "col2"}
-            ]})
-        }
+        handler.container.require_db_provider.return_value = MagicMock(collections={"collections": [
+            {"name": "col1"}, {"name": "col2"}
+        ]})
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections")
         assert resp.status_code == 200
@@ -119,11 +115,9 @@ class TestListCollections:
             "*": CollectionPermission(access=True),
         })
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(collections={"collections": [
-                {"name": "col1"}, {"name": "col2"}
-            ]})
-        }
+        handler.container.require_db_provider.return_value = MagicMock(collections={"collections": [
+            {"name": "col1"}, {"name": "col2"}
+        ]})
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections")
         assert resp.status_code == 200
@@ -139,9 +133,9 @@ class TestGetDocumentCounts:
     def test_admin_gets_all(self):
         user = _make_user(is_admin=True)
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(document_counts=MagicMock(return_value={"col1": 3, "col2": 5}))
-        }
+        handler.container.require_db_provider.return_value = MagicMock(
+            document_counts=MagicMock(return_value={"col1": 3, "col2": 5})
+        )
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections/document-counts")
         assert resp.status_code == 200
@@ -152,9 +146,9 @@ class TestGetDocumentCounts:
             "col1": CollectionPermission(access=True),
         })
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(document_counts=MagicMock(return_value={"col1": 3, "col2": 5}))
-        }
+        handler.container.require_db_provider.return_value = MagicMock(
+            document_counts=MagicMock(return_value={"col1": 3, "col2": 5})
+        )
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections/document-counts")
         assert resp.status_code == 200
@@ -165,17 +159,15 @@ class TestGetDocumentCounts:
         # swallowed by GET /collections/{name} matching name="document-counts"
         user = _make_user(is_admin=True)
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(
-                document_counts=MagicMock(return_value={"col1": 1}),
-                get_collection=MagicMock(return_value={"name": "document-counts", "documents": []}),
-            )
-        }
+        handler.container.require_db_provider.return_value = MagicMock(
+            document_counts=MagicMock(return_value={"col1": 1}),
+            get_collection=MagicMock(return_value={"name": "document-counts", "documents": []}),
+        )
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections/document-counts")
         assert resp.status_code == 200
         assert "counts" in resp.json()
-        handler.container.providers["db"].get_collection.assert_not_called()
+        handler.container.require_db_provider.return_value.get_collection.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -187,15 +179,13 @@ class TestGetCollection:
     def test_returns_collection_with_documents(self):
         user = _make_user(is_admin=True)
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(get_collection=MagicMock(return_value={
-                "name": "col1",
-                "documents": [
-                    {"source_uri": "a.pdf"},
-                    {"source_uri": "b.pdf"},
-                ]
-            }))
-        }
+        handler.container.require_db_provider.return_value = MagicMock(get_collection=MagicMock(return_value={
+            "name": "col1",
+            "documents": [
+                {"source_uri": "a.pdf"},
+                {"source_uri": "b.pdf"},
+            ]
+        }))
         handler.container.services.get.return_value = None  # no users service
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections/col1")
@@ -205,9 +195,7 @@ class TestGetCollection:
     def test_returns_404_when_not_found(self):
         user = _make_user(is_admin=True)
         handler = MagicMock()
-        handler.container.providers = {
-            "db": MagicMock(get_collection=MagicMock(return_value=None))
-        }
+        handler.container.require_db_provider.return_value = MagicMock(get_collection=MagicMock(return_value=None))
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections/missing")
         assert resp.status_code == 404
@@ -330,7 +318,7 @@ class TestUploadDocument:
         sync_manifest = MagicMock()
         sync_manifest.claim_owner.return_value = "original/report.pdf"  # someone else already owns this hash
         db = MagicMock()
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
         handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
 
         from io import BytesIO
@@ -362,7 +350,7 @@ class TestUploadDocument:
         sync_manifest = MagicMock()
         sync_manifest.claim_owner.return_value = "original/report.pdf"
         db = MagicMock()
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
         handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
 
         from io import BytesIO
@@ -389,7 +377,7 @@ class TestDeleteDocument:
     def _client(self, sync_manifest):
         user = _make_user(is_admin=True)
         handler = MagicMock()
-        handler.container.providers = {"db": MagicMock()}
+        handler.container.require_db_provider.return_value = MagicMock()
         handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
         handler.container.services.get.return_value = None
         return TestClient(_app(user=user, handler=handler)), handler
@@ -403,7 +391,7 @@ class TestDeleteDocument:
         resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
 
         assert resp.status_code == 200
-        handler.container.providers["db"].delete_document.assert_called_once_with("test-col", "sub/doc.md")
+        handler.container.require_db_provider.return_value.delete_document.assert_called_once_with("test-col", "sub/doc.md")
         sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
 
     def test_non_owner_reference_skips_real_delete(self):
@@ -416,7 +404,7 @@ class TestDeleteDocument:
         resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
 
         assert resp.status_code == 200
-        handler.container.providers["db"].delete_document.assert_not_called()
+        handler.container.require_db_provider.return_value.delete_document.assert_not_called()
         sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
 
     def test_owner_with_remaining_references_hands_off(self):
@@ -430,9 +418,9 @@ class TestDeleteDocument:
         resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
 
         assert resp.status_code == 200
-        handler.container.providers["db"].delete_document.assert_not_called()
+        handler.container.require_db_provider.return_value.delete_document.assert_not_called()
         sync_manifest.reassign_owner.assert_called_once_with("test-col", "hash123", "other/copy.md")
-        handler.container.providers["db"].rename_source.assert_called_once_with("test-col", "sub/doc.md", "other/copy.md")
+        handler.container.require_db_provider.return_value.rename_source.assert_called_once_with("test-col", "sub/doc.md", "other/copy.md")
         sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
 
     def test_owner_with_no_remaining_references_deletes_for_real(self):
@@ -445,7 +433,7 @@ class TestDeleteDocument:
         resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
 
         assert resp.status_code == 200
-        handler.container.providers["db"].delete_document.assert_called_once_with("test-col", "sub/doc.md")
+        handler.container.require_db_provider.return_value.delete_document.assert_called_once_with("test-col", "sub/doc.md")
         sync_manifest.remove_owner.assert_called_once_with("test-col", "hash123")
         sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
 
@@ -463,7 +451,7 @@ class TestGetDocument:
         db.get_document.return_value = {
             "source_uri": "doc.pdf", "doc_info": {"title": "T"}, "chunks": [{"id": "c1", "content": "hi"}],
         }
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
 
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections/test-col/documents", params={"source_uri": "doc.pdf"})
@@ -479,7 +467,7 @@ class TestGetDocument:
         handler = MagicMock()
         db = MagicMock()
         db.get_document.return_value = None
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
 
         client = TestClient(_app(user=user, handler=handler))
         resp = client.get("/collections/test-col/documents", params={"source_uri": "missing.pdf"})
@@ -498,7 +486,7 @@ class TestUpdateDocumentMetadata:
         handler = MagicMock()
         db = MagicMock()
         db.update_document_metadata.return_value = True
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
 
         client = TestClient(_app(user=user, handler=handler))
         resp = client.patch(
@@ -517,7 +505,7 @@ class TestUpdateDocumentMetadata:
         handler = MagicMock()
         db = MagicMock()
         db.update_document_metadata.return_value = True
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
 
         client = TestClient(_app(user=user, handler=handler))
         resp = client.patch(
@@ -533,7 +521,7 @@ class TestUpdateDocumentMetadata:
         handler = MagicMock()
         db = MagicMock()
         db.update_document_metadata.return_value = False
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
 
         client = TestClient(_app(user=user, handler=handler))
         resp = client.patch(
@@ -610,7 +598,7 @@ class TestSyncDiff:
         sync_manifest.get_last_synced_at.return_value = None
         db = MagicMock()
         db.get_classifications.return_value = {"changed.md": 3}
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
         handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
 
         client = TestClient(_app(user=user, handler=handler))
@@ -638,7 +626,7 @@ class TestSyncDiff:
         sync_manifest.get_last_synced_at.return_value = None
         db = MagicMock()
         db.get_classifications.return_value = {"changed.md": 99}  # not a real Classification level
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
         handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
 
         client = TestClient(_app(user=user, handler=handler))
@@ -676,7 +664,7 @@ class TestDeleteCollection:
         handler = MagicMock()
         db = MagicMock()
         db.delete_collection.return_value = True
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
         sync_manifest = MagicMock()
         handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
         handler.container.services.get.return_value = None
@@ -694,7 +682,7 @@ class TestDeleteCollection:
         handler = MagicMock()
         db = MagicMock()
         db.delete_collection.return_value = False
-        handler.container.providers = {"db": db}
+        handler.container.require_db_provider.return_value = db
         sync_manifest = MagicMock()
         handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
 

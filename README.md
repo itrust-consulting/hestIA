@@ -77,7 +77,6 @@ All backend configuration is injected via environment variables. The defaults in
 | `DEFAULT_GEN_MODEL` | `RedHatAI/Qwen3.6-35B-A3B-NVFP4` | Model ID for generation |
 | `DEFAULT_EMB_MODEL` | `qwen3-embedding:0.6b` | Model ID for embeddings |
 | `DEFAULT_RKK_MODEL` | `dengcao/Qwen3-Reranker-4B:Q8_0` | Model ID for reranking |
-| `ENABLE_AUTH` | `true` | Toggle authentication |
 | `AUTH_MODE` | `local` | `local` · `ldap` · `oidc` |
 | `AUTH_SECRET_KEY` | _(change this)_ | JWT signing secret |
 | `AUTH_TOKEN_LIFETIME` | `360` | JWT lifetime in minutes |

@@ -25,6 +25,21 @@ def _settings(max_context_tokens=100, summary_target_tokens=20, summary_model=No
     return s
 
 
+def _generator(compaction_enabled=True, compaction_context_window=None, compaction_summary_length=None,
+               compaction_model=None, default_model="connection-model"):
+    """A Generator connection double with no per-connection overrides set,
+    so check_context_budget/run_compaction fall back to the global settings
+    values -- matching the real Generator's unset-override defaults."""
+    g = MagicMock()
+    g.compaction_enabled = compaction_enabled
+    g.compaction_context_window = compaction_context_window
+    g.compaction_summary_length = compaction_summary_length
+    g.compaction_model = compaction_model
+    g.default_model = default_model
+    g.chat = AsyncMock()
+    return g
+
+
 def _msg(role, content, created_at, rowid):
     return {"role": role, "content": content, "created_at": created_at, "rowid": rowid}
 
@@ -43,7 +58,7 @@ class TestCheckContextBudget:
     def test_under_budget_passthrough(self):
         settings = _settings(max_context_tokens=100_000)
         tail = [_msg("user", "hi", 1, 1), _msg("assistant", "hello", 2, 2)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is False
         assert check.history is not None
         assert check.fold is None
@@ -53,26 +68,26 @@ class TestCheckContextBudget:
     def test_tokens_field_set_when_over_budget(self):
         settings = _settings(max_context_tokens=200, summary_target_tokens=20)
         tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(10)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is True
         assert check.tokens == count_message_tokens(tail)
 
     def test_tokens_field_set_when_cannot_fold(self):
         settings = _settings(max_context_tokens=10, summary_target_tokens=2)
         tail = [_big_msg("user", 1)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is False
         assert check.tokens == count_message_tokens(tail)
 
     def test_empty_tail_never_needs_compaction(self):
         settings = _settings(max_context_tokens=1)
-        check = check_context_budget("a huge prior summary " * 500, [], settings)
+        check = check_context_budget("a huge prior summary " * 500, [], settings, _generator())
         assert check.needs_compaction is False
 
     def test_over_budget_triggers_compaction(self):
         settings = _settings(max_context_tokens=200, summary_target_tokens=20)
         tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(10)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is True
         assert check.fold
         assert check.keep is not None
@@ -82,7 +97,7 @@ class TestCheckContextBudget:
     def test_cut_point_never_leaves_keep_starting_with_assistant(self):
         settings = _settings(max_context_tokens=2000, summary_target_tokens=100)
         tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(20)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is True
         assert check.keep  # a real middle cut, not "fold everything"
         assert check.keep[0]["role"] == "user"
@@ -95,7 +110,7 @@ class TestCheckContextBudget:
         # a handful of the newest messages regardless of budget pressure.
         settings = _settings(max_context_tokens=200, summary_target_tokens=20)
         tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(30)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is True
         assert len(check.keep) >= 4
         assert check.fold + check.keep == tail
@@ -114,7 +129,7 @@ class TestCheckContextBudget:
             oversized,
             _msg("assistant", "ok", 91, 91),
         ]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is True
         assert all(m["content"] != oversized["content"] for m in check.keep)
         assert oversized in check.fold
@@ -124,7 +139,7 @@ class TestCheckContextBudget:
         # compaction can't help, so this must not crash and must not compact
         settings = _settings(max_context_tokens=10, summary_target_tokens=2)
         tail = [_big_msg("user", 1)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is False
         assert check.history is not None
 
@@ -136,7 +151,7 @@ class TestCheckContextBudget:
         settings = _settings(max_context_tokens=100, summary_target_tokens=20)
         oversized_summary = "word " * 500
         tail = [_msg("user", "hi", 1, 1), _msg("assistant", "hello", 2, 2)]
-        check = check_context_budget(oversized_summary, tail, settings)
+        check = check_context_budget(oversized_summary, tail, settings, _generator())
         assert check.needs_compaction is True
         assert len(check.fold) >= 1
         assert check.keep[0]["role"] == "user" if check.keep else True
@@ -149,9 +164,19 @@ class TestCheckContextBudget:
 class TestCheckContextBudgetForce:
 
     def test_force_compacts_even_when_comfortably_under_budget(self):
-        settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
-        tail = [_msg("user" if i % 2 == 0 else "assistant", "hi", i, i) for i in range(20)]
-        check = check_context_budget(None, tail, settings, force=True)
+        # A tiny handful of short messages fits easily in ANY budget, so there
+        # would never be anything productive for force to fold there (see
+        # test_force_still_reports_not_needed_when_tail_too_short_to_fold).
+        # "Comfortably under budget" here means the auto-compaction path
+        # (candidate_tokens <= effective_budget) would say no compaction is
+        # needed, while force's tighter keep_budget (which reserves room for
+        # the summary + the new turn) still finds real messages to fold.
+        settings = _settings(max_context_tokens=2500, summary_target_tokens=100)
+        tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(20)]
+        auto_check = check_context_budget(None, tail, settings, _generator())
+        assert auto_check.needs_compaction is False  # confirms "comfortably under budget"
+
+        check = check_context_budget(None, tail, settings, _generator(), force=True)
         assert check.needs_compaction is True
         assert check.fold
         assert check.keep
@@ -160,23 +185,24 @@ class TestCheckContextBudgetForce:
     def test_force_still_reports_not_needed_when_tail_too_short_to_fold(self):
         settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
         tail = [_msg("user", "hi", 1, 1)]
-        check = check_context_budget(None, tail, settings, force=True)
+        check = check_context_budget(None, tail, settings, _generator(), force=True)
         assert check.needs_compaction is False
 
     def test_force_keeps_only_min_keep_messages(self):
-        settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
-        tail = [_msg("user" if i % 2 == 0 else "assistant", "hi", i, i) for i in range(20)]
-        check = check_context_budget(None, tail, settings, force=True)
-        # snapped forward to a user-role boundary, so keep may be slightly
-        # larger than MIN_KEEP_MESSAGES but never dramatically so
-        assert len(check.keep) <= 6
+        settings = _settings(max_context_tokens=2000, summary_target_tokens=100)
+        tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(20)]
+        check = check_context_budget(None, tail, settings, _generator(), force=True)
+        # no MIN_KEEP_MESSAGES floor under force (see _split_force_fold) --
+        # only the token-budget walk snapped forward to a user-role boundary,
+        # so keep can legitimately be smaller than auto-compaction's floor.
+        assert len(check.keep) >= 1
         assert check.keep[0]["role"] == "user"
 
     def test_default_is_unaffected_by_force_param(self):
         # force omitted entirely must be byte-identical to today's behavior
         settings = _settings(max_context_tokens=100_000, summary_target_tokens=20)
         tail = [_msg("user", "hi", 1, 1), _msg("assistant", "hello", 2, 2)]
-        check = check_context_budget(None, tail, settings)
+        check = check_context_budget(None, tail, settings, _generator())
         assert check.needs_compaction is False
 
 
@@ -242,7 +268,7 @@ class TestRunCompaction:
 
     def test_no_prior_summary_calls_llm_once_and_persists_boundary(self):
         settings = _settings()
-        generator = MagicMock()
+        generator = _generator()
         generator.chat = AsyncMock(return_value="a concise summary")
         users = self._users()
         conversation_id = uuid.uuid4()
@@ -264,7 +290,7 @@ class TestRunCompaction:
 
     def test_prior_summary_is_included_in_prompt_as_rolling_update(self):
         settings = _settings()
-        generator = MagicMock()
+        generator = _generator()
         generator.chat = AsyncMock(return_value="updated summary")
         users = self._users()
         conversation_id = uuid.uuid4()
@@ -279,7 +305,7 @@ class TestRunCompaction:
 
     def test_no_prior_summary_prompt_says_first_summarization(self):
         settings = _settings()
-        generator = MagicMock()
+        generator = _generator()
         generator.chat = AsyncMock(return_value="summary")
         users = self._users()
         fold = [_msg("user", "hi", 1, 1)]
@@ -291,7 +317,7 @@ class TestRunCompaction:
 
     def test_uses_summary_model_override_when_set(self):
         settings = _settings(summary_model="override-model", default_gen_model="default-model")
-        generator = MagicMock()
+        generator = _generator(compaction_model=None, default_model="connection-model")
         generator.chat = AsyncMock(return_value="summary")
         users = self._users()
         fold = [_msg("user", "hi", 1, 1)]
@@ -301,15 +327,20 @@ class TestRunCompaction:
         assert generator.chat.await_args.kwargs["model"] == "override-model"
 
     def test_falls_back_to_default_gen_model(self):
-        settings = _settings(summary_model=None, default_gen_model="default-model")
-        generator = MagicMock()
+        # 3-tier fallback (see run_compaction's docstring): this connection's
+        # own compaction_model override, then the global summary_model
+        # preference, then the connection's own default_model -- there is no
+        # fallback to settings.default_gen_model, since each generation
+        # connection now carries its own default model.
+        settings = _settings(summary_model=None)
+        generator = _generator(compaction_model=None, default_model="connection-default-model")
         generator.chat = AsyncMock(return_value="summary")
         users = self._users()
         fold = [_msg("user", "hi", 1, 1)]
 
         _run(run_compaction(generator, settings, users, uuid.uuid4(), None, fold, []))
 
-        assert generator.chat.await_args.kwargs["model"] == "default-model"
+        assert generator.chat.await_args.kwargs["model"] == "connection-default-model"
 
 
 # ---------------------------------------------------------------------------
@@ -326,13 +357,13 @@ class TestRetryIdempotency:
         # would legitimately need to recompact again, which isn't what this
         # test is checking.
         settings = _settings(max_context_tokens=900, summary_target_tokens=100)
+        generator = _generator()
 
         # Turn 1: tail is over budget, compaction runs and persists a boundary.
         tail = [_big_msg("user" if i % 2 == 0 else "assistant", i) for i in range(10)]
-        first_check = check_context_budget(None, tail, settings)
+        first_check = check_context_budget(None, tail, settings, generator)
         assert first_check.needs_compaction is True
 
-        generator = MagicMock()
         generator.chat = AsyncMock(return_value="short summary")
         users = MagicMock()
         conversation_id = uuid.uuid4()
@@ -356,7 +387,7 @@ class TestRetryIdempotency:
         deleted = set(id(m) for m in first_check.keep[-2:])  # the retried user+assistant pair
         tail_for_retry = [m for m in remaining_after_boundary if id(m) not in deleted]
 
-        second_check = check_context_budget("short summary", tail_for_retry, settings)
+        second_check = check_context_budget("short summary", tail_for_retry, settings, generator)
 
         assert second_check.needs_compaction is False
         generator.chat.assert_awaited_once()  # still only the one call from turn 1

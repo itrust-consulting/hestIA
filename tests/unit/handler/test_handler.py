@@ -23,6 +23,21 @@ from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 from tests.unit.conftest import _make_user
 
 
+def _generator_double(chat_return=None, default_model="test-model"):
+    """A Generator connection double with no per-connection compaction
+    overrides set, so context-budget math falls back to whatever settings
+    are configured on the container -- matching a real Generator's unset
+    compaction_context_window/compaction_summary_length/compaction_model."""
+    g = MagicMock()
+    g.compaction_enabled = True
+    g.compaction_context_window = None
+    g.compaction_summary_length = None
+    g.compaction_model = None
+    g.default_model = default_model
+    g.chat = AsyncMock(return_value=chat_return)
+    return g
+
+
 # ---------------------------------------------------------------------------
 # _normalize_citekey
 # ---------------------------------------------------------------------------
@@ -124,7 +139,7 @@ class TestFormatCitations:
 class TestBuildPrompt:
 
     def test_no_hits_returns_original_prompt(self):
-        prompt, cites = _build_prompt("original", [])
+        prompt, cites = _build_prompt("original", [], "{user_prompt}{retrieved_data}{source_map}")
         assert prompt == "original"
         assert cites == []
 
@@ -134,7 +149,8 @@ class TestBuildPrompt:
             "source": "doc", "content": "chunk",
             "doc_info": {}, "info": {},
         }
-        prompt, cites = _build_prompt("user question", [point])
+        template = "{user_prompt}\n{retrieved_data}\n{source_map}"
+        prompt, cites = _build_prompt("user question", [point], template)
         assert "user question" in prompt
         assert "chunk" in prompt
         assert len(cites) == 1
@@ -305,7 +321,7 @@ class TestRunEncodeDense:
         asyncio.run(runner._run_encode_dense(node, slot, stream=False))
 
         assert slot["vector"] == DenseVector(vector=[0.1])
-        svc.encode.assert_awaited_once_with("hello")
+        svc.encode.assert_awaited_once_with("hello", model=None, options=None)
 
     def test_writes_result_to_custom_output_key(self):
         svc = MagicMock()
@@ -327,7 +343,7 @@ class TestRunEncodeDense:
 
         asyncio.run(runner._run_encode_dense(node, slot, stream=False))
 
-        svc.encode.assert_awaited_once_with("resolved text")
+        svc.encode.assert_awaited_once_with("resolved text", model=None, options=None)
 
 
 class TestRunEncodeSparse:
@@ -488,7 +504,8 @@ class TestRunGenerate:
         svc = MagicMock()
         svc.generate = AsyncMock(return_value="answer")
         runner = self._runner(svc)
-        node = Node(id="n1", type="Generate", inputs={"prompt": "hi"}, outputs={}, model="m1", options={"temp": 0.1})
+        node = Node(id="n1", type="Generate",
+                    inputs={"prompt": "hi", "model": "m1", "options": {"temp": 0.1}}, outputs={})
         slot = {}
 
         asyncio.run(runner._run_generate(node, slot, stream=False))
@@ -590,10 +607,14 @@ class TestWrapStream:
         req.model_kwargs = {}
         req.freed_tokens = None
 
+        if generator is None:
+            generator = _generator_double()
+
         users_svc = MagicMock()
         users_svc.create_user_conversation.return_value = uuid.uuid4()
         users_svc.append_conversation_message.return_value = uuid.uuid4()
         runner.container.services.get.side_effect = lambda name: {"users": users_svc, "generate": generator}.get(name)
+        runner.container.require_service.side_effect = lambda name: {"users": users_svc, "generate": generator}.get(name)
 
         pc = PersistChat(runner=runner, req=req)
         pc.users = users_svc
@@ -677,8 +698,7 @@ class TestWrapStream:
         # over budget, the final frame must say so (needs_compaction: True)
         # without actually folding anything itself.
         import json
-        generator = MagicMock()
-        generator.chat = AsyncMock(return_value="a concise summary")
+        generator = _generator_double(chat_return="a concise summary")
         pc, req = self._make_persist_chat(generator=generator)
         pc.users.assert_conversation_owner = MagicMock()
         pc.users.get_conversation_context_state.return_value = {}
@@ -883,6 +903,7 @@ class TestRequestHandlerResolve:
         container = MagicMock()
         container.settings = settings
         container.services.get.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
+        container.require_service.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
 
         policy = MagicMock()
         policy.check.return_value = PolicyResult(decision=PolicyDecision.ALLOW)
@@ -964,7 +985,7 @@ class TestRequestHandlerResolve:
 
     def test_skips_context_budget_for_generate_exec_type(self):
         users = MagicMock()
-        h = self._handler(users=users, generator=MagicMock())
+        h = self._handler(users=users, generator=_generator_double())
         req = self._req(exec_type="generate", conversation_id=str(uuid.uuid4()))
 
         asyncio.run(h.resolve(req, stream=False))
@@ -980,8 +1001,7 @@ class TestRequestHandlerResolve:
             for i in range(20)
         ]
         users.get_messages_after_boundary.return_value = big_tail
-        generator = MagicMock()
-        generator.chat = AsyncMock(return_value="a summary")
+        generator = _generator_double(chat_return="a summary")
 
         h = self._handler(users=users, generator=generator)
         req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
@@ -1000,8 +1020,7 @@ class TestRequestHandlerResolve:
         users.get_messages_after_boundary.return_value = [
             {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
         ]
-        generator = MagicMock()
-        generator.chat = AsyncMock()
+        generator = _generator_double()
 
         h = self._handler(users=users, generator=generator)
         req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
@@ -1015,7 +1034,7 @@ class TestRequestHandlerResolve:
     def test_context_budget_failure_fails_open(self):
         users = MagicMock()
         users.get_conversation_context_state.side_effect = RuntimeError("boom")
-        h = self._handler(users=users, generator=MagicMock())
+        h = self._handler(users=users, generator=_generator_double())
         req = self._req(exec_type="chat", conversation_id=str(uuid.uuid4()))
 
         result = asyncio.run(h.resolve(req, stream=False))
@@ -1047,6 +1066,7 @@ class TestStreamWithBudgetNotice:
         container = MagicMock()
         container.settings = settings
         container.services.get.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
+        container.require_service.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
 
         h = RequestHandler.__new__(RequestHandler)
         h.container = container
@@ -1087,8 +1107,7 @@ class TestStreamWithBudgetNotice:
             for i in range(20)
         ]
         users.get_messages_after_boundary.return_value = big_tail
-        generator = MagicMock()
-        generator.chat = AsyncMock(return_value="a summary")
+        generator = _generator_double(chat_return="a summary")
 
         h = self._handler(users, generator)
         req = self._req()
@@ -1109,8 +1128,7 @@ class TestStreamWithBudgetNotice:
         users.get_messages_after_boundary.return_value = [
             {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
         ]
-        generator = MagicMock()
-        generator.chat = AsyncMock()
+        generator = _generator_double()
 
         h = self._handler(users, generator)
         req = self._req()
@@ -1122,7 +1140,7 @@ class TestStreamWithBudgetNotice:
 
     def test_non_chat_exec_type_skips_budget_check_entirely(self):
         users = MagicMock()
-        generator = MagicMock()
+        generator = _generator_double()
         h = self._handler(users, generator)
         req = self._req()
         req.exec_type = "generate"  # not in CONTEXT_BUDGET_EXEC_TYPES

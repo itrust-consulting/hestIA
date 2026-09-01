@@ -21,8 +21,9 @@ def _app(user=None, container=None):
 
 
 def _mock_retriever():
+    from unittest.mock import AsyncMock
     r = MagicMock()
-    r.retrieve.return_value = MagicMock(points=[])
+    r.retrieve = AsyncMock(return_value=MagicMock(points=[]))
     return r
 
 
@@ -30,7 +31,7 @@ class TestSearchRouter:
 
     def test_semantic_mode_accepted(self):
         container = MagicMock()
-        container.services = {"search": _mock_retriever()}
+        container.require_service.return_value = _mock_retriever()
 
         client = TestClient(_app(container=container))
         resp = client.post("/search", json={
@@ -42,7 +43,7 @@ class TestSearchRouter:
 
     def test_keyword_mode_accepted(self):
         container = MagicMock()
-        container.services = {"search": _mock_retriever()}
+        container.require_service.return_value = _mock_retriever()
 
         client = TestClient(_app(container=container))
         resp = client.post("/search", json={
@@ -54,7 +55,7 @@ class TestSearchRouter:
 
     def test_hybrid_mode_accepted(self):
         container = MagicMock()
-        container.services = {"search": _mock_retriever()}
+        container.require_service.return_value = _mock_retriever()
 
         client = TestClient(_app(container=container))
         resp = client.post("/search", json={
@@ -85,7 +86,7 @@ class TestSearchRouter:
             "allowed-col": CollectionPermission(access=True)
         })
         container = MagicMock()
-        container.services = {"search": _mock_retriever()}
+        container.require_service.return_value = _mock_retriever()
 
         client = TestClient(_app(user=user, container=container))
         resp = client.post("/search", json={
@@ -100,7 +101,7 @@ class TestSearchRouter:
             "*": CollectionPermission(access=True)
         })
         container = MagicMock()
-        container.services = {"search": _mock_retriever()}
+        container.require_service.return_value = _mock_retriever()
 
         client = TestClient(_app(user=user, container=container))
         resp = client.post("/search", json={

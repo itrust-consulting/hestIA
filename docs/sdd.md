@@ -448,7 +448,6 @@ Key environment variables:
 | `LLM_API_KEY` / `DB_API_KEY` | Optional bearer tokens for LLM and Qdrant | None |
 | `DEFAULT_GEN_MODEL` | Default generation model name | — |
 | `DEFAULT_EMB_MODEL` | Default embedding model name | — |
-| `ENABLE_AUTH` | Enable authentication subsystem | `false` |
 | `AUTH_MODE` | Authentication mode (`local` / `ldap` / `oidc`) | `local` |
 | `AUTH_SECRET_KEY` | JWT signing key (minimum 32 characters) | Required |
 | `AUTH_TOKEN_LIFETIME` | Token validity in minutes | `360` |

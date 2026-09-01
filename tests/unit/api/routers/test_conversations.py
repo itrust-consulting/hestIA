@@ -20,6 +20,17 @@ def _app(user=None, handler=None):
     return app
 
 
+def _generator(chat_result=None):
+    generator = MagicMock()
+    generator.compaction_enabled = True
+    generator.compaction_context_window = None
+    generator.compaction_summary_length = None
+    generator.compaction_model = None
+    generator.default_model = "test-model"
+    generator.chat = AsyncMock(return_value=chat_result)
+    return generator
+
+
 def _handler(users, generator=None, max_context_tokens=32000, summary_target_tokens=6000):
     handler = MagicMock()
     settings = MagicMock()
@@ -29,6 +40,7 @@ def _handler(users, generator=None, max_context_tokens=32000, summary_target_tok
     settings.default_gen_model = "test-model"
     handler.container.settings = settings
     handler.container.services.get.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
+    handler.container.require_service.side_effect = lambda name: {"users": users, "generate": generator}.get(name)
     return handler
 
 
@@ -55,7 +67,7 @@ class TestGetConversationMessages:
         users.get_conversation_messages.return_value = {
             "messages": [], "has_more": False, "next_cursor": None,
         }
-        handler = _handler(users)
+        handler = _handler(users, _generator())
 
         client = TestClient(_app(handler=handler))
         resp = client.get(f"/conversations/{uuid.uuid4()}")
@@ -89,8 +101,7 @@ class TestCompactConversation:
     def test_not_needed_when_under_budget(self):
         tail = [{"role": "user", "content": "hi", "created_at": 1, "rowid": 1}]
         users = _users(tail)
-        generator = MagicMock()
-        generator.chat = AsyncMock()
+        generator = _generator()
         handler = _handler(users, generator)
 
         client = TestClient(_app(handler=handler))
@@ -103,15 +114,18 @@ class TestCompactConversation:
         users.update_conversation_context_summary.assert_not_called()
 
     def test_compacts_even_when_under_budget_since_manual_is_forced(self):
+        # Messages sized so the tail comfortably fits the auto-compaction
+        # budget (nothing would fold automatically) while still exceeding
+        # force's tighter keep_budget (which reserves room for the summary +
+        # the new turn), so forcing genuinely has something to fold.
         long_tail = [
-            {"role": "user" if i % 2 == 0 else "assistant", "content": "hi",
+            {"role": "user" if i % 2 == 0 else "assistant", "content": "word " * 100,
              "created_at": i, "rowid": i}
             for i in range(20)
         ]
         users = _users(long_tail)
-        generator = MagicMock()
-        generator.chat = AsyncMock(return_value="a concise summary")
-        handler = _handler(users, generator, max_context_tokens=100_000, summary_target_tokens=20)
+        generator = _generator(chat_result="a concise summary")
+        handler = _handler(users, generator, max_context_tokens=2500, summary_target_tokens=100)
 
         client = TestClient(_app(handler=handler))
         resp = client.post(f"/conversations/{uuid.uuid4()}/compact")
@@ -129,8 +143,7 @@ class TestCompactConversation:
             for i in range(20)
         ]
         users = _users(big_tail)
-        generator = MagicMock()
-        generator.chat = AsyncMock(return_value="a concise summary")
+        generator = _generator(chat_result="a concise summary")
         handler = _handler(users, generator, max_context_tokens=200, summary_target_tokens=20)
 
         client = TestClient(_app(handler=handler))

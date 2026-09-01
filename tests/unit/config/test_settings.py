@@ -137,38 +137,37 @@ class TestLoadAuthSettings:
 class TestSettingsLoad:
 
     def test_assembles_with_defaults(self, monkeypatch):
-        monkeypatch.delenv("ENABLE_AUTH", raising=False)
+        monkeypatch.setenv("AUTH_SECRET_KEY", "k" * 32)
         monkeypatch.setenv("DEFAULT_GEN_MODEL", "default-model")
         s = Settings.load()
-        assert s.enable_auth is False
-        assert s.auth is None
-
-    def test_enable_auth_loads_auth_settings(self, monkeypatch):
-        monkeypatch.setenv("ENABLE_AUTH", "true")
-        monkeypatch.setenv("AUTH_SECRET_KEY", "k" * 32)
-        monkeypatch.setenv("AUTH_MODE", "local")
-        monkeypatch.setenv("DEFAULT_GEN_MODEL", "test-model")
-        s = Settings.load()
-        assert s.enable_auth is True
         assert s.auth is not None
+        assert s.auth.auth_mode == "local"
 
     def test_port_parsed_from_env(self, monkeypatch):
         monkeypatch.setenv("PORT", "9999")
+        monkeypatch.setenv("AUTH_SECRET_KEY", "k" * 32)
         monkeypatch.setenv("DEFAULT_GEN_MODEL", "m")
         s = Settings.load()
         assert s.port == 9999
 
     def test_raises_when_model_env_var_missing(self, monkeypatch):
         monkeypatch.delenv("DEFAULT_GEN_MODEL", raising=False)
-        monkeypatch.delenv("ENABLE_AUTH", raising=False)
+        monkeypatch.setenv("AUTH_SECRET_KEY", "k" * 32)
         import pydantic
         with pytest.raises(pydantic.ValidationError):
+            Settings.load()
+
+    def test_raises_when_auth_secret_key_missing(self, monkeypatch):
+        monkeypatch.delenv("AUTH_SECRET_KEY", raising=False)
+        monkeypatch.setenv("DEFAULT_GEN_MODEL", "m")
+        with pytest.raises(ConfigurationError, match="AUTH_SECRET_KEY"):
             Settings.load()
 
     def test_bootstrap_admin_defaults_to_none(self, monkeypatch):
         monkeypatch.delenv("DEFAULT_ADMIN_USERNAME", raising=False)
         monkeypatch.delenv("DEFAULT_ADMIN_PASSWORD", raising=False)
         monkeypatch.delenv("DEFAULT_ADMIN_EMAIL", raising=False)
+        monkeypatch.setenv("AUTH_SECRET_KEY", "k" * 32)
         monkeypatch.setenv("DEFAULT_GEN_MODEL", "m")
         s = Settings.load()
         assert s.bootstrap_admin_username is None
@@ -183,6 +182,7 @@ class TestSettingsLoad:
         monkeypatch.setenv("DEFAULT_ADMIN_EMAIL", "root@example.com")
         monkeypatch.setenv("DEFAULT_ADMIN_FIRST_NAME", "Root")
         monkeypatch.setenv("DEFAULT_ADMIN_LAST_NAME", "Account")
+        monkeypatch.setenv("AUTH_SECRET_KEY", "k" * 32)
         monkeypatch.setenv("DEFAULT_GEN_MODEL", "m")
         s = Settings.load()
         assert s.bootstrap_admin_username == "root"

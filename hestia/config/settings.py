@@ -82,7 +82,6 @@ class Settings(BaseModel):
     default_rkk_model: str = "dengcao/Qwen3-Reranker-4B:Q8_0"
 
     # --- auth ---
-    enable_auth: bool = True
     auth: AuthSettings | None = None
     ldap: LDAPSettings | None = None
     oidc: OIDCSettings | None = None
@@ -136,22 +135,18 @@ class Settings(BaseModel):
         ).resolve()
         app_data = project_root / (os.getenv("HESTIA_DATA_DIR") or "app/data")
 
-        enable_auth = os.getenv("ENABLE_AUTH", "false").lower() == "true"
-
         max_context_tokens = int(os.getenv("MAX_CONTEXT_TOKENS", "32000"))
         summary_target_tokens = int(os.getenv("SUMMARY_TARGET_TOKENS", "6000"))
         if summary_target_tokens >= max_context_tokens:
             raise ConfigurationError("SUMMARY_TARGET_TOKENS must be less than MAX_CONTEXT_TOKENS")
 
-        auth: AuthSettings | None = None
+        auth = _load_auth_settings()
         ldap: LDAPSettings | None = None
         oidc: OIDCSettings | None = None
-        if enable_auth:
-            auth = _load_auth_settings()
-            if auth.auth_mode == "ldap":
-                ldap = _load_ldap_settings()
-            elif auth.auth_mode == "oidc":
-                oidc = _load_oidc_settings()
+        if auth.auth_mode == "ldap":
+            ldap = _load_ldap_settings()
+        elif auth.auth_mode == "oidc":
+            oidc = _load_oidc_settings()
 
         return cls(
             port=int(os.getenv("PORT", "5555")),
@@ -166,7 +161,6 @@ class Settings(BaseModel):
             default_gen_model=default_llm_model,
             default_emb_model=os.getenv("DEFAULT_EMB_MODEL", default_llm_model),
             default_rkk_model=os.getenv("DEFAULT_RKK_MODEL", default_llm_model),
-            enable_auth=enable_auth,
             auth=auth,
             ldap=ldap,
             oidc=oidc,
