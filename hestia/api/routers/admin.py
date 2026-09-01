@@ -306,15 +306,22 @@ def add_tenant_collection(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
-    assert_collection_moderator(user, collection_id, h)
     role = req.get("role", "access")
     if role not in ("owner", "access"):
         raise HTTPException(400, "role must be 'owner' or 'access'")
+    if role == "owner":
+        assert_admin(user)
+    else:
+        assert_collection_moderator(user, collection_id, h)
     raw_cap = req.get("max_classification")
     max_classification = int(raw_cap) if raw_cap is not None else None
     h.container.services.get("users").add_tenant_collection(
         org_id, collection_id, role=role, max_classification=max_classification
     )
+    if role == "owner":
+        db = h.container.providers.get("db")
+        if db is not None:
+            db.update_collection_owner(collection_id, org_id)
     audit.admin_action(
         actor_id=str(user.id), action="tenant_collection_grant", target=f"{org_id}:{collection_id}",
         detail={"role": role, "max_classification": max_classification},
