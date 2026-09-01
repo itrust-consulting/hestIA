@@ -8,6 +8,7 @@ import { messages, isMutatingFront } from '$lib/stores/chat';
 import { requestScrollToBottom } from '$lib/stores/chatScroll';
 import { api } from '$lib/api/client';
 import { contextBudget, setContextBudget } from '$lib/stores/contextBudget';
+import { setActiveConversation, resetNewChatSelection, removeConversationSelection } from '$lib/stores/isms';
 
 const PAGE_SIZE = 20;
 // Always keep at least this many loaded messages above the current viewport
@@ -132,6 +133,7 @@ export async function loadConversations() {
 
 export async function openConversation(id: string) {
   activeConversationId.set(id);
+  setActiveConversation(id);
   if (browser) replaceState(`/chat?cid=${id}`, {});
   beforeCursor = null;
   hasMoreBefore.set(false);
@@ -184,6 +186,7 @@ export async function loadOlderMessages() {
 
 export function startNewChat() {
   activeConversationId.set(null);
+  resetNewChatSelection();
   messages.set([]);
   beforeCursor = null;
   hasMoreBefore.set(false);
@@ -206,6 +209,7 @@ export async function deleteConversation(id: string) {
   if (!res.ok) throw new Error('Delete failed');
 
   conversations.update((list) => list.filter((c) => c.id !== id));
+  removeConversationSelection(id);
 
   if (get(activeConversationId) === id) {
     startNewChat();

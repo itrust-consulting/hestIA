@@ -3,7 +3,8 @@
     import { page } from '$app/state';
     import Modal from '$lib/components/Modal.svelte';
     import InfoIcon from '../icons/infoIcon.svelte';
-    import { activeCorpusId, activeCorpusName, isIsmsActive } from '$lib/stores/isms';
+    import { activeCorpusId, activeCorpusName, isIsmsActive, selectCorpus, deactivateCorpus } from '$lib/stores/isms';
+    import { corpora, corporaLoaded, loadCorpora } from '$lib/stores/corpora';
     import { tooltip } from '$lib/actions/tooltip';
 
     /** Props passed from parent */
@@ -11,54 +12,20 @@
 
     const user = page.data.user;
 
-    let corpora = $state<{ id: string; name: string }[]>([]);
     let selectedCorpusId = $state('');
-    let isCorporaLoaded = $state(false);
-    type Collection = { id: string; name: string };
-
-    async function loadCorpora() {
-      isCorporaLoaded = false;
-
-      const allowed = user?.permissions?.allowed_collections;
-
-      if (!allowed) {
-        corpora = [];
-        isCorporaLoaded = true;
-        return;
-      }
-
-      // Admin: fetch all collections from backend
-      if (user?.permissions?.is_admin === true) {
-        const res = await fetch('/api/collections');
-        const data: { collections: Collection[] } = await res.json();
-        corpora = data.collections;
-      } else {
-        // Regular users: only those with access === true
-        corpora = Object.entries(allowed)
-          .filter(([, v]) => v.access === true)
-          .map(([id]) => ({ id, name: id }));
-      }
-
-      isCorporaLoaded = true;
-    }
 
     $effect(() => {
-        if (open) loadCorpora();
+        if (open) loadCorpora(user);
     });
 
 
     function handleCorpusSelect() {
-        const corpus = corpora.find(c => c.id === selectedCorpusId);
-        activeCorpusId.set(selectedCorpusId);
-        activeCorpusName.set(corpus?.name ?? null);
-
-        isIsmsActive.set(true);
+        const corpus = $corpora.find(c => c.id === selectedCorpusId);
+        selectCorpus(selectedCorpusId, corpus?.name ?? null);
         onClose();
     }
     function deactivateCorpusSelect() {
-        activeCorpusId.set(null)
-        activeCorpusName.set(null);
-        isIsmsActive.set(false);
+        deactivateCorpus();
     }
 
     /** Create mode state */
@@ -126,8 +93,8 @@
     <div class="isms-content">
       <select class="dropdown" bind:value={selectedCorpusId}>
       <option value="" disabled>Select a corpus…</option>
-      {#if isCorporaLoaded}
-          {#each corpora as c}
+      {#if $corporaLoaded}
+          {#each $corpora as c}
               <option value={c.id}>{c.name}</option>
           {/each}
       {/if}

@@ -9,7 +9,7 @@ import {
 
 import { activeConversationId, loadConversations, forceEvictStaleHeadNow } from '$lib/stores/conversations';
 import { setContextBudget, announceCompaction } from '$lib/stores/contextBudget';
-import { activeCorpusName } from '$lib/stores/isms';
+import { activeCorpusName, migrateNewChatSelection } from '$lib/stores/isms';
 import { api } from '$lib/api/client';
 import type { ContentPart } from '$lib/types';
 
@@ -155,6 +155,7 @@ export async function streamFromHistoryInto(
           // being mistaken for a streaming thinking chunk.
           freezeThinkingSecs();
           if (obj.conversation_id) {
+            migrateNewChatSelection(obj.conversation_id);
             activeConversationId.set(obj.conversation_id);
             await loadConversations();
             setContextBudget(obj.used_tokens, obj.max_tokens, obj.needs_compaction);
