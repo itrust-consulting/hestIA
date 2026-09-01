@@ -104,6 +104,33 @@ def _build_auth_stack(settings: Settings, user_repo: UserRepository) -> tuple[Us
     return user_service, auth_service
 
 
+def _bootstrap_admin_user(settings: Settings, repo: UserRepository, user_service: UserService) -> None:
+    """First-boot only: if the user table is empty (fresh install, or every
+    account having been deleted), create the initial admin from DEFAULT_ADMIN_*
+    env vars so there's always a way to log in. Runs regardless of AUTH_MODE
+    (local/ldap/oidc) as a break-glass account. No-op once any user exists."""
+    if repo.list_users():
+        return
+    if not (settings.bootstrap_admin_username and settings.bootstrap_admin_password
+            and settings.bootstrap_admin_email):
+        raise ConfigurationError(
+            "No users exist in the user database and DEFAULT_ADMIN_USERNAME / "
+            "DEFAULT_ADMIN_PASSWORD / DEFAULT_ADMIN_EMAIL are not all set -- "
+            "set them so a first admin account can be created on boot."
+        )
+    user_service.create_user(
+        username=settings.bootstrap_admin_username,
+        email=settings.bootstrap_admin_email,
+        password=settings.bootstrap_admin_password,
+        first_name=settings.bootstrap_admin_first_name,
+        last_name=settings.bootstrap_admin_last_name,
+        roles=["admin"],
+        must_change_pw=1,
+        auth_source="local",
+    )
+    _log.info("bootstrap_admin_created", extra={"username": settings.bootstrap_admin_username})
+
+
 @dataclass
 class Container:
     settings: Settings
@@ -267,6 +294,7 @@ def build_container(settings: Settings) -> Container:
         c.services["user_repository"] = repo
 
         user_service, auth_service = _build_auth_stack(settings, repo)
+        _bootstrap_admin_user(settings, repo, user_service)
         c.services["auth"] = auth_service
         c.services["users"] = user_service
 

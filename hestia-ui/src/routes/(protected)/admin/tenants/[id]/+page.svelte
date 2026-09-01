@@ -276,7 +276,7 @@
         </thead>
         <tbody>
           {#each members as m, i}
-            <tr onclick={() => goto(`/admin/users/user/${m.id}`)} class="clickable">
+            <tr onclick={() => goto(`/admin/users/${m.id}`)} class="clickable">
               <td class="num">{i + 1}</td>
               <td class="name">{m.username}</td>
               <td>{m.first_name} {m.last_name}</td>

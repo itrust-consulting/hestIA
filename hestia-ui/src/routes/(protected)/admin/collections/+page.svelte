@@ -4,6 +4,7 @@
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
   import BinIcon from '$lib/components/icons/binIcon.svelte';
   import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
   import type { Collection } from '$lib/types';
   import type { PageData } from './$types';
 
@@ -33,7 +34,7 @@
   </div>
   <div class="subtitle-row">
     <p class="subtitle">{data.isAdmin ? 'All collections across the system and their access configuration.' : 'Collections belonging to your moderated tenants.'}</p>
-    <button class="icon-btn" title="Create collection" onclick={() => (uploadOpen = true)}>
+    <button class="icon-btn" aria-label="Create collection" use:tooltip={"Create collection"} onclick={() => (uploadOpen = true)}>
       <PlusLgIcon />
     </button>
   </div>
@@ -81,7 +82,7 @@
               </td>
               {#if data.isAdmin}
                 <td class="actions-cell">
-                  <button class="del-btn" aria-label="Delete collection" title="Delete" onclick={(e) => { e.stopPropagation(); confirmDelete = col.id; }}>
+                  <button class="del-btn" aria-label="Delete collection" use:tooltip={"Delete"} onclick={(e) => { e.stopPropagation(); confirmDelete = col.id; }}>
                     <BinIcon />
                   </button>
                 </td>

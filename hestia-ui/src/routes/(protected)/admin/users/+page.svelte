@@ -4,6 +4,7 @@
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
   import BinIcon from '$lib/components/icons/binIcon.svelte';
   import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   const { data } = $props();
 
@@ -38,7 +39,7 @@
   </div>
   <div class="subtitle-row">
     <p class="subtitle">View and manage registered users.</p>
-    <button class="icon-btn" title="Add user" onclick={() => open('create_user')}>
+    <button class="icon-btn" aria-label="Add user" use:tooltip={"Add user"} onclick={() => open('create_user')}>
       <PlusLgIcon />
     </button>
   </div>
@@ -76,7 +77,7 @@
               </td>
               <td>{formatDate(u.expires_at)}</td>
               <td class="actions-cell">
-                <button class="del-btn" aria-label="Delete user" title="Delete" onclick={(e) => { e.stopPropagation();
+                <button class="del-btn" aria-label="Delete user" use:tooltip={"Delete"} onclick={(e) => { e.stopPropagation();
                   confirmDelete = u; }}><BinIcon /></button>
               </td>
             </tr>

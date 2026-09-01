@@ -3,6 +3,7 @@
   import Modal from '$lib/components/Modal.svelte';
   import ShowIcon from '$lib/components/icons/showIcon.svelte';
   import { addToast } from '$lib/stores/toast';
+  import { tooltip } from '$lib/actions/tooltip';
   import { parseJsonParam, parseParamValue } from '$lib/llmParamSchemas';
 
   const { data } = $props();
@@ -235,7 +236,7 @@
         <span>Signing key <span class="hint">(leave blank to keep existing)</span></span>
         <div class="password-row">
           <input type={tokenSecretKeyVisible ? 'text' : 'password'} bind:value={tokenSecretKey} placeholder={s.has_token_secret_key ? '••••••••' : 'required, min. 32 characters'} />
-          <button type="button" class="icon-btn" title={tokenSecretKeyVisible ? 'Hide' : 'Show'} onclick={() => (tokenSecretKeyVisible = !tokenSecretKeyVisible)}>
+          <button type="button" class="icon-btn" aria-label={tokenSecretKeyVisible ? 'Hide' : 'Show'} use:tooltip={tokenSecretKeyVisible ? 'Hide' : 'Show'} onclick={() => (tokenSecretKeyVisible = !tokenSecretKeyVisible)}>
             <ShowIcon />
           </button>
         </div>
@@ -261,7 +262,7 @@
           <span>Client secret <span class="hint">(leave blank to keep existing)</span></span>
           <div class="password-row">
             <input type={oidcClientSecretVisible ? 'text' : 'password'} bind:value={oidcClientSecret} placeholder={s.has_oidc_client_secret ? '••••••••' : 'optional'} />
-            <button type="button" class="icon-btn" title={oidcClientSecretVisible ? 'Hide' : 'Show'} onclick={() => (oidcClientSecretVisible = !oidcClientSecretVisible)}>
+            <button type="button" class="icon-btn" aria-label={oidcClientSecretVisible ? 'Hide' : 'Show'} use:tooltip={oidcClientSecretVisible ? 'Hide' : 'Show'} onclick={() => (oidcClientSecretVisible = !oidcClientSecretVisible)}>
               <ShowIcon />
             </button>
           </div>
@@ -349,7 +350,7 @@
           <span>Bind password <span class="hint">(leave blank to keep existing)</span></span>
           <div class="password-row">
             <input type={ldapBindPasswordVisible ? 'text' : 'password'} bind:value={ldapBindPassword} placeholder={s.has_ldap_bind_password ? '••••••••' : 'optional'} />
-            <button type="button" class="icon-btn" title={ldapBindPasswordVisible ? 'Hide' : 'Show'} onclick={() => (ldapBindPasswordVisible = !ldapBindPasswordVisible)}>
+            <button type="button" class="icon-btn" aria-label={ldapBindPasswordVisible ? 'Hide' : 'Show'} use:tooltip={ldapBindPasswordVisible ? 'Hide' : 'Show'} onclick={() => (ldapBindPasswordVisible = !ldapBindPasswordVisible)}>
               <ShowIcon />
             </button>
           </div>

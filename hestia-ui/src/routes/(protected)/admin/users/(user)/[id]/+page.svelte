@@ -317,7 +317,7 @@
           <div class="org-item">
             <span class="org-abbr">{org.abbr}</span>
             <span class="org-name">{org.name}</span>
-            <button class="org-remove" onclick={() => removeOrg(org.id)} title="Remove from organisation">×</button>
+            <button class="org-remove" onclick={() => removeOrg(org.id)} aria-label="Remove from organisation" use:tooltip={"Remove from organisation"}>×</button>
           </div>
         {/each}
       </div>

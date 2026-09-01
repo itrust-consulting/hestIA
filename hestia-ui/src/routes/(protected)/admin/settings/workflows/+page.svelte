@@ -3,6 +3,9 @@
   import { addToast } from '$lib/stores/toast';
   import Modal from '$lib/components/Modal.svelte';
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
+  import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
+  import EditIcon from '$lib/components/icons/editIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   const { data } = $props();
 
@@ -91,9 +94,12 @@
         Edit the YAML below to change how a request type is handled.
       </p>
     </div>
-    <div class="page-header-right">
-      <button class="action-btn" onclick={openCreate}>+ New Workflow</button>
-    </div>
+  </div>
+
+  <div class="section-header">
+    <button class="icon-btn" aria-label="New workflow" use:tooltip={"New workflow"} onclick={openCreate}>
+      <PlusLgIcon />
+    </button>
   </div>
 
   <div class="table-container">
@@ -117,7 +123,9 @@
               {/if}
             </td>
             <td class="actions-cell">
-              <button class="edit-btn" onclick={(e) => { e.stopPropagation(); goto(`/admin/settings/workflows/${w.exec_type}`); }}>Edit</button>
+              <button class="edit-btn" aria-label="Edit workflow" use:tooltip={"Edit"} onclick={(e) => { e.stopPropagation(); goto(`/admin/settings/workflows/${w.exec_type}`); }}>
+                <EditIcon />
+              </button>
               {#if w.is_builtin}
                 {#if w.is_custom}
                   <button class="del-btn" disabled={resetting === w.exec_type} onclick={(e) => { e.stopPropagation(); resetWorkflow(w.exec_type); }}>
@@ -179,7 +187,13 @@
   margin-bottom: 1.5rem;
 }
 .page-header-left { flex: 1; }
-.page-header-right { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
 
 .title {
   font-size: var(--text-3xl);
@@ -240,13 +254,15 @@
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid var(--color-neutral-300);
   color: var(--color-neutral-700);
-  padding: 0.25rem 0.6rem;
+  padding: 0.35rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: var(--text-sm);
 }
 .edit-btn:hover { background: var(--color-neutral-100); }
 

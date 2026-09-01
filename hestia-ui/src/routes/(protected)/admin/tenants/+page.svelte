@@ -5,6 +5,7 @@
   import BinIcon from '$lib/components/icons/binIcon.svelte';
   import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
   import { addToast } from '$lib/stores/toast';
+  import { tooltip } from '$lib/actions/tooltip';
 
   const { data } = $props();
 
@@ -65,7 +66,7 @@
   <div class="subtitle-row">
     <p class="subtitle">{data.isAdmin ? 'Manage organisations and their document access.' : 'Organisations you moderate.'}</p>
     {#if data.isAdmin}
-      <button class="icon-btn" title="Add tenant" onclick={openCreate}>
+      <button class="icon-btn" aria-label="Add tenant" use:tooltip={"Add tenant"} onclick={openCreate}>
         <PlusLgIcon />
       </button>
     {/if}
@@ -102,7 +103,7 @@
               <td class="muted">{formatDate(t.created_at)}</td>
               <td class="actions-cell">
                 {#if data.isAdmin}
-                  <button class="del-btn" aria-label="Delete tenant" title="Delete" onclick={(e) => { e.stopPropagation(); confirmDelete = t; }}><BinIcon /></button>
+                  <button class="del-btn" aria-label="Delete tenant" use:tooltip={"Delete"} onclick={(e) => { e.stopPropagation(); confirmDelete = t; }}><BinIcon /></button>
                 {/if}
               </td>
             </tr>
