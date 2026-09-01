@@ -6,7 +6,7 @@ from hestia.api.schemas.requests import ChatRequest
 from hestia.api.security import get_current_user
 from hestia.api.streaming import abort_on_disconnect
 from hestia.domain.auth.models import User
-from hestia.domain.rag.graph import ExecutionRequest
+from hestia.domain.rag.graph import ExecutionRequest, has_query_text
 from hestia.handler import RequestHandler
 
 router = APIRouter()
@@ -38,9 +38,16 @@ async def chat(
     last_user_message = req.messages[last_user_idx]["content"] if last_user_idx is not None else None
     history = req.messages[:last_user_idx] if last_user_idx is not None else req.messages
 
+    # Retrieval needs a real query to search with -- a file-only turn (no
+    # typed text) skips it entirely rather than embedding/searching on
+    # nothing, and falls back to the plain chat template (no Encode/
+    # Retrieve nodes); the attachment still reaches the model via
+    # ${attached_documents} in that template's prompt.
     exec_req = ExecutionRequest(
         user=user,
-        exec_type="rag_chat" if req.collection else "chat",
+        exec_type="rag_chat" if (
+            req.collection and has_query_text(req.last_user_display_content, last_user_message)
+        ) else "chat",
         history=history,
         last_user_message=last_user_message,
         last_user_display_content=req.last_user_display_content,

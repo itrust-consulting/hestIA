@@ -44,12 +44,21 @@ nodes:
   - id: Augment1
     type: Augment
     inputs:
+      # Retrieval query and generation prompt both stay pure typed text --
+      # attachments are threaded separately below (attachments/
+      # ${attached_documents}) so a file's content reaches the LLM without
+      # ever being folded into what Encode1/Encode2 embed for search.
       prompt: ${last_user_message}
       hits:   ?points
-      # Admin-editable RAG system prompt -- must keep all three placeholders
-      # ({retrieved_data}, {source_map}, {user_prompt}); this is what the
-      # LLM actually sees, wrapping the retrieved context and citation-key
-      # instructions around the user's message.
+      attachments: ${attached_documents}
+      # Admin-editable RAG system prompt -- must keep the three required
+      # placeholders ({retrieved_data}, {source_map}, {user_prompt}); this
+      # is what the LLM actually sees, wrapping the retrieved context and
+      # citation-key instructions around the user's message.
+      # {attached_documents} is optional -- resolves to "" when the user
+      # attached no files -- but keep it if you want attachments (which the
+      # user provided directly, not via the knowledge base) to actually
+      # reach the model.
       template: |
         You are an assistant with access to an organizations ISMS knowledge base of Markdown documents.
         Below are the most relevant excerpts retrieved from that database.
@@ -62,11 +71,18 @@ nodes:
             {source_map}
         </source-map>
 
+        <attached-documents>
+            {attached_documents}
+        </attached-documents>
+
         Instruction:
         - Use LaTeX-style citations when referencing retrieved data: \cite{{key}} for a single source,
           or \cite{{key1,key2}} for multiple sources.
         - IMPORTANT: Use ONLY the numeric keys defined in <source-map>. Do NOT derive keys from
           filenames, document titles, or any other source. The keys are short integers (1, 2, 3, ...).
+        - <attached-documents>, if non-empty, holds file(s) the user attached directly to this
+          message -- they are not part of the knowledge base and are not in <source-map>, so do NOT
+          invent a citation key for them; just use their content directly when relevant.
         - If the retrieved data is insufficient, say so explicitly.
         - Do NOT include a separate sources or references section at the end.
 
