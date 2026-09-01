@@ -3,7 +3,7 @@
     import ISMSModal from './modals/ISMSModal.svelte';
     import AuditModal from './modals/AuditModal.svelte';
     import AssetModal from './modals/AssetModal.svelte';
-    import { isIsmsActive } from '$lib/stores/isms';
+    import { ismsModalOpenRequested } from '$lib/stores/isms';
     import SidebarLeft from './icons/sidebar-left.svelte';
     import Chaticon from './icons/chaticon.svelte';
     import BinIcon from './icons/binIcon.svelte';
@@ -33,6 +33,15 @@
     function close() {
         openModal = null;
     }
+
+    // Lets the Ctrl+Shift+D shortcut (handled in the chat page) open the
+    // corpus picker even though its open/close state lives here.
+    let lastIsmsOpenRequest = 0;
+    ismsModalOpenRequested.subscribe((n) => {
+        if (n === lastIsmsOpenRequest) return;
+        lastIsmsOpenRequest = n;
+        open("isms");
+    });
 
     function newChat() {
         startNewChat();
@@ -109,11 +118,13 @@
         <p class="section-label">Features</p>
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="sidebar-item agent-item" onclick={() => open("isms")}>
+        <div
+            class="sidebar-item agent-item"
+            onclick={() => open("isms")}
+            use:tooltip={`<strong>Ask My Docs</strong><br/>
+                Ctrl+Shift+D`}
+        >
             <span class="agent-item-label"><BookIcon /> Ask My Docs</span>
-            {#if $isIsmsActive}
-                <span class="active-dot"></span>
-            {/if}
         </div>
         {#if isAdmin}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -265,29 +276,6 @@
         max-width: unset;
         overflow: visible;
     }
-    .agent-item .active-dot { /* green-500 */
-        border-radius: 50%;
-        margin-left: auto;
-        animation: pulse 1.6s ease-in-out infinite;
-
-        /* NEW: subtle 3D shading */
-        background: radial-gradient(
-            circle at 30% 30%,
-            #7ef8a1,     /* highlight */
-            #22c55e 60%, /* main green */
-            #139b45 100% /* darker edge */
-        );
-
-        width: 15px;
-        height: 15px;
-    }
-
-    @keyframes pulse {
-        0% { transform: scale(1); opacity: 0.9; }
-        50% { transform: scale(1.2); opacity: 1; }
-        100% { transform: scale(1); opacity: 0.9; }
-    }
-
     .sidebar-list {
         display: flex;
         flex-direction: column;

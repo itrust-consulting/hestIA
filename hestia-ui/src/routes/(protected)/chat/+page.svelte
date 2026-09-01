@@ -20,7 +20,9 @@
   import MessageRow from '$lib/components/MessageRow.svelte';
   import ContextUsageRing from '$lib/components/ContextUsageRing.svelte';
   import type { ChatMessage, Citation } from '$lib/types';
-  import { isIsmsActive, activeCorpusName } from '$lib/stores/isms';
+  import { isIsmsActive, activeCorpusId, activeCorpusName, toggleIsmsActive, requestOpenIsmsModal, selectCorpus } from '$lib/stores/isms';
+  import { corpora, loadCorpora } from '$lib/stores/corpora';
+  import ChevronIcon from '$lib/components/icons/chevronIcon.svelte';
 
   import { addToast } from '$lib/stores/toast';
   import Paperclip from '$lib/components/icons/paperclipIcon.svelte';
@@ -49,11 +51,17 @@
     window.addEventListener("click", handler);
     return () => window.removeEventListener("click", handler);
   });
-  onMount(() => window.addEventListener("keydown", onKey));
+  onMount(() => {
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   onMount(async () => {
     await loadConversations();
     const cid = get(page).url.searchParams.get('cid');
     if (cid) openConversation(cid);
+  });
+  onMount(() => {
+    loadCorpora(get(page).data.user);
   });
   
 
@@ -139,6 +147,13 @@
   let citePopover: CitePopover | null = null;
   let activeChip: HTMLElement | null = null;
 
+  let corpusDropdownOpen = false;
+
+  function chooseCorpus(c: { id: string; name: string }) {
+    selectCorpus(c.id, c.name);
+    corpusDropdownOpen = false;
+  }
+
   onMount(() => {
     function onChipClick(e: MouseEvent) {
       const chip = (e.target as Element).closest('.cite-chip');
@@ -171,6 +186,9 @@
       if (!t.closest('.cite-chip') && !t.closest('.cite-popover')) {
         citePopover = null;
         activeChip = null;
+      }
+      if (corpusDropdownOpen && !t.closest('.corpus-picker')) {
+        corpusDropdownOpen = false;
       }
     }
 
@@ -291,12 +309,40 @@
     tick().then(resizeTextarea);
   }
 
+  function cycleCorpus(direction: 1 | -1) {
+    const list = get(corpora);
+    if (!list.length) return;
+    const currentId = get(activeCorpusId);
+    const idx = list.findIndex(c => c.id === currentId);
+    const next = list[(idx + direction + list.length) % list.length];
+    selectCorpus(next.id, next.name);
+  }
+
+  // onKey is bound both on window (below) and on the textarea's own
+  // keydown, so a physical keypress made while the textarea is focused
+  // reaches this function twice (element phase, then bubbling to window)
+  // -- both calls share the exact same KeyboardEvent instance, so this
+  // dedupes by identity to avoid double-handling one keypress.
+  let lastHandledIsmsEvent: KeyboardEvent | null = null;
+
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
     }
     if (e.key === "Escape" && get(sending)) stop();
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      if (e === lastHandledIsmsEvent) return;
+      lastHandledIsmsEvent = e;
+      if (!toggleIsmsActive()) requestOpenIsmsModal();
+    }
+    if (e.ctrlKey && e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      if (e === lastHandledIsmsEvent) return;
+      lastHandledIsmsEvent = e;
+      cycleCorpus(e.key === 'ArrowDown' ? 1 : -1);
+    }
   }
 
 </script>
@@ -316,7 +362,30 @@
     {#if $isIsmsActive && $activeCorpusName}
       <div class="banner">
         <strong>Ask My Docs</strong>
-        <p>Selected corpus: {$activeCorpusName}</p>
+        <div class="corpus-picker">
+          <button
+            type="button"
+            class="corpus-picker-toggle"
+            on:click={() => corpusDropdownOpen = !corpusDropdownOpen}
+            aria-expanded={corpusDropdownOpen}
+            aria-haspopup="listbox"
+            use:tooltip={`Switch corpus<br/>Ctrl+Shift+↑ / Ctrl+Shift+↓`}
+          >
+            <p>Selected corpus: {$activeCorpusName}</p>
+            <span class="corpus-caret" class:open={corpusDropdownOpen}><ChevronIcon /></span>
+          </button>
+          {#if corpusDropdownOpen}
+            <ul class="corpus-dropdown" role="listbox">
+              {#each $corpora as c}
+                <li role="option" aria-selected={c.id === $activeCorpusId}>
+                  <button type="button" class="corpus-option" class:selected={c.id === $activeCorpusId} on:click={() => chooseCorpus(c)}>
+                    {c.name}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
       </div>
     {/if}
   <!-- Messages -->
@@ -471,6 +540,82 @@
   font-size: var(--text-sm);
   font-weight: 400;
   color: var(--color-neutral-400);
+}
+
+.corpus-picker {
+  position: relative;
+}
+
+.corpus-picker-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.corpus-picker-toggle:hover p {
+  color: var(--color-neutral-600);
+}
+
+.corpus-caret {
+  display: inline-flex;
+  color: var(--color-neutral-600);
+  transition: transform 120ms ease;
+}
+
+.corpus-caret :global(svg) {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+.corpus-caret.open {
+  transform: rotate(180deg);
+}
+
+.corpus-dropdown {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 20;
+  min-width: 12rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--color-white);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px color-mix(in oklab, black 15%, transparent);
+}
+
+.corpus-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-neutral-700);
+  cursor: pointer;
+}
+
+.corpus-option:hover {
+  background: var(--color-neutral-100);
+}
+
+.corpus-option.selected {
+  font-weight: 600;
+  color: var(--color-blue-700);
 }
 
   @keyframes fadeInBanner {
