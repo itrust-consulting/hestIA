@@ -155,6 +155,19 @@ class LogSettingsUpdateRequest(Request):
     log_level: str
 
 
+# ---- Workflow settings ----
+
+class WorkflowUpdateRequest(Request):
+    yaml_text: str
+
+
+class WorkflowCreateRequest(Request):
+    name: str
+    # Omitted/None means "use the minimal starter graph" -- see
+    # hestia/api/routers/workflow_settings.py's _STARTER_YAML.
+    yaml_text: Optional[str] = None
+
+
 # ---- Auth settings ----
 # Global, single-row config (mode, password policy, JWT signing, OIDC,
 # LDAP). Secret fields (token_secret_key, oidc_client_secret,

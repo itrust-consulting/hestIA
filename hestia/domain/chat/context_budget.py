@@ -98,12 +98,17 @@ def check_context_budget(
     compaction_enabled, since usage-display endpoints need them too — only
     needs_compaction itself is gated on the toggle.
 
-    force=True skips both the enabled check and the budget check, and always
-    folds down to MIN_KEEP_MESSAGES (via _split_force_fold) as long as
-    there's anything productive to fold — used for user-initiated manual
-    compaction, which should always do real work when clicked (regardless of
-    whether auto-compaction is enabled for this connection), not only when
-    the auto-trigger budget is exceeded.
+    force=True skips both the enabled check and the budget check, but still
+    folds by the same token-budget walk as the auto path (via
+    _split_force_fold) rather than a fixed message-count floor — used for
+    user-initiated manual compaction. A fixed "always keep the last N
+    messages" floor previously meant a single oversized recent message could
+    sit untouched in "keep" while a handful of tiny old messages got folded
+    into a summary that cost more tokens (framing overhead) than it saved --
+    manual compaction would report success while making usage worse. If the
+    tail already fits comfortably within budget, fold comes back empty and
+    this correctly reports needs_compaction=False instead of forcing a
+    pointless (or harmful) compaction just because the button was clicked.
 
     Concurrency note: this function and update_conversation_context_summary
     are not used atomically as a pair — two overlapping requests for the same
@@ -133,10 +138,10 @@ def check_context_budget(
     if not force and (not generator.compaction_enabled or candidate_tokens <= effective_budget):
         return BudgetCheck(history=candidate, needs_compaction=False, tokens=candidate_tokens)
 
+    keep_budget = max(effective_budget - summary_target - RESERVE_FOR_NEW_TURN, 0)
     if force:
-        fold, keep = _split_force_fold(tail)
+        fold, keep = _split_force_fold(tail, keep_budget)
     else:
-        keep_budget = max(effective_budget - summary_target - RESERVE_FOR_NEW_TURN, 0)
         fold, keep = _split_oldest_to_fold(tail, keep_budget, effective_budget)
     if not fold:
         # Nothing productive to fold (e.g. a single message alone exceeds
@@ -152,33 +157,52 @@ def check_context_budget(
     return BudgetCheck(needs_compaction=True, fold=fold, keep=keep, tokens=candidate_tokens)
 
 
-def _split_oldest_to_fold(
-    tail: list[dict], keep_budget: int, effective_budget: int
-) -> tuple[list[dict], list[dict]]:
+def _walk_by_token_budget(tail: list[dict], keep_budget: int) -> int:
     """Walk the tail backwards from the newest message, accumulating tokens,
-    until the next-older message would exceed keep_budget. Snap the cut to a
-    'user' role boundary so the kept tail never starts mid-exchange with an
-    orphaned assistant reply. Always folds at least one message (forward
-    progress) if the tail has more than one message and is over budget at all.
-
-    Tries to keep at least MIN_KEEP_MESSAGES messages regardless of the
-    token-budget walk above -- recency takes priority over strict budget
-    adherence for normal-sized messages. But this floor never pulls in a
-    message that alone exceeds effective_budget (e.g. a giant RAG-augmented
-    prompt or a large pasted block): such a message can never coexist with a
-    summary + new turn no matter how recent it is, so protecting it here
-    would just guarantee compaction re-triggers on every subsequent turn
-    without ever making progress.
-    """
+    until the next-older message would exceed keep_budget. Returns the cut
+    index -- tail[:cut] is the fold candidate, tail[cut:] the keep candidate.
+    Always keeps at least the single newest message regardless of its size
+    (the i != n - 1 guard below), so the most recent turn is never itself
+    folded away just because it happens to be large. cut can come back 0
+    (nothing folds) when the whole tail already fits within keep_budget."""
     n = len(tail)
     running = 0
-    cut = n  # index into tail where "keep" starts; tail[:cut] gets folded
+    cut = n
     for i in range(n - 1, -1, -1):
         msg_tokens = count_message_tokens([_as_chat_message(tail[i])])
         if running + msg_tokens > keep_budget and i != n - 1:
             break
         running += msg_tokens
         cut = i
+    return cut
+
+
+def _snap_to_user_boundary(tail: list[dict], cut: int) -> int:
+    """Nudges cut forward to the next 'user' message so the kept tail never
+    starts mid-exchange with an orphaned assistant reply."""
+    n = len(tail)
+    while cut < n and tail[cut]["role"] != "user":
+        cut += 1
+    return cut
+
+
+def _split_oldest_to_fold(
+    tail: list[dict], keep_budget: int, effective_budget: int
+) -> tuple[list[dict], list[dict]]:
+    """Auto-compaction's split: the token-budget walk, then try to keep at
+    least MIN_KEEP_MESSAGES messages regardless of that walk -- recency takes
+    priority over strict budget adherence for normal-sized messages. This
+    floor never pulls in a message that alone exceeds effective_budget (e.g.
+    a giant RAG-augmented prompt or a large pasted block): such a message can
+    never coexist with a summary + new turn no matter how recent it is, so
+    protecting it here would just guarantee compaction re-triggers on every
+    subsequent turn without ever making progress. Only called once we're
+    already known to be over budget -- but that can be because of a large
+    prior_summary even when the tail itself is small enough to fit
+    keep_budget on its own (cut == 0), so forward progress still isn't
+    guaranteed by the walk alone; the explicit guard below covers that."""
+    n = len(tail)
+    cut = _walk_by_token_budget(tail, keep_budget)
 
     floor_cut = max(0, n - MIN_KEEP_MESSAGES)
     while cut > floor_cut:
@@ -194,23 +218,21 @@ def _split_oldest_to_fold(
         # "keep" actually starts.
         cut = 1
 
-    # snap forward to the next 'user' message so keep never starts with an
-    # orphaned assistant reply
-    while cut < n and tail[cut]["role"] != "user":
-        cut += 1
-
+    cut = _snap_to_user_boundary(tail, cut)
     return tail[:cut], tail[cut:]
 
 
-def _split_force_fold(tail: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Fold everything except the most recent MIN_KEEP_MESSAGES, regardless of
-    token budget -- used for user-initiated manual compaction, which should
-    always do real work when clicked rather than only when the auto-trigger
-    budget is exceeded."""
-    n = len(tail)
-    cut = max(0, n - MIN_KEEP_MESSAGES)
-    while cut < n and tail[cut]["role"] != "user":
-        cut += 1
+def _split_force_fold(tail: list[dict], keep_budget: int) -> tuple[list[dict], list[dict]]:
+    """User-initiated manual compaction's split: the same token-budget walk
+    as auto-compaction, but deliberately WITHOUT the MIN_KEEP_MESSAGES floor
+    -- that floor is what let a single oversized recent message sit
+    untouched in "keep" while only tiny old messages got folded, sometimes
+    costing more tokens (summary + framing overhead) than it freed. May
+    return an empty fold when the tail already fits within keep_budget;
+    check_context_budget then correctly reports needs_compaction=False
+    rather than forcing a pointless compaction just because the button was
+    clicked."""
+    cut = _snap_to_user_boundary(tail, _walk_by_token_budget(tail, keep_budget))
     return tail[:cut], tail[cut:]
 
 

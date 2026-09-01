@@ -21,7 +21,7 @@
       ]
     },
     {
-      label: 'System',
+      label: 'Settings',
       items: [
         { label: 'Connections', href: '/admin/settings/connections' },
         { label: 'Workflows', href: '/admin/settings/workflows' },

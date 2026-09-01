@@ -13,6 +13,7 @@ from hestia.api.routers.registry import include_routers
 from hestia.config.settings import Settings
 from hestia.container import build_container
 from hestia.domain.policies.guard import ExecutionPolicy
+from hestia.domain.rag.template_sync import sync_templates
 from hestia.handler import RequestHandler
 from hestia.infrastructure.logging.config import setup_logging, shutdown_logging
 from hestia.infrastructure.logging.middleware import CorrelationMiddleware
@@ -37,6 +38,7 @@ def create_api() -> FastAPI:
                 cfg = auth_svc.config
                 login_rate_limit.configure(cfg.max_failed_attempts, cfg.lockout_duration_minutes)
             app.state.container = container
+            sync_templates(settings.project_root / "hestia" / "templates", settings.app_data / "templates")
             app.state.handler = RequestHandler(container, policy=ExecutionPolicy())
             include_routers(app, set(container.services.keys()))
 

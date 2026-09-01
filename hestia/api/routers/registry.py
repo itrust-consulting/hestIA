@@ -11,6 +11,7 @@ from hestia.api.routers.account import router as account_router
 from hestia.api.routers.admin import router as admin_router
 from hestia.api.routers.llm_settings import router as llm_settings_router
 from hestia.api.routers.auth_settings import router as auth_settings_router
+from hestia.api.routers.workflow_settings import router as workflow_settings_router
 from hestia.api.routers.logs import router as logs_router
 from hestia.api.routers.conversations import router as convo_router
 from hestia.api.routers.encode import router as encode_router
@@ -37,6 +38,7 @@ ROUTER_REGISTRY: Dict[str, RouterSpec] = {
     "admin":     RouterSpec(router=admin_router,     prefix="/admin", tags=("admin",),        always_on=True),
     "llm_settings": RouterSpec(router=llm_settings_router, prefix="/admin", tags=("admin",),  always_on=True),
     "auth_settings": RouterSpec(router=auth_settings_router, prefix="/admin", tags=("admin",), always_on=True),
+    "workflow_settings": RouterSpec(router=workflow_settings_router, prefix="/admin", tags=("admin",), always_on=True),
     "logs":      RouterSpec(router=logs_router,      prefix="/admin", tags=("admin",),        always_on=True),
     "encode":    RouterSpec(router=encode_router,    prefix="/api",   tags=("encode",),       service="encDense"),
     "generate":  RouterSpec(router=generate_router,  prefix="/api",   tags=("generate",),     service="generate"),

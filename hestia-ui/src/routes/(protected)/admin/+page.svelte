@@ -60,12 +60,12 @@
         </div>
       </div>
       <div class="admin-card">
-        <h2 class="admin-card-header">System</h2>
+        <h2 class="admin-card-header">Settings</h2>
         <div class="admin-list">
           <div class="admin-item" onclick={() => goto('/admin/settings/connections')}>
             <span>Connections</span><span class="chevron">›</span>
           </div>
-          <div class="admin-item" onclick={() => goto('/admin/settings/connections')}>
+          <div class="admin-item" onclick={() => goto('/admin/settings/workflows')}>
             <span>Workflows</span><span class="chevron">›</span>
           </div>
           <div class="admin-item" onclick={() => goto('/admin/settings/authentication')}>

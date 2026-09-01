@@ -20,7 +20,7 @@
   function close() { openModal = null; }
 
   function goToUser(userId: string | number) {
-    goto(`/admin/users/user/${userId}`);
+    goto(`/admin/users/${userId}`);
   }
 
   let confirmDelete = $state<{ id: string; username: string } | null>(null);
