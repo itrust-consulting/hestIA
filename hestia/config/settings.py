@@ -87,6 +87,13 @@ class Settings(BaseModel):
     ldap: LDAPSettings | None = None
     oidc: OIDCSettings | None = None
 
+    # --- bootstrap admin (first-boot only; see container._bootstrap_admin_user) ---
+    bootstrap_admin_username: str | None = None
+    bootstrap_admin_password: str | None = None
+    bootstrap_admin_email: str | None = None
+    bootstrap_admin_first_name: str = "Admin"
+    bootstrap_admin_last_name: str = "User"
+
     # --- paths ---
     project_root: pathlib.Path = pathlib.Path(".")
     app_data: pathlib.Path = pathlib.Path("./app/data")
@@ -163,6 +170,11 @@ class Settings(BaseModel):
             auth=auth,
             ldap=ldap,
             oidc=oidc,
+            bootstrap_admin_username=os.getenv("DEFAULT_ADMIN_USERNAME") or None,
+            bootstrap_admin_password=os.getenv("DEFAULT_ADMIN_PASSWORD") or None,
+            bootstrap_admin_email=os.getenv("DEFAULT_ADMIN_EMAIL") or None,
+            bootstrap_admin_first_name=os.getenv("DEFAULT_ADMIN_FIRST_NAME", "Admin"),
+            bootstrap_admin_last_name=os.getenv("DEFAULT_ADMIN_LAST_NAME", "User"),
             project_root=project_root,
             app_data=app_data,
             udb_path=app_data / "users.db",

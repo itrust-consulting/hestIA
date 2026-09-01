@@ -11,9 +11,9 @@ services:
       - app_network
     environment:
       - 'PORT=5555'
-      - 'LLM_URL=http://localhost:8000'
+      - 'LLM_URL=${LLM_URL:-http://localhost:8000}'
       - 'LLM_API_KEY=${LLM_API_KEY}'
-      - 'DB_URL=http://localhost:6333'
+      - 'DB_URL=${DB_URL:-http://localhost:6333}'
       - 'DB_API_KEY=${DB_API_KEY}'
       - 'DEFAULT_GEN_MODEL=RedHatAI/Qwen3.6-35B-A3B-NVFP4'
       - 'DEFAULT_EMB_MODEL=Qwen/Qwen3-Embedding-0.6B'
@@ -27,6 +27,11 @@ services:
       - 'OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}'
       - 'AUTH_SECRET_KEY=${AUTH_SECRET_KEY}'
       - 'AUTH_TOKEN_LIFETIME=360'
+      # Break-glass local admin, created once on first boot if the user
+      # database is empty (see hestia/container.py:_bootstrap_admin_user).
+      - 'DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME}'
+      - 'DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}'
+      - 'DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL}'
       - 'LOG_LEVEL=INFO'
       # Relative to app_data.parent (see Settings.load()) -- resolves to
       # app_data/logs, i.e. inside the ./app/data volume mount below, so log

@@ -11,6 +11,7 @@
   import SunIcon from '$lib/components/icons/sunIcon.svelte';
   import HestiaIcon from '$lib/components/icons/hestiaIcon.svelte';
   import { sending } from '$lib/chat/actions';
+  import { tooltip } from '$lib/actions/tooltip';
 
   import { onMount } from 'svelte';
   import { version } from '$app/environment';
@@ -142,7 +143,7 @@
     </div>
     {#if !hideHeaderButtons}
     <div class="app-header-buttons">
-      <button class="icon-btn" onclick={toggleDark} aria-label="Toggle dark mode" title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+      <button class="icon-btn" onclick={toggleDark} aria-label="Toggle dark mode" use:tooltip={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
         {#if isDark}
           <SunIcon />
         {:else}
@@ -154,6 +155,8 @@
         <button
           class="icon-btn"
           onclick={toggleDropdown}
+          aria-label="Account menu"
+          use:tooltip={"Account menu"}
         >
           <UserIcon />
         </button>

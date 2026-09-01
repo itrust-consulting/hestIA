@@ -164,3 +164,29 @@ class TestSettingsLoad:
         import pydantic
         with pytest.raises(pydantic.ValidationError):
             Settings.load()
+
+    def test_bootstrap_admin_defaults_to_none(self, monkeypatch):
+        monkeypatch.delenv("DEFAULT_ADMIN_USERNAME", raising=False)
+        monkeypatch.delenv("DEFAULT_ADMIN_PASSWORD", raising=False)
+        monkeypatch.delenv("DEFAULT_ADMIN_EMAIL", raising=False)
+        monkeypatch.setenv("DEFAULT_GEN_MODEL", "m")
+        s = Settings.load()
+        assert s.bootstrap_admin_username is None
+        assert s.bootstrap_admin_password is None
+        assert s.bootstrap_admin_email is None
+        assert s.bootstrap_admin_first_name == "Admin"
+        assert s.bootstrap_admin_last_name == "User"
+
+    def test_bootstrap_admin_loaded_from_env(self, monkeypatch):
+        monkeypatch.setenv("DEFAULT_ADMIN_USERNAME", "root")
+        monkeypatch.setenv("DEFAULT_ADMIN_PASSWORD", "a" * 20)
+        monkeypatch.setenv("DEFAULT_ADMIN_EMAIL", "root@example.com")
+        monkeypatch.setenv("DEFAULT_ADMIN_FIRST_NAME", "Root")
+        monkeypatch.setenv("DEFAULT_ADMIN_LAST_NAME", "Account")
+        monkeypatch.setenv("DEFAULT_GEN_MODEL", "m")
+        s = Settings.load()
+        assert s.bootstrap_admin_username == "root"
+        assert s.bootstrap_admin_password == "a" * 20
+        assert s.bootstrap_admin_email == "root@example.com"
+        assert s.bootstrap_admin_first_name == "Root"
+        assert s.bootstrap_admin_last_name == "Account"

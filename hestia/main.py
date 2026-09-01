@@ -46,7 +46,9 @@ def create_api() -> FastAPI:
             yield
         finally:
             _log.info("shutdown")
-            await app.state.container.aclose()
+            container = getattr(app.state, "container", None)
+            if container is not None:
+                await container.aclose()
             shutdown_logging()
 
     app = FastAPI(lifespan=lifespan, title="hestIA", version="alpha_v0.3")

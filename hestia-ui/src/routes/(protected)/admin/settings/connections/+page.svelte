@@ -6,6 +6,7 @@
   import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
   import SettingsIcon from '$lib/components/icons/settingsIcon.svelte';
   import ShowIcon from '$lib/components/icons/showIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
   import { getParamSpecs, paramValueToString, parseParamValue, buildObjectParam, parseJsonParam } from '$lib/llmParamSchemas';
 
   const { data } = $props();
@@ -356,7 +357,7 @@
                 {/if}
               </td>
               <td class="actions-cell">
-                <button class="icon-btn" title="Settings" onclick={() => openSettings(c)}>
+                <button class="icon-btn" aria-label="Settings" use:tooltip={"Settings"} onclick={() => openSettings(c)}>
                   <SettingsIcon />
                 </button>
               </td>
@@ -373,7 +374,7 @@
 
   <div class="section-header">
     <h3>Manage Ollama API Connections</h3>
-    <button class="icon-btn" title="Add connection" onclick={() => openAddConnection('ollama')}>
+    <button class="icon-btn" aria-label="Add connection" use:tooltip={"Add connection"} onclick={() => openAddConnection('ollama')}>
       <PlusLgIcon />
     </button>
   </div>
@@ -381,7 +382,7 @@
 
   <div class="section-header">
     <h3>Manage OpenAI API Connections</h3>
-    <button class="icon-btn" title="Add connection" onclick={() => openAddConnection('openai')}>
+    <button class="icon-btn" aria-label="Add connection" use:tooltip={"Add connection"} onclick={() => openAddConnection('openai')}>
       <PlusLgIcon />
     </button>
   </div>
@@ -389,7 +390,7 @@
 
     <div class="section-header">
     <h3>Manage Qdrant API Connections</h3>
-    <button class="icon-btn" title="Add connection" onclick={() => openAddConnection('qdrant')}>
+    <button class="icon-btn" aria-label="Add connection" use:tooltip={"Add connection"} onclick={() => openAddConnection('qdrant')}>
       <PlusLgIcon />
     </button>
   </div>
@@ -416,7 +417,7 @@
       <span>API key</span>
       <div class="password-row">
         <input type={addApiKeyVisible ? 'text' : 'password'} bind:value={addApiKey} placeholder="optional" />
-        <button type="button" class="icon-btn" title={addApiKeyVisible ? 'Hide' : 'Show'} onclick={() => (addApiKeyVisible = !addApiKeyVisible)}>
+        <button type="button" class="icon-btn" aria-label={addApiKeyVisible ? 'Hide' : 'Show'} use:tooltip={addApiKeyVisible ? 'Hide' : 'Show'} onclick={() => (addApiKeyVisible = !addApiKeyVisible)}>
           <ShowIcon />
         </button>
       </div>
@@ -441,7 +442,7 @@
       <span>API key <span class="hint">(leave blank to keep existing)</span></span>
       <div class="password-row">
         <input type={settingsApiKeyVisible ? 'text' : 'password'} bind:value={settingsApiKey} placeholder={settingsConn?.has_api_key ? '••••••••' : 'optional'} />
-        <button type="button" class="icon-btn" title={settingsApiKeyVisible ? 'Hide' : 'Show'} onclick={() => (settingsApiKeyVisible = !settingsApiKeyVisible)}>
+        <button type="button" class="icon-btn" aria-label={settingsApiKeyVisible ? 'Hide' : 'Show'} use:tooltip={settingsApiKeyVisible ? 'Hide' : 'Show'} onclick={() => (settingsApiKeyVisible = !settingsApiKeyVisible)}>
           <ShowIcon />
         </button>
       </div>
