@@ -10,8 +10,9 @@
   import UploadIcon from '$lib/components/icons/uploadIcon.svelte';
   import RetryIcon from '$lib/components/icons/retry.svelte';
   import SettingsIcon from '$lib/components/icons/settingsIcon.svelte';
+  import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
   import { tooltip } from '$lib/actions/tooltip';
-  import { classificationLabel, CLASSIFICATION_OPTIONS, CLASSIFICATION_LABELS } from '$lib/classification';
+  import { CLASSIFICATION_OPTIONS, CLASSIFICATION_LABELS } from '$lib/classification';
 
   const { data }: { data: { collection: Collection; allOrganizations: Org[]; isAdmin: boolean; canManage: boolean } } = $props();
   const c = $derived(data.collection);
@@ -28,6 +29,10 @@
     })
   );
 
+  const reassignableOrgs = $derived(
+    allOrgs.filter(o => !ownerTenant || o.id !== ownerTenant.id)
+  );
+
   function statusClass(s: string) {
     if (s === 'green')  return 'badge-green';
     if (s === 'yellow') return 'badge-yellow';
@@ -38,36 +43,115 @@
   let manageAccessOpen = $state(false);
 
   function openManageAccess() {
-    selectedGrantOrg = null;
+    selectedOwnerOrg = null;
+    closeOrgSearch();
     manageAccessOpen = true;
   }
 
-  // ── Grant access ──────────────────────────────────────────────────────
-  let selectedGrantOrg = $state<number | null>(null);
-  let grantMaxClass    = $state<number | null>(null);
-  let granting = $state(false);
+  // ── Reassign owner (admin only) ────────────────────────────────────────
+  let selectedOwnerOrg = $state<number | null>(null);
+  let reassigningOwner = $state(false);
 
-  async function grantAccess() {
-    if (!selectedGrantOrg) return;
-    granting = true;
+  async function reassignOwner() {
+    if (!selectedOwnerOrg) return;
+    reassigningOwner = true;
     try {
       const res = await fetch(
-        `/api/admin/tenants/${selectedGrantOrg}/collections/${encodeURIComponent(c.id)}`,
+        `/api/admin/tenants/${selectedOwnerOrg}/collections/${encodeURIComponent(c.id)}`,
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ role: 'access', max_classification: grantMaxClass }),
+          body: JSON.stringify({ role: 'owner' }),
         },
       );
       if (!res.ok) throw new Error(`${res.status}`);
-      selectedGrantOrg = null;
-      grantMaxClass    = null;
+      selectedOwnerOrg = null;
+      addToast('Owner reassigned.', 'success');
+      await invalidateAll();
+    } catch {
+      addToast('Failed to reassign owner.', 'error');
+    } finally {
+      reassigningOwner = false;
+    }
+  }
+
+  // ── Grant access (org search popover) ───────────────────────────────────
+  let orgSearchOpen      = $state(false);
+  let orgSearchQuery     = $state('');
+  let addingOrgId        = $state<number | null>(null);
+  let orgSearchWrapperEl = $state<HTMLDivElement | null>(null);
+
+  const filteredGrantableOrgs = $derived(
+    (() => {
+      const q = orgSearchQuery.trim().toLowerCase();
+      if (!q) return grantableOrgs;
+      return grantableOrgs.filter(o =>
+        o.name.toLowerCase().includes(q) || o.abbreviation.toLowerCase().includes(q)
+      );
+    })()
+  );
+
+  function toggleOrgSearch() {
+    if (orgSearchOpen) {
+      closeOrgSearch();
+    } else {
+      orgSearchQuery = '';
+      orgSearchOpen  = true;
+    }
+  }
+
+  function closeOrgSearch() {
+    orgSearchOpen = false;
+  }
+
+  function handleWindowClick(e: MouseEvent) {
+    if (orgSearchOpen && orgSearchWrapperEl && !orgSearchWrapperEl.contains(e.target as Node)) {
+      closeOrgSearch();
+    }
+  }
+
+  async function selectOrgForAccess(org: Org) {
+    addingOrgId = org.id;
+    try {
+      const res = await fetch(
+        `/api/admin/tenants/${org.id}/collections/${encodeURIComponent(c.id)}`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ role: 'access', max_classification: 0 }),
+        },
+      );
+      if (!res.ok) throw new Error(`${res.status}`);
+      closeOrgSearch();
       addToast('Access granted.', 'success');
       await invalidateAll();
     } catch {
       addToast('Failed to grant access.', 'error');
     } finally {
-      granting = false;
+      addingOrgId = null;
+    }
+  }
+
+  // ── Update max permission for an access grant ───────────────────────────
+  let updatingMaxClass = $state<Record<number, boolean>>({});
+
+  async function updateMaxClassification(orgId: number, level: number) {
+    updatingMaxClass = { ...updatingMaxClass, [orgId]: true };
+    try {
+      const res = await fetch(
+        `/api/admin/tenants/${orgId}/collections/${encodeURIComponent(c.id)}`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ role: 'access', max_classification: level }),
+        },
+      );
+      if (!res.ok) throw new Error(`${res.status}`);
+      await invalidateAll();
+    } catch {
+      addToast('Failed to update permission.', 'error');
+    } finally {
+      updatingMaxClass = { ...updatingMaxClass, [orgId]: false };
     }
   }
 
@@ -297,50 +381,122 @@
 <!-- ── Manage access modal ────────────────────────────────────────────── -->
 <Modal title="Manage Access" open={manageAccessOpen} onClose={() => (manageAccessOpen = false)}>
   <div class="access-modal-body">
-    {#if accessTenants.length === 0}
-      <p class="no-access">No tenants currently have access.</p>
-    {:else}
-      <div class="access-list">
-        {#each accessTenants as org}
-          <div class="access-row">
-            <span class="abbr-chip">{org.abbreviation}</span>
-            <span class="access-name">{org.name}</span>
-            <span class="max-class-badge">
-              {org.max_classification !== null ? `max: ${classificationLabel(org.max_classification)}` : 'no cap'}
-            </span>
-            <button
-              class="revoke-btn"
-              onclick={() => revokeAccess(org.id)}
-              disabled={revokingId === org.id}
-            >
-              {revokingId === org.id ? 'Revoking…' : 'Revoke'}
+    <div class="owner-section">
+      <span class="owner-section-label">Owner</span>
+      <div class="owner-current">
+        {#if ownerTenant}
+          <span class="abbr-chip owner-chip">{ownerTenant.abbreviation}</span>
+          <span class="access-name">{ownerTenant.name}</span>
+        {:else}
+          <span class="no-access">No owner set.</span>
+        {/if}
+      </div>
+      {#if data.isAdmin}
+        <div class="grant-row">
+          <select class="grant-select" bind:value={selectedOwnerOrg}>
+            <option value={null} disabled>Select new owner…</option>
+            {#each reassignableOrgs as org}
+              <option value={org.id}>{org.name} ({org.abbreviation})</option>
+            {/each}
+          </select>
+          <button class="grant-btn" onclick={reassignOwner} disabled={reassigningOwner || !selectedOwnerOrg}>
+            {reassigningOwner ? 'Reassigning…' : 'Reassign owner'}
+          </button>
+        </div>
+      {/if}
+    </div>
+
+    <div class="access-section">
+      <div class="access-section-header">
+        <span class="owner-section-label">Access</span>
+        {#if grantableOrgs.length > 0}
+          <div class="org-search-wrapper" bind:this={orgSearchWrapperEl}>
+            {#if orgSearchOpen}
+              <div class="org-search-popover">
+                <input
+                  class="org-search-input"
+                  type="text"
+                  placeholder="Search organizations…"
+                  bind:value={orgSearchQuery}
+                />
+                <div class="org-search-list">
+                  {#if filteredGrantableOrgs.length === 0}
+                    <p class="org-search-empty">No matching organizations.</p>
+                  {:else}
+                    {#each filteredGrantableOrgs as org (org.id)}
+                      <button
+                        class="org-search-item"
+                        onclick={() => selectOrgForAccess(org)}
+                        disabled={addingOrgId === org.id}
+                      >
+                        <span class="abbr-chip">{org.abbreviation}</span>
+                        <span class="org-search-item-name">{org.name}</span>
+                        {#if addingOrgId === org.id}<span class="org-search-item-status">Adding…</span>{/if}
+                      </button>
+                    {/each}
+                  {/if}
+                </div>
+              </div>
+            {/if}
+            <button class="icon-btn" aria-label="Add access" use:tooltip={"Add access"} onclick={toggleOrgSearch}>
+              <PlusLgIcon />
             </button>
           </div>
-        {/each}
+        {/if}
       </div>
-    {/if}
 
-    {#if grantableOrgs.length > 0}
-      <div class="grant-row">
-        <select class="grant-select" bind:value={selectedGrantOrg}>
-          <option value={null} disabled>Select tenant…</option>
-          {#each grantableOrgs as org}
-            <option value={org.id}>{org.name} ({org.abbreviation})</option>
-          {/each}
-        </select>
-        <select class="grant-class-input" bind:value={grantMaxClass}>
-          <option value={null}>No cap</option>
-          {#each CLASSIFICATION_OPTIONS as lvl}
-            <option value={lvl}>{CLASSIFICATION_LABELS[lvl]}</option>
-          {/each}
-        </select>
-        <button class="grant-btn" onclick={grantAccess} disabled={granting || !selectedGrantOrg}>
-          {granting ? 'Granting…' : 'Grant access'}
-        </button>
-      </div>
-    {/if}
+      {#if accessTenants.length === 0}
+        <p class="no-access">No tenants currently have access.</p>
+      {:else}
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Acronym</th>
+              <th>Name</th>
+              <th>Max. Permission</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each accessTenants as org}
+              <tr>
+                <td><span class="abbr-chip">{org.abbreviation}</span></td>
+                <td class="name">{org.name}</td>
+                <td>
+                  <select
+                    class="inline-select"
+                    onchange={(e) => {
+                      const raw = (e.currentTarget as HTMLSelectElement).value;
+                      updateMaxClassification(org.id, Number(raw));
+                    }}
+                    disabled={updatingMaxClass[org.id]}
+                  >
+                    {#each CLASSIFICATION_OPTIONS as lvl}
+                      <option value={lvl} selected={org.max_classification === lvl}>{CLASSIFICATION_LABELS[lvl]}</option>
+                    {/each}
+                  </select>
+                </td>
+                <td class="actions-cell">
+                  <button
+                    class="del-btn"
+                    aria-label="Revoke access"
+                    use:tooltip={"Revoke"}
+                    onclick={() => revokeAccess(org.id)}
+                    disabled={revokingId === org.id}
+                  >
+                    <BinIcon />
+                  </button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    </div>
   </div>
 </Modal>
+
+<svelte:window onclick={handleWindowClick} />
 
 <style>
 .admin-content {
@@ -494,25 +650,6 @@
   color: var(--color-neutral-800);
 }
 .grant-select:focus { outline: none; border-color: var(--color-blue-400); }
-.grant-class-input {
-  width: 9rem;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  background: var(--color-neutral-50);
-  color: var(--color-neutral-800);
-}
-.grant-class-input:focus { outline: none; border-color: var(--color-blue-400); }
-.max-class-badge {
-  font-size: var(--text-xs);
-  color: var(--color-neutral-500);
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  padding: 0.1rem 0.45rem;
-  white-space: nowrap;
-}
 
 .grant-btn {
   padding: 0.35rem 0.875rem;
@@ -562,39 +699,148 @@
   min-width: 22rem;
 }
 
-.access-list {
+.owner-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.owner-section-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-neutral-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.owner-current { display: flex; align-items: center; gap: 0.5rem; }
+.owner-chip { background: var(--color-blue-100); }
+
+.access-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.access-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.org-search-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.org-search-popover {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 0.5rem);
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  width: 16rem;
+  padding: 0.6rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  z-index: 10;
 }
 
-.access-row {
+.org-search-input {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-800);
+}
+.org-search-input:focus { outline: none; border-color: var(--color-blue-400); }
+
+.org-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.org-search-item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid var(--color-neutral-100);
+  gap: 0.5rem;
+  padding: 0.35rem 0.4rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-neutral-800);
 }
-.access-row:last-child { border-bottom: none; }
+.org-search-item:hover:not(:disabled) { background: var(--color-neutral-100); }
+.org-search-item:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.org-search-item-name { flex: 1; }
+.org-search-item-status { font-size: var(--text-xs); color: var(--color-neutral-400); }
+
+.org-search-empty {
+  font-size: var(--text-sm);
+  color: var(--color-neutral-400);
+  padding: 0.35rem 0.4rem;
+  margin: 0;
+}
+
+.inline-select {
+  box-sizing: border-box;
+  width: 30%;
+  max-width: 50%;
+  padding: 0.25rem 0.5rem;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-neutral-300);
+  background: var(--color-white);
+  color: var(--color-neutral-800);
+  cursor: pointer;
+}
+.inline-select:focus { outline: none; border-color: var(--color-blue-500); }
+.inline-select:disabled {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-400);
+  cursor: not-allowed;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table th,
+.data-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--color-neutral-100);
+  text-align: left;
+  vertical-align: middle;
+  font-size: var(--text-sm);
+}
+.data-table thead th {
+  font-weight: 600;
+  color: var(--color-neutral-600);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--color-neutral-50); }
+.data-table td.name { font-weight: 500; }
+.data-table td.actions-cell { width: 5rem; text-align: right; }
 
 .access-name {
   flex: 1;
   font-size: var(--text-sm);
   color: var(--color-neutral-700);
 }
-
-.revoke-btn {
-  background: transparent;
-  border: 1px solid var(--color-red-300);
-  color: var(--color-red-600);
-  padding: 0.2rem 0.55rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-xs);
-  white-space: nowrap;
-}
-.revoke-btn:hover:not(:disabled) { background: var(--color-red-50); }
-.revoke-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────── */
 .danger-btn {
@@ -643,6 +889,7 @@
   background: transparent; border: 1px solid var(--color-red-300); color: var(--color-red-600);
   padding: 0.35rem; border-radius: var(--radius-md); cursor: pointer;
 }
-.del-btn:hover { background: var(--color-red-50); }
+.del-btn:hover:not(:disabled) { background: var(--color-red-50); }
+.del-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 </style>

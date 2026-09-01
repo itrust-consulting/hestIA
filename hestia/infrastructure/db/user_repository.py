@@ -414,6 +414,11 @@ class UserRepository:
     @with_txn
     def add_tenant_collection(self, conn, *, org_id: int, collection_id: str, role: str = "access",
                               max_classification: int | None = None):
+        if role == "owner":
+            conn.execute(
+                "DELETE FROM tenant_collections WHERE collection_id = ? AND role = 'owner' AND org_id != ?",
+                (collection_id, org_id)
+            )
         conn.execute(
             "INSERT OR REPLACE INTO tenant_collections (collection_id, org_id, role, max_classification) "
             "VALUES (?, ?, ?, ?)",
