@@ -2,6 +2,8 @@
   import { goto, invalidateAll } from '$app/navigation';
   import CreateUserModal from '$lib/components/modals/CreateUserModal.svelte';
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
+  import BinIcon from '$lib/components/icons/binIcon.svelte';
+  import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
 
   const { data } = $props();
 
@@ -18,7 +20,7 @@
   function close() { openModal = null; }
 
   function goToUser(userId: string | number) {
-    goto(`/admin/users/user/${userId}`);
+    goto(`/admin/users/${userId}`);
   }
 
   let confirmDelete = $state<{ id: string; username: string } | null>(null);
@@ -32,16 +34,14 @@
 
 <div class="admin-content">
   <div class="page-header">
-    <div class="page-header-left">
-      <h1 class="title">User Management</h1>
-    </div>
-    <div class="page-header-right">
-      <button class="action-btn" onclick={() => open('create_user')}>
-        Add User
-      </button>
-    </div>
+    <h1 class="title">User Management</h1>
   </div>
-  <p class="subtitle">View and manage registered users.</p>
+  <div class="subtitle-row">
+    <p class="subtitle">View and manage registered users.</p>
+    <button class="icon-btn" title="Add user" onclick={() => open('create_user')}>
+      <PlusLgIcon />
+    </button>
+  </div>
 
   <div class="table-container">
     <table class="data-table">
@@ -51,13 +51,14 @@
           <th>Username</th>
           <th>Email</th>
           <th>Name</th>
+          <th>Status</th>
           <th>Expires</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         {#if data.users.length === 0}
-          <tr><td colspan="5" class="loading-cell">No users found.</td></tr>
+          <tr><td colspan="6" class="loading-cell">No users found.</td></tr>
         {:else}
           {#each data.users as u, i}
             <tr class="clickable-row" onclick={() => goToUser(u.id)}>
@@ -65,12 +66,18 @@
               <td>{u.username}</td>
               <td>{u.email}</td>
               <td>{u.first_name} {u.last_name}</td>
-              <td>{formatDate(u.expires_at)}</td>
               <td>
-                <button class="edit-btn" onclick={(e) => { e.stopPropagation();
-                  goto(`/admin/users/user/${u.id}`); }}>Edit</button>
-                <button class="del-btn" onclick={(e) => { e.stopPropagation();
-                  confirmDelete = u; }}>Delete</button>
+                <span class="status-dot" class:status-dot--online={u.is_online}></span>
+                {#if u.is_online}
+                  Online
+                {:else}
+                  <span class="muted">Last active: {formatDate(u.last_seen_at)}</span>
+                {/if}
+              </td>
+              <td>{formatDate(u.expires_at)}</td>
+              <td class="actions-cell">
+                <button class="del-btn" aria-label="Delete user" title="Delete" onclick={(e) => { e.stopPropagation();
+                  confirmDelete = u; }}><BinIcon /></button>
               </td>
             </tr>
           {/each}
@@ -108,15 +115,8 @@
 }
 
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 0.25rem;
-  gap: 1rem;
 }
-.page-header-left { flex: 1; }
-.page-header-right { display: flex; gap: 0.5rem; align-items: center; }
-
 
 .title {
   font-size: var(--text-3xl);
@@ -124,9 +124,16 @@
   margin-bottom: 0.25rem;
 }
 
+.subtitle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 .subtitle {
   color: var(--color-neutral-600);
-  margin-bottom: 1.5rem;
 }
 
 .table-container {
@@ -155,47 +162,38 @@
   background: var(--color-neutral-50);
   z-index: 2;
   font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-neutral-600);
   box-shadow: 0 1px 0 var(--color-neutral-200);
 }
 .clickable-row { cursor: pointer; transition: background 100ms ease; }
-.clickable-row:hover { background: var(--color-gray-700); }
+.clickable-row:hover { background: var(--color-neutral-100); }
 
-td.num { width: 4rem; text-align: right; color: var(--color-neutral-400); }
-td.name { font-weight: 500; }
-td.muted { color: var(--color-neutral-500); font-size: var(--text-sm); }
-td.actions-cell { width: 10rem; text-align: right; display: flex; gap: 0.4rem; justify-content: flex-end; align-items: center; }
+.muted { color: var(--color-gray-700); font-size: var(--text-sm); }
+td.actions-cell { width: 5rem; text-align: right; }
 
-td.members-cell { width: 6rem; }
-.no-members { color: var(--color-neutral-400); }
-
-
-.action-btn {
-  background: var(--color-blue-600); color: white;
-  padding: 0.5rem 1rem; border-radius: var(--radius-lg);
-  cursor: pointer; font-weight: 600; border: none; font-size: var(--text-sm);
+.status-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-neutral-300);
+  margin-right: 0.4rem;
 }
-.action-btn:hover:not(:disabled) { background: var(--color-blue-700); }
-.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.edit-btn {
-  background: transparent;
-  border: 1px solid var(--color-neutral-300);
-  color: var(--color-neutral-700);
-  padding: 0.25rem 0.6rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-sm);
-}
-.edit-btn:hover { background: var(--color-neutral-100); }
+.status-dot--online { background: var(--color-green-600); }
 
 .del-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid var(--color-red-300);
   color: var(--color-red-600);
-  padding: 0.25rem 0.6rem;
+  padding: 0.35rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: var(--text-sm);
 }
 .del-btn:hover { background: var(--color-red-50); }
 

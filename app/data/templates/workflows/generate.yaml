@@ -1,0 +1,16 @@
+entrypoint: Generate1
+exitpoints: [Generate1]
+
+include:
+  - ../base/generate.yaml
+
+nodes:
+  - use: generate.yaml
+    with:
+      id: Generate1
+      inputs:
+        prompt: ${prompt}
+        model: ${model}
+        options: ${model_kwargs}
+      outputs:
+        response: response

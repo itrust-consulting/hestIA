@@ -153,6 +153,8 @@ class UserRepository:
             "ALTER TABLE tenant_collections ADD COLUMN role TEXT NOT NULL DEFAULT 'access'",
             "ALTER TABLE collection_tenants RENAME TO tenant_collections",
             "ALTER TABLE tenant_collections ADD COLUMN max_classification INTEGER DEFAULT NULL",
+            "ALTER TABLE users ADD COLUMN last_login_at INTEGER DEFAULT NULL",
+            "ALTER TABLE users ADD COLUMN last_seen_at INTEGER DEFAULT NULL",
         ]:
             try:
                 conn.execute(ddl)
@@ -165,8 +167,32 @@ class UserRepository:
     def list_users(self) -> list[sqlite3.Row]:
         return self._get_conn().execute(
             "SELECT id, username, email, first_name, last_name, must_change_pw, auth_source, "
-            "created_at, updated_at, expires_at FROM users ORDER BY last_name ASC"
+            "created_at, updated_at, expires_at, last_seen_at "
+            "FROM users ORDER BY last_name ASC"
         ).fetchall()
+
+    @with_txn
+    def record_login(self, conn, *, id: uuid.UUID, ts: int):
+        conn.execute("UPDATE users SET last_login_at = ?, last_seen_at = ? WHERE id = ?", (ts, ts, id.bytes))
+
+    @with_txn
+    def touch_last_seen(self, conn, *, id: uuid.UUID, ts: int):
+        conn.execute("UPDATE users SET last_seen_at = ? WHERE id = ?", (ts, id.bytes))
+
+    def get_user_activity(self, id: uuid.UUID) -> sqlite3.Row | None:
+        """Last login/seen + conversation/message counts for one user --
+        deliberately not part of list_users()'s SELECT (that's the
+        frequently-loaded admin overview, kept cheap); this backs the
+        per-user detail page's "Additional info" section instead."""
+        return self._get_conn().execute(
+            "SELECT u.last_login_at, u.last_seen_at, "
+            "COUNT(DISTINCT c.id) AS conversation_count, COUNT(m.id) AS message_count "
+            "FROM users u "
+            "LEFT JOIN conversations c ON c.user_id = u.id "
+            "LEFT JOIN messages m ON m.c_id = c.id "
+            "WHERE u.id = ? GROUP BY u.id",
+            (id.bytes,),
+        ).fetchone()
 
     @with_txn
     def insert_user(self, conn, *, user_id: uuid.UUID, username: str, email: str,
@@ -304,7 +330,7 @@ class UserRepository:
     def get_organization_users(self, id: int) -> list[sqlite3.Row]:
         return self._get_conn().execute(
             "SELECT u.id, u.username, u.email, u.first_name, u.last_name, "
-            "uo.classification_level, uo.tenant_role "
+            "uo.classification_level, uo.tenant_role, u.last_seen_at "
             "FROM user_orgs uo JOIN users u ON uo.user_id = u.id WHERE uo.org_id = ?",
             (id,),
         ).fetchall()

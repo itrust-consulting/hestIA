@@ -83,11 +83,14 @@ class _SystemFilter(logging.Filter):
 # ---------------------------------------------------------------------------
 
 _listener: logging.handlers.QueueListener | None = None
+_system_handler: logging.Handler | None = None
+_console_handler: logging.Handler | None = None
 
 
 # @MRS-066
 def setup_logging(settings: "Settings") -> None:
-    global _listener
+    global _listener, _system_handler, _console_handler
+    _console_handler = None  # reset -- only set below if log_to_console is on this call
 
     log_dir = pathlib.Path(settings.log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -105,6 +108,7 @@ def setup_logging(settings: "Settings") -> None:
     system_fh.setFormatter(json_fmt)
     system_fh.setLevel(level)
     system_fh.addFilter(_SystemFilter())
+    _system_handler = system_fh
 
     # audit.log — time-rotated (daily), 90-day retention, audit records only
     audit_fh = logging.handlers.TimedRotatingFileHandler(
@@ -129,6 +133,7 @@ def setup_logging(settings: "Settings") -> None:
         console_fh.setLevel(level)
         console_fh.addFilter(_SystemFilter())
         handlers.append(console_fh)
+        _console_handler = console_fh
 
     # Single queue → single background thread → all handlers
     log_queue: queue.Queue = queue.Queue(maxsize=-1)
@@ -151,3 +156,20 @@ def setup_logging(settings: "Settings") -> None:
 def shutdown_logging() -> None:
     if _listener:
         _listener.stop()
+
+
+def set_log_level(settings: "Settings", level_name: str) -> None:
+    """Live, in-memory verbosity change for system.log/console -- no restart
+    needed (handler.setLevel() is safe to call at any time), but also not
+    persisted: reverts to the LOG_LEVEL env var on next restart. audit.log's
+    handler is deliberately never touched here -- it stays fixed at INFO
+    regardless of the system log level, so turning system logging down can
+    never silence the audit trail."""
+    level = getattr(logging, level_name.upper(), None)
+    if not isinstance(level, int):
+        raise ValueError(f"Unknown log level: {level_name!r}")
+    if _system_handler is not None:
+        _system_handler.setLevel(level)
+    if _console_handler is not None:
+        _console_handler.setLevel(level)
+    settings.log_level = level_name.upper()

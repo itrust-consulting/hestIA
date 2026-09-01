@@ -24,10 +24,12 @@ export async function proxyBinaryResponse(upstream: Response): Promise<Response>
       headers: { 'content-type': 'application/json' }
     });
   }
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream' }
-  });
+  const headers: Record<string, string> = {
+    'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream'
+  };
+  const disposition = upstream.headers.get('content-disposition');
+  if (disposition) headers['content-disposition'] = disposition;
+  return new Response(upstream.body, { status: upstream.status, headers });
 }
 
 export async function proxyResponse(upstream: Response): Promise<Response> {

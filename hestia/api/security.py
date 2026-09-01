@@ -10,6 +10,7 @@ from fastapi.security import OAuth2PasswordBearer
 from hestia.api.dependencies import get_container
 from hestia.container import Container
 from hestia.domain.auth.models import User
+from hestia.domain.auth.users import now_epoch
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
@@ -60,6 +61,7 @@ def _issue_token(result, auth) -> dict:
         algorithm=auth.config.token_encoding_alg,
         expiration_time=auth.config.token_lifetime_minutes,
     )
+    auth.local.repo.record_login(id=result.user_id, ts=now_epoch())
     return {"access_token": token, "token_type": "bearer", "must_change_pw": result.must_change_pw}
 
 

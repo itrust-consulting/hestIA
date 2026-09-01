@@ -7,8 +7,9 @@ from pydantic import BaseModel
 
 from hestia.api.dependencies import get_container
 from hestia.api.limiter import limiter, login_rate_limit
-from hestia.api.security import _issue_token
+from hestia.api.security import _issue_token, get_current_user
 from hestia.container import Container
+from hestia.domain.auth.models import User
 
 router = APIRouter()
 
@@ -25,6 +26,22 @@ async def login(
     if not result.success:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=result.message)
     return _issue_token(result, auth)
+
+
+@router.post("/logout")
+async def logout(
+    user: User = Depends(get_current_user),
+    c: Container = Depends(get_container),
+):
+    """Called by the frontend's /api/logout handler while the token is still
+    valid (before it deletes the cookie) -- get_current_user gives us a
+    verified identity rather than trusting an unauthenticated claim. Tokens
+    here are stateless JWTs with no server-side session, so there's nothing
+    to actually revoke; this exists purely to audit the event."""
+    auth = c.services.get("auth")
+    if auth is not None:
+        auth.audit_logout(user_id=str(user.id), username=user.username, source=user.auth_source)
+    return {"ok": True}
 
 
 @router.get("/auth/oidc/authorize")

@@ -36,4 +36,4 @@ def models(c: Container = Depends(get_container)) -> Dict[str, Any]:
 
 @router.get("/collections")
 def collections(c: Container = Depends(get_container)) -> Dict[str, Any]:
-    return Response(json.dumps(c.providers["db"].collections), media_type="application/json")
+    return Response(json.dumps(c.require_db_provider().collections), media_type="application/json")

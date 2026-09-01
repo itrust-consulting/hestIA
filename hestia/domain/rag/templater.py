@@ -39,6 +39,14 @@ class TemplateRepository:
         self._cache[path] = data
         return data
 
+    def invalidate(self) -> None:
+        """Clears every cached template so the next load_yaml() re-reads
+        from disk -- called after an admin edits a workflow file (see
+        hestia/api/routers/workflow_settings.py). Only ever a handful of
+        files (4 workflows + a few base fragments), so a full clear is
+        simpler than tracking which single path changed."""
+        self._cache.clear()
+
 
 # @MRS-035
 class TemplatePlanBuilder:
@@ -153,6 +161,8 @@ class TemplatePlanBuilder:
             "model_kwargs": req.model_kwargs,
             "collection": req.collection,
             "query_kwargs": req.query_kwargs,
+            "embedding_model": req.embedding_model,
+            "embedding_model_kwargs": req.embedding_model_kwargs,
         }
 
     def _merge_fragment(self, frag: dict, overrides: dict) -> dict:
@@ -172,7 +182,6 @@ class TemplatePlanBuilder:
                 type=n["type"],
                 inputs=n.get("inputs", {}),
                 outputs=n.get("outputs", {}),
-                model=n.get("model"),
             )
             for n in nodes_raw
         ]

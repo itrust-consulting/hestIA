@@ -7,6 +7,10 @@
   import type { Collection } from '$lib/types';
   import type { PageData } from './$types';
   import { addToast } from '$lib/stores/toast';
+  import BinIcon from '$lib/components/icons/binIcon.svelte';
+  import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
+  import EditIcon from '$lib/components/icons/editIcon.svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   const { data }: { data: PageData } = $props();
 
@@ -197,16 +201,18 @@
         <span class="meta">Created {formatDate(tenant.created_at)}</span>
       </div>
     </div>
-    {#if data.isAdmin}
-      <div class="danger-zone">
-        <button class="btn-danger" onclick={() => (confirmDeleteOpen = true)}>Delete Tenant</button>
-      </div>
-    {/if}
   </div>
 
   <!-- ── Details card ───────────────────────────────────────────────────── -->
   <section class="card">
-    <h2 class="section-title">Details</h2>
+    <div class="section-header">
+      <h2 class="section-title">Details</h2>
+      {#if data.isAdmin && !editing}
+        <button class="icon-btn" aria-label="Edit" use:tooltip={"Edit"} onclick={startEdit}>
+          <EditIcon />
+        </button>
+      {/if}
+    </div>
 
     {#if editing}
       <div class="form-grid">
@@ -241,11 +247,6 @@
           <dd>{formatDate(tenant.created_at)}</dd>
         </div>
       </dl>
-      {#if data.isAdmin}
-        <div class="card-footer">
-          <button class="btn-secondary" onclick={startEdit}>Edit</button>
-        </div>
-      {/if}
     {/if}
   </section>
 
@@ -253,8 +254,8 @@
   <section class="card">
     <div class="section-header">
       <h2 class="section-title">Members</h2>
-      <button class="action-btn" onclick={openAdd} disabled={availableUsers.length === 0}>
-        Add Member
+      <button class="icon-btn" aria-label="Add member" use:tooltip={"Add member"} onclick={openAdd} disabled={availableUsers.length === 0}>
+        <PlusLgIcon />
       </button>
     </div>
 
@@ -270,7 +271,7 @@
             <th>Email</th>
             <th>Classification</th>
             <th>Role</th>
-            <th>Actions</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -301,8 +302,7 @@
                 </select>
               </td>
               <td class="actions-cell" onclick={(e) => e.stopPropagation()}>
-                <button class="edit-btn" onclick={() => goto(`/admin/users/user/${m.id}`)}>Edit</button>
-                <button class="del-btn" onclick={() => (confirmRemoveMember = m)}>Remove</button>
+                <button class="del-btn-icon" aria-label="Remove member" use:tooltip={"Delete"} onclick={() => (confirmRemoveMember = m)}><BinIcon /></button>
               </td>
             </tr>
           {/each}
@@ -316,8 +316,9 @@
     <div class="section-header">
       <h2 class="section-title">Collections</h2>
       <div class="col-header-actions">
-        <button class="action-btn" onclick={() => (uploadOpen = true)}>Add collection</button>
-
+        <button class="icon-btn" aria-label="Add collection" use:tooltip={"Add collection"} onclick={() => (uploadOpen = true)}>
+          <PlusLgIcon />
+        </button>
       </div>
     </div>
     {#if ownedCollections.length === 0}
@@ -352,7 +353,7 @@
               </td>
               {#if data.isAdmin}
                 <td class="actions-cell">
-                  <button class="del-btn" onclick={(e) => { e.stopPropagation(); confirmDeleteCol = col.id; }}>Delete</button>
+                  <button class="del-btn-icon" aria-label="Delete collection" use:tooltip={"Delete"} onclick={(e) => { e.stopPropagation(); confirmDeleteCol = col.id; }}><BinIcon /></button>
                 </td>
               {/if}
             </tr>
@@ -398,6 +399,22 @@
       </table>
     {/if}
   </section>
+
+  <!-- ── Danger zone ────────────────────────────────────────────────────── -->
+  {#if data.isAdmin}
+    <section class="card danger-card">
+      <div class="danger-row">
+        <div>
+          <p class="danger-title">Delete this tenant</p>
+          <p class="danger-desc">
+            Permanently delete <strong>{tenant.name}</strong> and remove it from all users.
+          </p>
+          <p class="danger-desc">This will not affect documents in the knowledge base.</p>
+        </div>
+        <button class="danger-btn" onclick={() => (confirmDeleteOpen = true)}>Delete tenant</button>
+      </div>
+    </section>
+  {/if}
 </div>
 
 <!-- ── Add member modal ───────────────────────────────────────────────────── -->
@@ -510,7 +527,25 @@
 .title { font-size: var(--text-2xl); font-weight: 700; margin-bottom: 0.15rem; }
 .meta { font-size: var(--text-sm); color: var(--color-neutral-500); }
 
-.danger-zone { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.danger-card {
+  border: 1px solid var(--color-red-200);
+}
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.danger-title {
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  margin-bottom: 0.2rem;
+}
+.danger-desc {
+  font-size: var(--text-sm);
+  color: var(--color-neutral-500);
+  max-width: 40rem;
+}
 
 .card {
   background: var(--color-neutral-50);
@@ -620,7 +655,7 @@
 td.num { width: 3.5rem; text-align: right; color: var(--color-neutral-400); }
 td.name { font-weight: 500; }
 td.muted { color: var(--color-neutral-500); }
-td.actions-cell { width: 9rem; text-align: right; display: flex; gap: 0.4rem; justify-content: flex-end; align-items: center; }
+td.actions-cell { width: 5rem; text-align: right; }
 .clickable-row { cursor: pointer; }
 
 
@@ -700,6 +735,15 @@ td.actions-cell { width: 9rem; text-align: right; display: flex; gap: 0.4rem; ju
 .btn-primary:hover:not(:disabled) { background: var(--color-blue-700); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.danger-btn {
+  background: var(--color-red-600); color: white;
+  padding: 0.5rem 1.25rem; border-radius: var(--radius-lg);
+  font-weight: 600; font-size: var(--text-sm); border: none; cursor: pointer;
+  white-space: nowrap;
+}
+.danger-btn:hover:not(:disabled) { background: var(--color-red-700); }
+.danger-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .btn-secondary {
   background: var(--color-neutral-100); color: var(--color-neutral-800);
   padding: 0.5rem 1.25rem; border-radius: var(--radius-lg);
@@ -708,43 +752,18 @@ td.actions-cell { width: 9rem; text-align: right; display: flex; gap: 0.4rem; ju
 .btn-secondary:hover:not(:disabled) { background: var(--color-neutral-200); }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-danger {
-  background: var(--color-red-600); color: white;
-  padding: 0.4rem 0.9rem; border-radius: var(--radius-md);
-  font-size: var(--text-sm); font-weight: 500; border: none; cursor: pointer;
-}
-.btn-danger:hover:not(:disabled) { background: var(--color-red-700); }
-.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.action-btn {
-  background: var(--color-blue-600); color: white;
-  padding: 0.5rem 1rem; border-radius: var(--radius-lg);
-  cursor: pointer; font-weight: 600; border: none; font-size: var(--text-sm);
-}
-.action-btn:hover:not(:disabled) { background: var(--color-blue-700); }
-.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.edit-btn {
-  background: transparent;
-  border: 1px solid var(--color-neutral-300);
-  color: var(--color-neutral-700);
-  padding: 0.2rem 0.55rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-xs);
-}
-.edit-btn:hover { background: var(--color-neutral-100); }
-
-.del-btn {
+.del-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid var(--color-red-300);
   color: var(--color-red-600);
-  padding: 0.2rem 0.55rem;
+  padding: 0.3rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: var(--text-xs);
 }
-.del-btn:hover { background: var(--color-red-50); }
+.del-btn-icon:hover { background: var(--color-red-50); }
 
 .form-stack { display: flex; flex-direction: column; gap: 0.875rem; }
 .muted-note { color: var(--color-neutral-500); font-size: var(--text-sm); }

@@ -189,7 +189,7 @@ async def upload_document(
             if isinstance(classification_override, str):
                 requested = Classification.from_label(classification_override)
                 if requested is not None:
-                    h.container.providers["db"].bump_classification(collection, owner, requested.level)
+                    h.container.require_db_provider().bump_classification(collection, owner, requested.level)
         sync_repo.upsert_entry(collection, sync_id, file.filename, content_hash, int(time.time()))
     else:
         result = await asyncio.to_thread(pipeline.ingest, req)
@@ -213,7 +213,7 @@ def list_collections(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
-    all_collections = h.container.providers["db"].collections.get("collections", [])
+    all_collections = h.container.require_db_provider().collections.get("collections", [])
 
     perms = user.permissions
     if perms.is_admin:
@@ -232,7 +232,7 @@ def get_document_counts(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
-    counts = h.container.providers["db"].document_counts()
+    counts = h.container.require_db_provider().document_counts()
 
     perms = user.permissions
     if perms.is_admin:
@@ -252,7 +252,7 @@ def get_collection(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
-    result = h.container.providers["db"].get_collection(name)
+    result = h.container.require_db_provider().get_collection(name)
     if result is None:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"Collection '{name}' not found.")
@@ -275,7 +275,7 @@ def get_document(
     user: User = Depends(get_current_user),
 ):
     assert_collection_moderator(user, name, h)
-    doc = h.container.providers["db"].get_document(name, source_uri)
+    doc = h.container.require_db_provider().get_document(name, source_uri)
     if doc is None:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"Document '{source_uri}' not found in '{name}'.")
@@ -291,7 +291,7 @@ def delete_document(
 ):
     assert_collection_moderator(user, name, h)
 
-    db = h.container.providers["db"]
+    db = h.container.require_db_provider()
     sync_repo = h.container.services["sync_manifest"]
 
     should_delete_content = True
@@ -343,7 +343,7 @@ def update_document_metadata(
     ]
     level = max(matched_levels) if matched_levels else None
 
-    ok = h.container.providers["db"].update_document_metadata(name, body.source_uri, body.metadata, level)
+    ok = h.container.require_db_provider().update_document_metadata(name, body.source_uri, body.metadata, level)
     if not ok:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"Document '{body.source_uri}' not found in '{name}'.")
@@ -384,7 +384,7 @@ def sync_diff(
     # Let the client pre-fill a modified document's classification with
     # whatever's already stored, rather than defaulting to "auto-detect" for
     # a file whose content changed slightly but is still the same document.
-    levels = h.container.providers["db"].get_classifications(name, modified)
+    levels = h.container.require_db_provider().get_classifications(name, modified)
     previous_classifications = {
         uri: cls.aliases[0]
         for uri, level in levels.items()
@@ -423,7 +423,7 @@ def delete_collection(
     user: User = Depends(get_current_user),
 ):
     assert_collection_moderator(user, name, h)
-    deleted = h.container.providers["db"].delete_collection(name)
+    deleted = h.container.require_db_provider().delete_collection(name)
     if not deleted:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"Collection '{name}' not found.")

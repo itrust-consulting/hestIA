@@ -1,12 +1,13 @@
 <script lang="ts">
   import { env } from '$env/dynamic/public';
   import { page } from '$app/stores';
+  import ItrustIcon from './icons/itrustIcon.svelte';
 
   const currentVersion = env.PUBLIC_APP_VERSION;
 
   const adminNavGroups = [
     {
-      label: 'Users & Authentication',
+      label: 'Identity & Access',
       items: [
         { label: 'Users',    href: '/admin/users'   },
         { label: 'Roles',    href: '/admin/roles'   },
@@ -20,9 +21,12 @@
       ]
     },
     {
-      label: 'System',
+      label: 'Settings',
       items: [
-        { label: 'Settings', href: '/admin/settings' },
+        { label: 'Connections', href: '/admin/settings/connections' },
+        { label: 'Workflows', href: '/admin/settings/workflows' },
+        { label: 'Authentication', href: '/admin/settings/authentication' },
+        { label: 'Logging', href: '/admin/settings/logging' },
       ]
     },
   ];
@@ -61,6 +65,10 @@
   </div>
 
   <div class="sidebar-footer">
+    <span class="powered-by">Powered by</span>
+    <div class="logo-wrapper">
+      <ItrustIcon />
+    </div>
     <span class="version">{currentVersion}</span>
   </div>
 </aside>
@@ -127,5 +135,31 @@
   color: var(--color-neutral-500);
   font-size: var(--text-xs);
   user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.powered-by {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-neutral-400);
+}
+
+.logo-wrapper :global(svg) {
+  width: 5em;
+  filter: grayscale(1);
+  opacity: 0.55;
+  transition: opacity 150ms ease;
+}
+
+:global(.dark) .logo-wrapper :global(svg) {
+  filter: grayscale(1) invert(1);
+}
+
+.logo-wrapper:hover :global(svg) {
+  opacity: 0.85;
 }
 </style>

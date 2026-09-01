@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -14,8 +15,34 @@ from hestia.api.security import (
 from hestia.api.schemas.requests import CreateUserRequest, CreateOrgRequest, UpdateOrgRequest
 from hestia.domain.auth.models import User
 from hestia.handler import RequestHandler
+from hestia.infrastructure.logging.audit import audit
+from hestia.infrastructure.logging.query import count_failed_logins
 
 router = APIRouter()
+
+# A few multiples of the frontend's 45s heartbeat interval -- forgiving of
+# browsers throttling setInterval in backgrounded tabs.
+_ONLINE_THRESHOLD_MS = 3 * 60 * 1000
+
+
+def _since_7d_str() -> str:
+    # Match _JsonFormatter's exact "ts" string shape (config.py) -- plain
+    # string comparison in count_failed_logins/_matches needs the same
+    # format on both sides, not Python's default +00:00 isoformat() suffix.
+    since_dt = datetime.now(timezone.utc) - timedelta(days=7)
+    return since_dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _annotate_online(users: list[dict]) -> list[dict]:
+    """Adds is_online (from last_seen_at) to each user dict for the overview
+    table -- kept cheap (no log scan, no join) since this is the frequently-
+    loaded admin list. Conversation/message counts and failed-login history
+    live on the per-user detail page instead (get_user_profile below)."""
+    now = int(datetime.now(timezone.utc).timestamp() * 1000)
+    for u in users:
+        last_seen = u.get("last_seen_at")
+        u["is_online"] = bool(last_seen and now - last_seen < _ONLINE_THRESHOLD_MS)
+    return users
 
 
 # Users
@@ -27,7 +54,7 @@ def get_users(
     assert_admin_or_moderator(user)
     svc = h.container.services.get("users")
     if user.permissions.is_admin:
-        return {"users": svc.list_users()}
+        return {"users": _annotate_online(svc.list_users())}
     seen: set[uuid.UUID] = set()
     result = []
     for org_id in user.permissions.moderated_tenants:
@@ -35,7 +62,7 @@ def get_users(
             if u["id"] not in seen:
                 seen.add(u["id"])
                 result.append(u)
-    return {"users": result}
+    return {"users": _annotate_online(result)}
 
 
 @router.get("/users/user/{uid}")
@@ -45,7 +72,16 @@ def get_user_profile(
     user: User = Depends(get_current_user),
 ):
     assert_admin(user)
-    return h.container.services.get("users").load_user_profile(uuid.UUID(uid))
+    svc = h.container.services.get("users")
+    profile = svc.load_user_profile(uuid.UUID(uid))
+    if profile is None:
+        raise HTTPException(404, "User not found")
+    failed = count_failed_logins(h.container.settings.log_dir, since=_since_7d_str())
+    return {
+        **profile.model_dump(),
+        **svc.get_user_activity(uuid.UUID(uid)),
+        "failed_logins_7d": failed.get(profile.username, 0),
+    }
 
 
 @router.patch("/users/user/{uid}")
@@ -67,6 +103,13 @@ def update_user(
         role_ids=req.get("role_ids"),
         new_password=req.get("new_password") or None,
     )
+    audit.admin_action(
+        actor_id=str(user.id), action="user_update", target=uid,
+        detail={
+            "username": req.get("username"), "email": req.get("email"), "role_ids": req.get("role_ids"),
+            "expires_at": req.get("expires_at"), "password_reset": bool(req.get("new_password")),
+        },
+    )
     return {"ok": True}
 
 
@@ -78,6 +121,7 @@ def delete_user(
 ):
     assert_admin(user)
     h.container.services.get("users").delete_user(uuid.UUID(uid))
+    audit.admin_action(actor_id=str(user.id), action="user_delete", target=uid)
     return {"ok": True}
 
 
@@ -99,6 +143,10 @@ def create_user(
         roles=req.roles,
         organization=req.organization,
         expires_at=req.expires_at,
+    )
+    audit.admin_action(
+        actor_id=str(user.id), action="user_create", target=str(user_id),
+        detail={"username": req.username, "roles": req.roles, "organization": req.organization},
     )
     return {"ok": True, "user_id": str(user_id)}
 
@@ -140,6 +188,10 @@ def create_organization(
     if not req.name or not req.abbreviation:
         raise HTTPException(400, "Organization name and abbreviation required")
     h.container.services.get("users").create_org(name=req.name, abbreviation=req.abbreviation)
+    audit.admin_action(
+        actor_id=str(user.id), action="org_create", target=req.name,
+        detail={"abbreviation": req.abbreviation},
+    )
     return {"ok": True}
 
 
@@ -154,6 +206,10 @@ def update_organization(
     if not req.name or not req.abbreviation:
         raise HTTPException(400, "Organization name and abbreviation required")
     h.container.services.get("users").update_org(org_id=org_id, name=req.name, abbreviation=req.abbreviation)
+    audit.admin_action(
+        actor_id=str(user.id), action="org_update", target=str(org_id),
+        detail={"name": req.name, "abbreviation": req.abbreviation},
+    )
     return {"ok": True}
 
 
@@ -165,6 +221,7 @@ def delete_organization(
 ):
     assert_admin(user)
     h.container.services.get("users").delete_org(org_id=org_id)
+    audit.admin_action(actor_id=str(user.id), action="org_delete", target=str(org_id))
     return {"ok": True}
 
 
@@ -190,6 +247,7 @@ def add_organization_member(
     h.container.services.get("users").add_user_to_org(
         user_id=uuid.UUID(user_id), org_id=org_id
     )
+    audit.admin_action(actor_id=str(user.id), action="org_member_add", target=f"{org_id}:{user_id}")
     return {"ok": True}
 
 
@@ -204,6 +262,7 @@ def remove_organization_member(
     h.container.services.get("users").remove_user_from_org(
         user_id=uuid.UUID(user_id), org_id=org_id
     )
+    audit.admin_action(actor_id=str(user.id), action="org_member_remove", target=f"{org_id}:{user_id}")
     return {"ok": True}
 
 
@@ -256,6 +315,10 @@ def add_tenant_collection(
     h.container.services.get("users").add_tenant_collection(
         org_id, collection_id, role=role, max_classification=max_classification
     )
+    audit.admin_action(
+        actor_id=str(user.id), action="tenant_collection_grant", target=f"{org_id}:{collection_id}",
+        detail={"role": role, "max_classification": max_classification},
+    )
     return {"ok": True}
 
 
@@ -268,6 +331,7 @@ def remove_tenant_collection(
 ):
     assert_collection_moderator(user, collection_id, h)
     h.container.services.get("users").remove_tenant_collection(org_id, collection_id)
+    audit.admin_action(actor_id=str(user.id), action="tenant_collection_revoke", target=f"{org_id}:{collection_id}")
     return {"ok": True}
 
 
@@ -283,6 +347,10 @@ def set_member_classification(
     assert_tenant_moderator(user, org_id)
     level = int(req.get("level", 0))
     h.container.services.get("users").set_member_classification(uuid.UUID(user_id), org_id, level)
+    audit.admin_action(
+        actor_id=str(user.id), action="member_classification_set", target=f"{org_id}:{user_id}",
+        detail={"level": level},
+    )
     return {"ok": True}
 
 
@@ -297,6 +365,10 @@ def set_member_tenant_role(
     assert_tenant_role_assigner(user, org_id)
     role = req.get("role")  # 'moderator', 'co-moderator', or None
     h.container.services.get("users").set_member_tenant_role(uuid.UUID(user_id), org_id, role)
+    audit.admin_action(
+        actor_id=str(user.id), action="member_tenant_role_set", target=f"{org_id}:{user_id}",
+        detail={"role": role},
+    )
     return {"ok": True}
 
 
@@ -330,6 +402,10 @@ def create_collection(
         svc = h.container.services.get("users")
         if svc:
             svc.add_tenant_collection(owner_org_id, name, role="owner")
+    audit.admin_action(
+        actor_id=str(user.id), action="collection_create", target=name,
+        detail={"owner_org_id": owner_org_id},
+    )
     return {"ok": True, "name": name}
 
 

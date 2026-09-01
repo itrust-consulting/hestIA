@@ -87,12 +87,13 @@ def get_conversation_messages(
         # calls (loadOlderMessages) don't display it and shouldn't pay for
         # the extra budget check.
         settings = h.container.settings
+        generator = h.container.require_service("generate")
         prior_summary, tail = fetch_budget_inputs(users, user.id, conversation_id)
-        check = check_context_budget(prior_summary, tail, settings)
+        check = check_context_budget(prior_summary, tail, settings, generator)
         result = {
             **result,
             "used_tokens": check.tokens,
-            "max_tokens": settings.max_context_tokens,
+            "max_tokens": generator.compaction_context_window or settings.max_context_tokens,
             "needs_compaction": check.needs_compaction,
         }
     return result
@@ -106,21 +107,22 @@ async def compact_conversation(
 ):
     users = h.container.services.get("users")
     settings = h.container.settings
+    generator = h.container.require_service("generate")
     conversation_id = uuid.UUID(cid)
+    max_tokens = generator.compaction_context_window or settings.max_context_tokens
     prior_summary, tail = fetch_budget_inputs(users, user.id, conversation_id)
-    check = check_context_budget(prior_summary, tail, settings, force=True)
+    check = check_context_budget(prior_summary, tail, settings, generator, force=True)
     if not check.needs_compaction:
         return CompactOut(
-            status="not_needed", used_tokens=check.tokens, max_tokens=settings.max_context_tokens,
+            status="not_needed", used_tokens=check.tokens, max_tokens=max_tokens,
         )
-    generator = h.container.services.get("generate")
     await run_compaction(
         generator, settings, users, conversation_id, prior_summary, check.fold, check.keep,
     )
     new_summary, new_tail = fetch_budget_inputs(users, user.id, conversation_id)
-    new_check = check_context_budget(new_summary, new_tail, settings)
+    new_check = check_context_budget(new_summary, new_tail, settings, generator)
     return CompactOut(
-        status="compacted", used_tokens=new_check.tokens, max_tokens=settings.max_context_tokens,
+        status="compacted", used_tokens=new_check.tokens, max_tokens=max_tokens,
     )
 
 

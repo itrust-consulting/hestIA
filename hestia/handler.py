@@ -23,7 +23,10 @@ CONTEXT_BUDGET_EXEC_TYPES = ("chat", "rag_chat")
 _log = logging.getLogger("hestia.system")
 
 # @MRS-038
-RAG_PROMPT = """
+# Fallback used only when an Augment node's inputs.template is unset (e.g. a
+# hand-built custom node) -- the real, admin-editable copy of this text now
+# lives inline in hestia/templates/workflows/rag_chat.yaml / rag_generate.yaml.
+_DEFAULT_AUGMENT_TEMPLATE = """
     You are an assistant with access to an organizations ISMS knowledge base of Markdown documents.
     Below are the most relevant excerpts retrieved from that database.
 
@@ -88,11 +91,11 @@ def _format_citations(hits: list) -> tuple[dict, list]:
     }, cite_list
 
 
-def _build_prompt(prompt: str, hits: list) -> tuple[str, list]:
+def _build_prompt(prompt: str, hits: list, template: str) -> tuple[str, list]:
     if not hits:
         return prompt, []
     formatted, cite_list = _format_citations(hits)
-    return RAG_PROMPT.format(
+    return template.format(
         retrieved_data=formatted["retrieved_data"],
         source_map=formatted["source_map"],
         user_prompt=prompt,
@@ -154,7 +157,10 @@ class Runner:
 
     async def _run_encode_dense(self, node, slot, stream):
         svc = self._svc("encDense")
-        dense = await svc.encode(self._resolve(node.inputs.get("data"), slot))
+        data = self._resolve(node.inputs.get("data"), slot)
+        model = self._resolve(node.inputs.get("model"), slot)
+        options = self._resolve(node.inputs.get("model_kwargs"), slot)
+        dense = await svc.encode(data, model=model, options=options)
         slot[node.outputs.get("vector", "vector")] = dense
 
     async def _run_encode_sparse(self, node, slot, stream):
@@ -181,16 +187,19 @@ class Runner:
     async def _run_augment(self, node, slot, stream):
         prompt = self._resolve(node.inputs.get("prompt"), slot) or ""
         hits = self._resolve(node.inputs.get("hits"), slot) or []
-        augmented, cite_list = _build_prompt(prompt, hits)
+        template = self._resolve(node.inputs.get("template"), slot) or _DEFAULT_AUGMENT_TEMPLATE
+        augmented, cite_list = _build_prompt(prompt, hits, template)
         slot[node.outputs.get("prompt", "prompt")] = augmented
         slot["_cite_list"] = cite_list
 
     async def _run_generate(self, node, slot, stream):
         svc = self._svc("generate")
         prompt = self._resolve(node.inputs.get("prompt"), slot)
+        model = self._resolve(node.inputs.get("model"), slot)
+        options = self._resolve(node.inputs.get("options"), slot)
         if stream:
-            return await svc.generate(prompt=prompt, model=node.model, options=node.options, stream=True)
-        resp = await svc.generate(prompt=prompt, model=node.model, options=node.options, stream=False)
+            return await svc.generate(prompt=prompt, model=model, options=options, stream=True)
+        resp = await svc.generate(prompt=prompt, model=model, options=options, stream=False)
         slot[node.outputs.get("response", "response")] = resp
         slot["final"] = resp
 
@@ -198,10 +207,12 @@ class Runner:
         svc = self._svc("generate")
         history = self._resolve(node.inputs.get("history"), slot) or []
         last = self._resolve(node.inputs.get("last_user_message"), slot)
+        model = self._resolve(node.inputs.get("model"), slot)
+        options = self._resolve(node.inputs.get("options"), slot)
         messages = history + [{"role": "user", "content": last}]
         if stream:
-            return await svc.chat(messages=messages, model=node.model, options=node.options, stream=True)
-        resp = await svc.chat(messages=messages, model=node.model, options=node.options, stream=False)
+            return await svc.chat(messages=messages, model=model, options=options, stream=True)
+        resp = await svc.chat(messages=messages, model=model, options=options, stream=False)
         slot[node.outputs.get("response", "response")] = resp
         slot["final"] = resp
 
@@ -332,11 +343,12 @@ class PersistChat:
         must never break the chat stream."""
         try:
             settings = self.runner.container.settings
+            generator = self.runner.container.require_service("generate")
             prior_summary, tail = fetch_budget_inputs(self.users, req.user.id, c_id)
-            check = check_context_budget(prior_summary, tail, settings)
+            check = check_context_budget(prior_summary, tail, settings, generator)
             fields = {
                 "used_tokens": check.tokens,
-                "max_tokens": settings.max_context_tokens,
+                "max_tokens": generator.compaction_context_window or settings.max_context_tokens,
                 "needs_compaction": check.needs_compaction,
             }
             if getattr(req, "freed_tokens", None):
@@ -391,7 +403,8 @@ class RequestHandler:
     def __init__(self, container, policy: PolicyGuard = None):
         self.container = container
         self.policy = policy or ExecutionPolicy()
-        self.builder = TemplatePlanBuilder(TemplateRepository())
+        templates_dir = str(container.settings.app_data / "templates")
+        self.builder = TemplatePlanBuilder(TemplateRepository(templates_dir))
         self.builder.preload(list(self.TEMPLATE_MAP.values()))
         self.runner = Runner(container)
 
@@ -419,7 +432,8 @@ class RequestHandler:
         surface the same notification manual compaction shows. Raises on
         failure -- callers are responsible for failing open."""
         users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
-        check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
+        generator = self.container.require_service("generate")
+        check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings, generator)
         if not check.needs_compaction:
             req.history = check.history
             return
@@ -434,7 +448,7 @@ class RequestHandler:
         streaming path can emit a "compacting" status frame right before
         calling this, once it already knows a fold is needed but before the
         slow part actually starts."""
-        generator = self.container.services.get("generate")
+        generator = self.container.require_service("generate")
         before_tokens = check.tokens
         new_history = await run_compaction(
             generator, self.container.settings, users, conversation_id,
@@ -454,6 +468,18 @@ class RequestHandler:
             _log.warning("context_budget_failed_fallback", extra={"conversation_id": req.conversation_id})
             # req.history stays whatever the client sent — never break this endpoint over it
 
+    def _populate_embedding_ctx(self, req: ExecutionRequest) -> None:
+        """Sets req.embedding_model/embedding_model_kwargs from the
+        currently-configured 'embedding' LLM connection, so workflow YAML
+        can reference ${embedding_model}/${embedding_model_kwargs} instead
+        of (incorrectly) reusing ${model}/${model_kwargs}, which carry the
+        request's generation model. Never sourced from the request itself --
+        see ExecutionRequest.embedding_model's docstring for why."""
+        enc = self.container.services.get("encDense")
+        if enc is not None:
+            req.embedding_model = enc.default_model or None
+            req.embedding_model_kwargs = enc.default_options
+
     async def resolve(self, req: ExecutionRequest, stream: bool = False):
         result: PolicyResult = self.policy.check(req)
 
@@ -465,6 +491,7 @@ class RequestHandler:
             req.query_kwargs["filters"] = result.filters
 
         template = self.TEMPLATE_MAP[req.exec_type]
+        self._populate_embedding_ctx(req)
 
         prompt_len = len(req.prompt or "") + len(req.last_user_message or "")
         user_id = str(req.user.id)
@@ -524,7 +551,8 @@ class RequestHandler:
             _log.debug("context_budget_stream_start", extra={"conversation_id": req.conversation_id})
             try:
                 users, conversation_id, prior_summary, tail = self._context_budget_inputs(req)
-                check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings)
+                generator = self.container.require_service("generate")
+                check: BudgetCheck = check_context_budget(prior_summary, tail, self.container.settings, generator)
                 if check.needs_compaction:
                     yield (json.dumps({"status": "compacting"}) + "\n").encode("utf-8")
                     await self._compact(req, users, conversation_id, prior_summary, check)

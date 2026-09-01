@@ -2,6 +2,8 @@
   import { goto, invalidateAll } from '$app/navigation';
   import CreateCollectionModal from '$lib/components/modals/CreateCollectionModal.svelte';
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
+  import BinIcon from '$lib/components/icons/binIcon.svelte';
+  import PlusLgIcon from '$lib/components/icons/plusLgIcon.svelte';
   import type { Collection } from '$lib/types';
   import type { PageData } from './$types';
 
@@ -27,12 +29,14 @@
 
 <div class="admin-content">
   <div class="page-header">
-    <div class="page-header-left">
-      <h1 class="title">Knowledge Base</h1>
-    </div>
-    <button class="action-btn" onclick={() => (uploadOpen = true)}>Create collection</button>
+    <h1 class="title">Knowledge Base</h1>
   </div>
-  <p class="subtitle">{data.isAdmin ? 'All collections across the system and their access configuration.' : 'Collections belonging to your moderated tenants.'}</p>
+  <div class="subtitle-row">
+    <p class="subtitle">{data.isAdmin ? 'All collections across the system and their access configuration.' : 'Collections belonging to your moderated tenants.'}</p>
+    <button class="icon-btn" title="Create collection" onclick={() => (uploadOpen = true)}>
+      <PlusLgIcon />
+    </button>
+  </div>
 
   <div class="table-container">
     <table class="data-table">
@@ -77,8 +81,8 @@
               </td>
               {#if data.isAdmin}
                 <td class="actions-cell">
-                  <button class="del-btn" onclick={(e) => { e.stopPropagation(); confirmDelete = col.id; }}>
-                    Delete
+                  <button class="del-btn" aria-label="Delete collection" title="Delete" onclick={(e) => { e.stopPropagation(); confirmDelete = col.id; }}>
+                    <BinIcon />
                   </button>
                 </td>
               {/if}
@@ -119,9 +123,6 @@
 }
 
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 0.25rem;
 }
 
@@ -131,9 +132,16 @@
   margin-bottom: 0;
 }
 
+.subtitle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 .subtitle {
   color: var(--color-neutral-600);
-  margin-bottom: 1.5rem;
 }
 
 .table-container {
@@ -172,7 +180,7 @@
 }
 
 .clickable-row { cursor: pointer; transition: background 100ms ease; }
-.clickable-row:hover { background: var(--color-gray-700); }
+.clickable-row:hover { background: var(--color-neutral-100); }
 
 td.col-name { font-weight: 500; color: var(--color-neutral-800); }
 td.muted { color: var(--color-neutral-500); font-size: var(--text-sm); }
@@ -220,22 +228,16 @@ td.actions-cell { width: 5rem; text-align: right; }
   color: var(--color-neutral-500);
 }
 
-.action-btn {
-  background: var(--color-blue-600); color: white;
-  padding: 0.5rem 1rem; border-radius: var(--radius-lg);
-  cursor: pointer; font-weight: 600; border: none; font-size: var(--text-sm);
-}
-.action-btn:hover:not(:disabled) { background: var(--color-blue-700); }
-.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
 .del-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid var(--color-red-300);
   color: var(--color-red-600);
-  padding: 0.25rem 0.6rem;
+  padding: 0.35rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: var(--text-sm);
 }
 .del-btn:hover { background: var(--color-red-50); }
 
