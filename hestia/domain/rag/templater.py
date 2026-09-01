@@ -8,12 +8,42 @@ from typing import Any, Dict
 import yaml
 
 from hestia.domain.exceptions import ConfigurationError
-from hestia.domain.rag.graph import ExecutionGraph, ExecutionRequest, Node
+from hestia.domain.rag.graph import ExecutionGraph, ExecutionRequest, Node, has_query_text
 
 
 _log = logging.getLogger("hestia.system")
 
 TEMPLATE_DIR = "hestia/templates"
+
+
+_ATTACHMENTS_WITH_QUESTION_PREFIX = (
+    "The user attached the following document(s) as extra context alongside "
+    "their message below. Use them together with any other information "
+    "available to you when answering."
+)
+_ATTACHMENTS_NO_QUESTION_PREFIX = (
+    "The user attached the following document(s) without asking a specific "
+    "question. Give a concise, helpful summary of the content -- note "
+    "anything that stands out -- and invite them to ask a follow-up "
+    "question if they want more detail."
+)
+
+
+def _format_attachments(attachments, has_text: bool) -> str:
+    """Renders last_user_attachments into the same <document name="...">
+    markup the frontend used to inline into the chat message itself, with a
+    short instruction paragraph so a bare document dump isn't ambiguous --
+    used only for the LLM-facing prompt (see chat.yaml/rag_chat.yaml's
+    ${attached_documents}), never for the retrieval query text, so an
+    attached file's content can't skew what gets embedded/searched."""
+    if not attachments:
+        return ""
+    blocks = "\n\n".join(
+        f'<document name="{a.get("name", "")}">\n{a.get("markdown", "")}\n</document>'
+        for a in attachments
+    )
+    prefix = _ATTACHMENTS_WITH_QUESTION_PREFIX if has_text else _ATTACHMENTS_NO_QUESTION_PREFIX
+    return f"{prefix}\n\n{blocks}"
 
 CTX_PATTERN = re.compile(r"\$\{([A-Za-z0-9_.]+)\}")
 CTX_EXACT_PATTERN = re.compile(r"^\$\{([A-Za-z0-9_.]+)\}$")
@@ -157,6 +187,10 @@ class TemplatePlanBuilder:
             "prompt": req.prompt,
             "history": req.history,
             "last_user_message": req.last_user_message,
+            "attached_documents": _format_attachments(
+                req.last_user_attachments,
+                has_query_text(req.last_user_display_content, req.last_user_message),
+            ),
             "model": req.model,
             "model_kwargs": req.model_kwargs,
             "collection": req.collection,

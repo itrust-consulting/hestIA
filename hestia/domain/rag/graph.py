@@ -65,7 +65,7 @@ NODE_TYPE_SPECS: Dict[str, Dict[str, List[str]]] = {
     "EncodeDense":  {"inputs": ["data", "model", "model_kwargs"], "outputs": ["vector"]},
     "EncodeSparse": {"inputs": ["data", "collection"], "outputs": ["vector"]},
     "Retrieve":     {"inputs": ["dense", "sparse", "collection", "options"], "outputs": ["hits"]},
-    "Augment":      {"inputs": ["prompt", "hits", "template"], "outputs": ["prompt"]},
+    "Augment":      {"inputs": ["prompt", "hits", "template", "attachments"], "outputs": ["prompt"]},
     "Generate":     {"inputs": ["prompt", "model", "options"], "outputs": ["response"]},
     "Chat":         {"inputs": ["history", "last_user_message", "model", "options"], "outputs": ["response"]},
 }
@@ -82,9 +82,29 @@ FRAGMENT_TO_TYPE: Dict[str, str] = {
 
 # The fixed set of ${...} context fields TemplatePlanBuilder._build_ctx
 # actually populates from an ExecutionRequest.
+def has_query_text(last_user_display_content, last_user_message) -> bool:
+    """Whether a turn carries any user-typed text, as opposed to only file
+    attachments -- used both to decide whether retrieval should run at all
+    (see api/routers/chat.py) and to choose how attachments are framed for
+    the LLM (see templater.py's _format_attachments). last_user_display_content
+    is authoritative when present -- it's exactly the typed text, with any
+    attachment markdown excluded. Falls back to inspecting the raw message
+    content for callers that don't set it."""
+    if last_user_display_content is not None:
+        return bool(last_user_display_content.strip())
+    if isinstance(last_user_message, str):
+        return bool(last_user_message.strip())
+    if isinstance(last_user_message, list):
+        return any(
+            isinstance(part, dict) and part.get("type") == "text" and (part.get("text") or "").strip()
+            for part in last_user_message
+        )
+    return bool(last_user_message)
+
+
 CONTEXT_FIELDS = frozenset({
-    "prompt", "history", "last_user_message", "model", "model_kwargs", "collection", "query_kwargs",
-    "embedding_model", "embedding_model_kwargs",
+    "prompt", "history", "last_user_message", "attached_documents", "model", "model_kwargs", "collection",
+    "query_kwargs", "embedding_model", "embedding_model_kwargs",
 })
 
 _CTX_REF = re.compile(r"^\$\{([A-Za-z0-9_.]+)\}$")
@@ -177,7 +197,11 @@ def validate_workflow_graph(root: Dict[str, Any]) -> None:
                     f"Node '{node_id}': template is missing required placeholder(s) {missing}."
                 )
             try:
-                template.format(retrieved_data="x", source_map="x", user_prompt="x")
+                # attached_documents is optional (Runner always passes it,
+                # defaulting to "" -- see handler.py's _run_augment), so a
+                # template using it must still validate even though it's
+                # not in _REQUIRED_AUGMENT_PLACEHOLDERS.
+                template.format(retrieved_data="x", source_map="x", user_prompt="x", attached_documents="x")
             except (KeyError, IndexError, ValueError) as e:
                 raise ValidationError(f"Node '{node_id}': template has invalid formatting syntax -- {e}.")
 

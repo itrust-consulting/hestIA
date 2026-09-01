@@ -37,10 +37,14 @@ function mapRawMessages(raw: any[]) {
     const createdAt = created_at ?? m.createdAt;
     const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : (m.metadata ?? {});
     if (m.role === 'user' && meta.display_content !== undefined) {
+      // Newer messages carry markdown directly on meta.attachments; older
+      // ones (from before attachments were split out of the retrieval
+      // query) only have it inlined as <document> blocks in m.content --
+      // fall back to extracting it from there.
       const docBlocks = parseDocumentBlocks(m.content);
-      const attachments = (meta.attachments ?? []).map((a: { name: string; size?: number }) => ({
+      const attachments = (meta.attachments ?? []).map((a: { name: string; size?: number; markdown?: string }) => ({
         ...a,
-        markdown: docBlocks.get(a.name),
+        markdown: a.markdown ?? docBlocks.get(a.name),
       }));
       return { ...m, createdAt, apiContent: m.content, content: meta.display_content, attachments };
     }

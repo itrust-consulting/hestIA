@@ -33,7 +33,7 @@ export const NODE_TYPES: NodeTypeSpec[] = [
     inputs: ['dense', 'sparse', 'collection', 'options'], outputs: ['hits'],
     contextDefaults: { options: 'query_kwargs' },
   },
-  { type: 'Augment', fragment: 'augment.yaml', label: 'Augment (RAG prompt)', inputs: ['prompt', 'hits', 'template'], outputs: ['prompt'] },
+  { type: 'Augment', fragment: 'augment.yaml', label: 'Augment (RAG prompt)', inputs: ['prompt', 'hits', 'template', 'attachments'], outputs: ['prompt'] },
   {
     type: 'Generate', fragment: 'generate.yaml', label: 'Generate',
     inputs: ['prompt', 'model', 'options'], outputs: ['response'],

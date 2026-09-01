@@ -42,26 +42,22 @@ export async function sendMessage(
 
   const userTempId = tempId();
 
+  // Attachment text is never merged into apiContent/content here -- it
+  // would otherwise become part of last_user_message, which the backend
+  // also embeds as the RAG retrieval query. Attachments ride separately
+  // via last_user_attachments (see streamFromHistoryInto) and get merged
+  // into the LLM-facing prompt server-side (${attached_documents}),
+  // leaving the retrieval query as just the user's typed text.
   let apiContent: string | ContentPart[] | undefined;
   if (images.length > 0) {
     const parts: ContentPart[] = [];
-    if (attachments.length > 0) {
-      const blocks = attachments
-        .map(a => `<document name="${a.name}">\n${a.markdown}\n</document>`)
-        .join('\n\n');
-      parts.push({ type: 'text', text: text.trim() ? `${blocks}\n\n${text}` : blocks });
-    } else if (text.trim()) {
+    if (text.trim()) {
       parts.push({ type: 'text', text });
     }
     for (const img of images) {
       parts.push({ type: 'image_url', image_url: { url: img.dataUrl } });
     }
     apiContent = parts;
-  } else if (attachments.length > 0) {
-    const blocks = attachments
-      .map(a => `<document name="${a.name}">\n${a.markdown}\n</document>`)
-      .join('\n\n');
-    apiContent = text.trim() ? `${blocks}\n\n${text}` : blocks;
   }
 
   messages.update(m => [
@@ -83,14 +79,14 @@ export async function sendMessage(
     { id: assistantTempId, role: 'assistant', content: '', createdAt: Date.now() + 2 }
   ]);
 
-  await streamFromHistoryInto(assistantTempId, userTempId, text, attachments.map(a => ({ name: a.name, size: a.size })));
+  await streamFromHistoryInto(assistantTempId, userTempId, text, attachments.map(a => ({ name: a.name, size: a.size, markdown: a.markdown })));
 }
 
 export async function streamFromHistoryInto(
   assistantTempId: string,
   userTempId: string,
   displayContent?: string,
-  msgAttachments?: { name: string; size?: number }[],
+  msgAttachments?: { name: string; size?: number; markdown?: string }[],
 ) {
   sending.set(true);
 
@@ -296,6 +292,6 @@ export async function retryMessage(assistantId: string) {
     newAssistantTempId,
     newUserTempId,
     userMsg.content,
-    userMsg.attachments?.map(a => ({ name: a.name, size: a.size })),
+    userMsg.attachments?.map(a => ({ name: a.name, size: a.size, markdown: a.markdown })),
   );
 }

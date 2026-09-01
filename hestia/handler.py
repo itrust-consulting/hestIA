@@ -38,11 +38,18 @@ _DEFAULT_AUGMENT_TEMPLATE = """
         {source_map}
     </source-map>
 
+    <attached-documents>
+        {attached_documents}
+    </attached-documents>
+
     Instruction:
     - Use LaTeX-style citations when referencing retrieved data: \\cite{{key}} for a single source,
       or \\cite{{key1,key2}} for multiple sources.
     - IMPORTANT: Use ONLY the numeric keys defined in <source-map>. Do NOT derive keys from
       filenames, document titles, or any other source. The keys are short integers (1, 2, 3, ...).
+    - <attached-documents>, if non-empty, holds file(s) the user attached directly to this message --
+      they are not part of the knowledge base and are not in <source-map>, so do NOT invent a
+      citation key for them; just use their content directly when relevant.
     - If the retrieved data is insufficient, say so explicitly.
     - Do NOT include a separate sources or references section at the end.
 
@@ -91,14 +98,19 @@ def _format_citations(hits: list) -> tuple[dict, list]:
     }, cite_list
 
 
-def _build_prompt(prompt: str, hits: list, template: str) -> tuple[str, list]:
+def _build_prompt(prompt: str, hits: list, template: str, attachments: str = "") -> tuple[str, list]:
     if not hits:
-        return prompt, []
+        # No retrieved context to wrap the template around -- still surface
+        # any attachments (the template's <attached-documents> section is
+        # skipped along with the rest of it here), just plainly ahead of
+        # the user's own message rather than silently dropping them.
+        return (f"{attachments}\n\n{prompt}" if attachments else prompt), []
     formatted, cite_list = _format_citations(hits)
     return template.format(
         retrieved_data=formatted["retrieved_data"],
         source_map=formatted["source_map"],
         user_prompt=prompt,
+        attached_documents=attachments,
     ), cite_list
 
 
@@ -188,7 +200,8 @@ class Runner:
         prompt = self._resolve(node.inputs.get("prompt"), slot) or ""
         hits = self._resolve(node.inputs.get("hits"), slot) or []
         template = self._resolve(node.inputs.get("template"), slot) or _DEFAULT_AUGMENT_TEMPLATE
-        augmented, cite_list = _build_prompt(prompt, hits, template)
+        attachments = self._resolve(node.inputs.get("attachments"), slot) or ""
+        augmented, cite_list = _build_prompt(prompt, hits, template, attachments)
         slot[node.outputs.get("prompt", "prompt")] = augmented
         slot["_cite_list"] = cite_list
 
@@ -368,9 +381,9 @@ class PersistChat:
             c_id = self.users.create_user_conversation(user_id, title)
 
         user_msg_id = None
-        if req.last_user_message:
+        if req.last_user_message or req.last_user_attachments:
             user_meta: dict = {}
-            user_content = req.last_user_message
+            user_content = req.last_user_message if req.last_user_message is not None else ""
             if req.last_user_display_content is not None:
                 user_meta["display_content"] = req.last_user_display_content
             if req.last_user_attachments:
