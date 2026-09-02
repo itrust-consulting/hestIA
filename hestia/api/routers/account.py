@@ -42,4 +42,5 @@ def heartbeat(
     user: User = Depends(get_current_user),
 ):
     h.container.services.get("users").repo.touch_last_seen(id=user.id, ts=now_epoch())
-    return {"ok": True}
+    n_svc = h.container.services.get("notifications")
+    return {"ok": True, "unread_notifications": n_svc.unread_count(user.id) if n_svc else 0}

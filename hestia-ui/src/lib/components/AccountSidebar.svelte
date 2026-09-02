@@ -4,6 +4,7 @@
   import SettingsIcon from '$lib/components/icons/settingsIcon.svelte';
   import HelpIcon from '$lib/components/icons/helpIcon.svelte';
   import LogoutIcon from '$lib/components/icons/logoutIcon.svelte';
+  import OrgIcon from '$lib/components/icons/orgIcon.svelte';
 
 
   import { env } from '$env/dynamic/public';
@@ -15,6 +16,7 @@
   const sections = [
     { id: "profile",   label: "Profile",   icon: UserIcon,   href: "/account/overview?section=profile" },
     { id: "security",  label: "Security",  icon: LockIcon,   href: "/account/overview?section=security" },
+    { id: "tenants",   label: "Tenants",   icon: OrgIcon,    href: "/account/overview?section=tenants" },
     { id: "support",   label: "Support",   icon: HelpIcon,   href: "/account/overview?section=support" },
     { id: "logout",    label: "Logout",    icon: LogoutIcon, href: "/api/logout", danger: true, noPreload: true },
   ];

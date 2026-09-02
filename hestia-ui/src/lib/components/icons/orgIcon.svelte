@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="bi bi-building"><!----><path d="M4 2.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v11h1.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H2v-11a.5.5 0 0 1 .5-.5H4zm1 1V13h6V3.5H5z"></path><path d="M6 5h1v1H6zm2 0h1v1H8zm-2 2h1v1H6zm2 0h1v1H8zm-2 2h1v1H6zm2 0h1v1H8z"></path></svg>

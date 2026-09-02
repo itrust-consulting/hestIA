@@ -1,6 +1,7 @@
 <script lang="ts">
   import './layout.css';
   import ToastContainer from '$lib/components/ToastContainer.svelte';
+  import NotificationBell from '$lib/components/NotificationBell.svelte';
   import SettingsIcon from '$lib/components/icons/settingsIcon.svelte';
   import AccountSetIcon from '$lib/components/icons/accountSetIcon.svelte';
   import AdminIcon from '$lib/components/icons/adminIcon.svelte';
@@ -65,14 +66,27 @@
 
   onMount(() => {
       startInactivityWatcher();
-      if (page.data.tokenExp) scheduleTokenExpiration(page.data.tokenExp);
-      if (page.data.user) startHeartbeat();
 
       const saved = localStorage.getItem('theme');
       if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         isDark = true;
         document.documentElement.classList.add('dark');
       }
+  });
+
+  // Login redirects via client-side goto(), and the root layout (this
+  // component) is already mounted from the pre-login /login page load at
+  // that point -- it never remounts on that navigation, so onMount's
+  // one-shot checks above would see stale page.data (still logged-out) and
+  // never retry. These need to react to page.data changing instead, so the
+  // heartbeat (and thus the notification badge) actually starts once the
+  // user is authenticated, not only after a full page reload.
+  $effect(() => {
+      if (page.data.tokenExp) scheduleTokenExpiration(page.data.tokenExp);
+  });
+
+  $effect(() => {
+      if (page.data.user) startHeartbeat();
   });
 
   const { children } = $props();
@@ -143,6 +157,9 @@
     </div>
     {#if !hideHeaderButtons}
     <div class="app-header-buttons">
+      {#if user}
+        <NotificationBell />
+      {/if}
       <button class="icon-btn" onclick={toggleDark} aria-label="Toggle dark mode" use:tooltip={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
         {#if isDark}
           <SunIcon />

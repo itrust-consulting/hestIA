@@ -27,6 +27,7 @@
         { label: 'Workflows', href: '/admin/settings/workflows' },
         { label: 'Authentication', href: '/admin/settings/authentication' },
         { label: 'Logging', href: '/admin/settings/logging' },
+        { label: 'Notifications', href: '/admin/settings/notifications' },
       ]
     },
   ];

@@ -11,13 +11,18 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
     error(403, 'Forbidden');
   }
 
-  const [tenantRes, membersRes, usersRes, tenantColsRes, collectionsRes, countsRes] = await Promise.all([
+  const [tenantRes, membersRes, usersRes, tenantColsRes, collectionsRes, countsRes,
+         joinRequestsRes, incomingShareRes, outgoingShareRes, invitationsRes] = await Promise.all([
     fetch('/api/admin/tenants'),
     fetch(`/api/admin/tenants/${params.id}/members`),
     fetch('/api/admin/users'),
     fetch(`/api/admin/tenants/${params.id}/collections`),
     fetch('/api/collections'),
     fetch('/api/admin/collections/document-counts'),
+    fetch(`/api/admin/tenants/${params.id}/join-requests?status=pending`),
+    fetch(`/api/admin/tenants/${params.id}/share-requests?direction=incoming&status=pending`),
+    fetch(`/api/admin/tenants/${params.id}/share-requests?direction=outgoing&status=pending`),
+    fetch(`/api/admin/tenants/${params.id}/invitations?status=pending`),
   ]);
 
   if (!tenantRes.ok) error(tenantRes.status, 'Could not load tenants.');
@@ -61,6 +66,11 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
     documentCount: counts[col.id] ?? 0,
   }));
 
+  const joinRequests = joinRequestsRes.ok ? ((await joinRequestsRes.json()).requests ?? []) : [];
+  const incomingShareRequests = incomingShareRes.ok ? ((await incomingShareRes.json()).requests ?? []) : [];
+  const outgoingShareRequests = outgoingShareRes.ok ? ((await outgoingShareRes.json()).requests ?? []) : [];
+  const invitations = invitationsRes.ok ? ((await invitationsRes.json()).invitations ?? []) : [];
+
   const uploadOrganizations = isAdmin
     ? allTenants.map((t: any) => ({ id: t.id, name: t.name, abbreviation: t.abbreviation }))
     : (locals.user?.orgs ?? [] as any[])
@@ -71,10 +81,15 @@ export const load: PageServerLoad = async ({ params, fetch, url, locals }) => {
     tenant,
     members,
     allUsers,
+    allTenants,
     allCollections,
     ownedCollections,
     accessibleCollections,
     uploadOrganizations,
+    joinRequests,
+    incomingShareRequests,
+    outgoingShareRequests,
+    invitations,
     editMode: url.searchParams.has('edit'),
   };
 };

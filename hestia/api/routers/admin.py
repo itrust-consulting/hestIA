@@ -416,6 +416,230 @@ def create_collection(
     return {"ok": True, "name": name}
 
 
+# Notifications
+@router.post("/notifications/broadcast")
+def broadcast_notification(
+    req: dict,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_admin(user)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    notif_id = svc.broadcast(req.get("title", ""), body=req.get("body") or None, link=req.get("link") or None)
+    audit.admin_action(
+        actor_id=str(user.id), action="notification_broadcast", target=str(notif_id),
+        detail={"title": req.get("title")},
+    )
+    return {"ok": True, "notification_id": str(notif_id)}
+
+
+@router.get("/notifications/history")
+def get_notification_history(
+    limit: int = 20,
+    before_created_at: int | None = None,
+    before_rowid: int | None = None,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_admin(user)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    return svc.list_broadcasts(limit=limit, before_created_at=before_created_at, before_rowid=before_rowid)
+
+
+# Tenant join requests (moderator)
+@router.get("/organizations/{org_id}/join-requests")
+def list_tenant_join_requests(
+    org_id: int,
+    status: str | None = None,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    return {"requests": svc.list_org_join_requests(org_id, status=status)}
+
+
+@router.post("/organizations/{org_id}/join-requests/{req_id}/approve")
+def approve_tenant_join_request(
+    org_id: int,
+    req_id: str,
+    req: dict,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    tenant_role = req.get("tenant_role") or None
+    if tenant_role:
+        assert_tenant_role_assigner(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    svc.approve_join_request(
+        uuid.UUID(req_id), user.id,
+        tenant_role=tenant_role, classification_level=int(req.get("classification_level") or 0),
+    )
+    audit.admin_action(
+        actor_id=str(user.id), action="join_request_approve", target=req_id,
+        detail={"org_id": org_id, "tenant_role": tenant_role, "classification_level": req.get("classification_level")},
+    )
+    return {"ok": True}
+
+
+@router.post("/organizations/{org_id}/join-requests/{req_id}/reject")
+def reject_tenant_join_request(
+    org_id: int,
+    req_id: str,
+    req: dict,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    svc.reject_join_request(uuid.UUID(req_id), user.id, reason=req.get("reason") or None)
+    audit.admin_action(actor_id=str(user.id), action="join_request_reject", target=req_id, detail={"org_id": org_id})
+    return {"ok": True}
+
+
+# Tenant invitations (moderator)
+@router.post("/organizations/{org_id}/invitations")
+def invite_tenant_user(
+    org_id: int,
+    req: dict,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    identifier = req.get("identifier") or ""
+    inv_id = svc.invite_user(org_id, identifier, user.id, message=req.get("message") or None)
+    audit.admin_action(
+        actor_id=str(user.id), action="tenant_invitation_send", target=str(inv_id),
+        detail={"org_id": org_id, "identifier": identifier},
+    )
+    return {"ok": True, "invitation_id": str(inv_id)}
+
+
+@router.get("/organizations/{org_id}/invitations")
+def list_tenant_invitations(
+    org_id: int,
+    status: str | None = None,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    return {"invitations": svc.list_org_invitations(org_id, status=status)}
+
+
+@router.post("/organizations/{org_id}/invitations/{inv_id}/cancel")
+def cancel_tenant_invitation(
+    org_id: int,
+    inv_id: str,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    svc.cancel_invitation(uuid.UUID(inv_id), org_id)
+    audit.admin_action(actor_id=str(user.id), action="tenant_invitation_cancel", target=inv_id, detail={"org_id": org_id})
+    return {"ok": True}
+
+
+# Tenant sharing requests (moderator)
+@router.post("/organizations/{org_id}/share-requests")
+def file_tenant_share_request(
+    org_id: int,
+    req: dict,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    target_org_id = req.get("target_org_id")
+    if not target_org_id:
+        raise HTTPException(400, "target_org_id required")
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    req_id = svc.file_share_request(org_id, int(target_org_id), user.id, message=req.get("message") or None)
+    audit.admin_action(
+        actor_id=str(user.id), action="share_request_file", target=str(req_id),
+        detail={"requesting_org_id": org_id, "target_org_id": target_org_id},
+    )
+    return {"ok": True, "request_id": str(req_id)}
+
+
+@router.get("/organizations/{org_id}/share-requests")
+def list_tenant_share_requests(
+    org_id: int,
+    direction: str = "incoming",
+    status: str | None = None,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    return {"requests": svc.list_org_share_requests(org_id, direction, status=status)}
+
+
+@router.post("/organizations/{org_id}/share-requests/{req_id}/approve")
+def approve_tenant_share_request(
+    org_id: int,
+    req_id: str,
+    req: dict,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    share_req = svc.repo.get_share_request(uuid.UUID(req_id))
+    if not share_req or share_req["target_org_id"] != org_id:
+        raise HTTPException(404, "Share request not found for this tenant.")
+    svc.approve_share_request(uuid.UUID(req_id), user.id, req.get("collections") or [])
+    audit.admin_action(
+        actor_id=str(user.id), action="share_request_approve", target=req_id,
+        detail={"org_id": org_id, "collections": req.get("collections")},
+    )
+    return {"ok": True}
+
+
+@router.post("/organizations/{org_id}/share-requests/{req_id}/reject")
+def reject_tenant_share_request(
+    org_id: int,
+    req_id: str,
+    req: dict,
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    assert_tenant_moderator(user, org_id)
+    svc = h.container.services.get("notifications")
+    if svc is None:
+        raise HTTPException(503, "Notification service unavailable.")
+    share_req = svc.repo.get_share_request(uuid.UUID(req_id))
+    if not share_req or share_req["target_org_id"] != org_id:
+        raise HTTPException(404, "Share request not found for this tenant.")
+    svc.reject_share_request(uuid.UUID(req_id), user.id, reason=req.get("reason") or None)
+    audit.admin_action(actor_id=str(user.id), action="share_request_reject", target=req_id, detail={"org_id": org_id})
+    return {"ok": True}
+
+
 # Roles
 @router.get("/roles")
 def get_roles(

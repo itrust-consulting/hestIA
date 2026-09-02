@@ -9,6 +9,8 @@ from hestia.api.routers.health import router as health_router
 from hestia.api.routers.auth import router as auth_router
 from hestia.api.routers.account import router as account_router
 from hestia.api.routers.admin import router as admin_router
+from hestia.api.routers.notifications import router as notifications_router
+from hestia.api.routers.notification_settings import router as notification_settings_router
 from hestia.api.routers.llm_settings import router as llm_settings_router
 from hestia.api.routers.auth_settings import router as auth_settings_router
 from hestia.api.routers.workflow_settings import router as workflow_settings_router
@@ -36,6 +38,8 @@ ROUTER_REGISTRY: Dict[str, RouterSpec] = {
     "account":   RouterSpec(router=account_router,   prefix="",       tags=("account",),      always_on=True),
     "convo":     RouterSpec(router=convo_router,     prefix="",       tags=("conversations",), always_on=True),
     "admin":     RouterSpec(router=admin_router,     prefix="/admin", tags=("admin",),        always_on=True),
+    "notifications": RouterSpec(router=notifications_router, prefix="", tags=("notifications",), always_on=True),
+    "notification_settings": RouterSpec(router=notification_settings_router, prefix="/admin", tags=("admin",), always_on=True),
     "llm_settings": RouterSpec(router=llm_settings_router, prefix="/admin", tags=("admin",),  always_on=True),
     "auth_settings": RouterSpec(router=auth_settings_router, prefix="/admin", tags=("admin",), always_on=True),
     "workflow_settings": RouterSpec(router=workflow_settings_router, prefix="/admin", tags=("admin",), always_on=True),

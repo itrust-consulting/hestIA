@@ -110,6 +110,113 @@ export type Permissions = {
 export type UserRole = { id: number; name: string };
 export type UserOrg  = { id: number; name: string; abbr: string };
 
+export type OrgBrief = { id: number; name: string; abbreviation: string };
+
+export type TenantSummary = {
+  member_count: number;
+  owned_collections: string[];
+  accessible_collections: string[];
+  classification_level: number | null;
+};
+
+export type WelcomeSettings = {
+  welcome_title: string;
+  welcome_body: string;
+};
+
+export type Broadcast = {
+  id: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  created_at: number;
+};
+
+export type NotificationType =
+  | 'system'
+  | 'join_request_received'
+  | 'join_request_approved'
+  | 'join_request_rejected'
+  | 'share_request_received'
+  | 'share_request_approved'
+  | 'share_request_rejected';
+
+export type Notification = {
+  id: string;
+  user_id: string | null;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  link: string | null;
+  ref_type: string | null;
+  ref_id: string | null;
+  data: Record<string, unknown>;
+  created_at: number;
+  is_read: boolean;
+};
+
+export type JoinRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export type JoinRequest = {
+  id: string;
+  user_id: string;
+  org_id: number;
+  status: JoinRequestStatus;
+  message: string | null;
+  reviewed_by: string | null;
+  review_reason: string | null;
+  granted_tenant_role: string | null;
+  granted_classification_level: number | null;
+  created_at: number;
+  resolved_at: number | null;
+  // present on the moderator-facing list
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  // present on the requester-facing list
+  org_name?: string;
+  org_abbreviation?: string;
+};
+
+export type ShareRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
+
+export type Invitation = {
+  id: string;
+  org_id: number;
+  user_id: string;
+  invited_by: string;
+  status: InvitationStatus;
+  message: string | null;
+  created_at: number;
+  resolved_at: number | null;
+  // present on the moderator-facing list
+  username?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  // present on the invitee-facing list
+  org_name?: string;
+  org_abbreviation?: string;
+};
+
+export type ShareRequest = {
+  id: string;
+  requesting_org_id: number;
+  target_org_id: number;
+  status: ShareRequestStatus;
+  message: string | null;
+  requested_by: string;
+  reviewed_by: string | null;
+  review_reason: string | null;
+  created_at: number;
+  resolved_at: number | null;
+  other_org_name: string;
+  other_org_abbreviation: string;
+};
+
 export type User = {
     id: string;
     username: string;
