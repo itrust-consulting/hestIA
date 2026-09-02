@@ -138,12 +138,95 @@ class UserRepository:
               FOREIGN KEY (c_id) REFERENCES conversations(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS notifications (
+              id            BLOB(16) PRIMARY KEY,
+              user_id       BLOB(16) DEFAULT NULL,
+              type          TEXT NOT NULL,
+              title         TEXT NOT NULL,
+              body          TEXT,
+              link          TEXT,
+              ref_type      TEXT,
+              ref_id        TEXT,
+              data_json     TEXT,
+              created_at    INTEGER NOT NULL,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS notification_reads (
+              notification_id BLOB(16) NOT NULL,
+              user_id          BLOB(16) NOT NULL,
+              read_at          INTEGER NOT NULL,
+              PRIMARY KEY (notification_id, user_id),
+              FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS tenant_join_requests (
+              id                            BLOB(16) PRIMARY KEY,
+              user_id                       BLOB(16) NOT NULL,
+              org_id                        INTEGER NOT NULL,
+              status                        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+              message                       TEXT,
+              reviewed_by                   BLOB(16),
+              review_reason                 TEXT,
+              granted_tenant_role           TEXT,
+              granted_classification_level  INTEGER,
+              created_at                    INTEGER NOT NULL,
+              resolved_at                   INTEGER,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+              FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS tenant_share_requests (
+              id                  BLOB(16) PRIMARY KEY,
+              requesting_org_id   INTEGER NOT NULL,
+              target_org_id       INTEGER NOT NULL,
+              status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+              message             TEXT,
+              requested_by        BLOB(16) NOT NULL,
+              reviewed_by         BLOB(16),
+              review_reason       TEXT,
+              created_at          INTEGER NOT NULL,
+              resolved_at         INTEGER,
+              FOREIGN KEY (requesting_org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+              FOREIGN KEY (target_org_id) REFERENCES organizations(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS tenant_share_grants (
+              request_id          BLOB(16) NOT NULL,
+              collection_id       TEXT NOT NULL,
+              max_classification  INTEGER,
+              PRIMARY KEY (request_id, collection_id),
+              FOREIGN KEY (request_id) REFERENCES tenant_share_requests(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS tenant_invitations (
+              id            BLOB(16) PRIMARY KEY,
+              org_id        INTEGER NOT NULL,
+              user_id       BLOB(16) NOT NULL,
+              invited_by    BLOB(16) NOT NULL,
+              status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','cancelled')),
+              message       TEXT,
+              created_at    INTEGER NOT NULL,
+              resolved_at   INTEGER,
+              FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
             CREATE INDEX IF NOT EXISTS idx_user_orgs ON user_orgs(user_id);
             CREATE INDEX IF NOT EXISTS idx_user_roles ON user_roles(user_id);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
             CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(c_id, created_at, id);
             CREATE INDEX IF NOT EXISTS idx_tenant_collections ON tenant_collections(org_id);
+            CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_notification_reads_user ON notification_reads(user_id);
+            CREATE INDEX IF NOT EXISTS idx_join_requests_org ON tenant_join_requests(org_id, status);
+            CREATE INDEX IF NOT EXISTS idx_join_requests_user ON tenant_join_requests(user_id);
+            CREATE INDEX IF NOT EXISTS idx_share_requests_target ON tenant_share_requests(target_org_id, status);
+            CREATE INDEX IF NOT EXISTS idx_share_requests_requesting ON tenant_share_requests(requesting_org_id);
+            CREATE INDEX IF NOT EXISTS idx_invitations_org ON tenant_invitations(org_id, status);
+            CREATE INDEX IF NOT EXISTS idx_invitations_user ON tenant_invitations(user_id, status);
             """
         )
         # executescript commits implicitly; run ALTER TABLE migrations separately
@@ -327,6 +410,11 @@ class UserRepository:
             "SELECT id, name, abbreviation, created_at FROM organizations WHERE name = ?", (name,)
         ).fetchone()
 
+    def get_organization_by_id(self, id: int) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT id, name, abbreviation, created_at FROM organizations WHERE id = ?", (id,)
+        ).fetchone()
+
     def get_organization_users(self, id: int) -> list[sqlite3.Row]:
         return self._get_conn().execute(
             "SELECT u.id, u.username, u.email, u.first_name, u.last_name, "
@@ -388,6 +476,12 @@ class UserRepository:
             "SELECT user_id FROM user_orgs WHERE org_id = ? AND tenant_role = 'moderator'", (org_id,)
         ).fetchone()
 
+    def get_org_moderators(self, org_id: int) -> list[sqlite3.Row]:
+        return self._get_conn().execute(
+            "SELECT user_id FROM user_orgs WHERE org_id = ? AND tenant_role IN ('moderator', 'co-moderator')",
+            (org_id,)
+        ).fetchall()
+
     # ---- tenant_collections ----
 
     def get_tenant_collections(self, org_id: int) -> list[sqlite3.Row]:
@@ -433,6 +527,270 @@ class UserRepository:
     @with_txn
     def remove_collection_grants(self, conn, *, collection_id: str):
         conn.execute("DELETE FROM tenant_collections WHERE collection_id = ?", (collection_id,))
+
+    # ---- notifications ----
+
+    @with_txn
+    def insert_notification(self, conn, *, notif_id: uuid.UUID, user_id: uuid.UUID | None, type: str,
+                            title: str, body: str | None, link: str | None, ref_type: str | None,
+                            ref_id: str | None, data_json: str | None, ts: int):
+        conn.execute(
+            "INSERT INTO notifications (id, user_id, type, title, body, link, ref_type, ref_id, data_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (notif_id.bytes, user_id.bytes if user_id else None, type, title, body, link,
+             ref_type, ref_id, data_json, ts),
+        )
+
+    # A broadcast (user_id IS NULL) is only visible to a user if it was sent
+    # on or after that user's account was created -- otherwise every new
+    # signup would inherit the entire history of past announcements.
+    _VISIBLE_BROADCAST = (
+        "(n.user_id = ? OR (n.user_id IS NULL AND n.created_at >= (SELECT created_at FROM users WHERE id = ?)))"
+    )
+
+    def get_notifications_for_user(
+        self, user_id: uuid.UUID, limit: int,
+        before_created_at: int | None = None, before_rowid: int | None = None,
+    ) -> list[sqlite3.Row]:
+        cursor_clause = ""
+        params: list = [user_id.bytes, user_id.bytes, user_id.bytes]
+        if before_created_at is not None:
+            cursor_clause = "AND (n.created_at < ? OR (n.created_at = ? AND n.rowid < ?))"
+            params += [before_created_at, before_created_at, before_rowid]
+        params.append(limit)
+        return self._get_conn().execute(
+            f"SELECT n.id, n.user_id, n.type, n.title, n.body, n.link, n.ref_type, n.ref_id, n.data_json, "
+            f"n.created_at, n.rowid, (nr.read_at IS NOT NULL) AS is_read "
+            f"FROM notifications n "
+            f"LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = ? "
+            f"WHERE {self._VISIBLE_BROADCAST} {cursor_clause} "
+            f"ORDER BY n.created_at DESC, n.rowid DESC LIMIT ?",
+            params,
+        ).fetchall()
+
+    def list_broadcast_notifications(
+        self, limit: int, before_created_at: int | None = None, before_rowid: int | None = None,
+    ) -> list[sqlite3.Row]:
+        """Admin-facing broadcast history -- unlike get_notifications_for_user,
+        this is not scoped to a viewer and returns every broadcast ever sent
+        (user_id IS NULL), not the mixed per-user inbox."""
+        cursor_clause = ""
+        params: list = []
+        if before_created_at is not None:
+            cursor_clause = "AND (created_at < ? OR (created_at = ? AND rowid < ?))"
+            params += [before_created_at, before_created_at, before_rowid]
+        params.append(limit)
+        return self._get_conn().execute(
+            f"SELECT id, title, body, link, created_at, rowid FROM notifications "
+            f"WHERE user_id IS NULL {cursor_clause} "
+            f"ORDER BY created_at DESC, rowid DESC LIMIT ?",
+            params,
+        ).fetchall()
+
+    def get_unread_notification_count(self, user_id: uuid.UUID) -> int:
+        row = self._get_conn().execute(
+            f"SELECT COUNT(*) AS c FROM notifications n "
+            f"LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = ? "
+            f"WHERE {self._VISIBLE_BROADCAST} AND nr.read_at IS NULL",
+            (user_id.bytes, user_id.bytes, user_id.bytes),
+        ).fetchone()
+        return row["c"] if row else 0
+
+    @with_txn
+    def mark_notification_read(self, conn, *, notification_id: uuid.UUID, user_id: uuid.UUID, ts: int):
+        conn.execute(
+            "INSERT OR IGNORE INTO notification_reads (notification_id, user_id, read_at) VALUES (?, ?, ?)",
+            (notification_id.bytes, user_id.bytes, ts),
+        )
+
+    @with_txn
+    def mark_all_notifications_read(self, conn, *, user_id: uuid.UUID, ts: int):
+        conn.execute(
+            f"INSERT OR IGNORE INTO notification_reads (notification_id, user_id, read_at) "
+            f"SELECT n.id, ?, ? FROM notifications n "
+            f"WHERE {self._VISIBLE_BROADCAST}",
+            (user_id.bytes, ts, user_id.bytes, user_id.bytes),
+        )
+
+    # ---- tenant join requests ----
+
+    @with_txn
+    def insert_join_request(self, conn, *, req_id: uuid.UUID, user_id: uuid.UUID, org_id: int,
+                            message: str | None, ts: int):
+        conn.execute(
+            "INSERT INTO tenant_join_requests (id, user_id, org_id, message, created_at) VALUES (?, ?, ?, ?, ?)",
+            (req_id.bytes, user_id.bytes, org_id, message, ts),
+        )
+
+    def get_join_request(self, req_id: uuid.UUID) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT id, user_id, org_id, status, message, reviewed_by, review_reason, "
+            "granted_tenant_role, granted_classification_level, created_at, resolved_at "
+            "FROM tenant_join_requests WHERE id = ?",
+            (req_id.bytes,),
+        ).fetchone()
+
+    def get_pending_join_request(self, user_id: uuid.UUID, org_id: int) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT id FROM tenant_join_requests WHERE user_id = ? AND org_id = ? AND status = 'pending'",
+            (user_id.bytes, org_id),
+        ).fetchone()
+
+    def list_join_requests_for_org(self, org_id: int, status: str | None = None) -> list[sqlite3.Row]:
+        if status:
+            return self._get_conn().execute(
+                "SELECT jr.id, jr.user_id, jr.org_id, jr.status, jr.message, jr.reviewed_by, jr.review_reason, "
+                "jr.granted_tenant_role, jr.granted_classification_level, jr.created_at, jr.resolved_at, "
+                "u.username, u.first_name, u.last_name, u.email "
+                "FROM tenant_join_requests jr JOIN users u ON u.id = jr.user_id "
+                "WHERE jr.org_id = ? AND jr.status = ? ORDER BY jr.created_at DESC",
+                (org_id, status),
+            ).fetchall()
+        return self._get_conn().execute(
+            "SELECT jr.id, jr.user_id, jr.org_id, jr.status, jr.message, jr.reviewed_by, jr.review_reason, "
+            "jr.granted_tenant_role, jr.granted_classification_level, jr.created_at, jr.resolved_at, "
+            "u.username, u.first_name, u.last_name, u.email "
+            "FROM tenant_join_requests jr JOIN users u ON u.id = jr.user_id "
+            "WHERE jr.org_id = ? ORDER BY jr.created_at DESC",
+            (org_id,),
+        ).fetchall()
+
+    def list_join_requests_for_user(self, user_id: uuid.UUID) -> list[sqlite3.Row]:
+        return self._get_conn().execute(
+            "SELECT jr.id, jr.user_id, jr.org_id, jr.status, jr.message, jr.reviewed_by, jr.review_reason, "
+            "jr.granted_tenant_role, jr.granted_classification_level, jr.created_at, jr.resolved_at, "
+            "o.name AS org_name, o.abbreviation AS org_abbreviation "
+            "FROM tenant_join_requests jr JOIN organizations o ON o.id = jr.org_id "
+            "WHERE jr.user_id = ? ORDER BY jr.created_at DESC",
+            (user_id.bytes,),
+        ).fetchall()
+
+    @with_txn
+    def resolve_join_request(self, conn, *, req_id: uuid.UUID, status: str, reviewed_by: uuid.UUID,
+                             review_reason: str | None, granted_tenant_role: str | None,
+                             granted_classification_level: int | None, ts: int):
+        conn.execute(
+            "UPDATE tenant_join_requests SET status = ?, reviewed_by = ?, review_reason = ?, "
+            "granted_tenant_role = ?, granted_classification_level = ?, resolved_at = ? WHERE id = ?",
+            (status, reviewed_by.bytes, review_reason, granted_tenant_role,
+             granted_classification_level, ts, req_id.bytes),
+        )
+
+    # ---- tenant share requests ----
+
+    @with_txn
+    def insert_share_request(self, conn, *, req_id: uuid.UUID, requesting_org_id: int, target_org_id: int,
+                             message: str | None, requested_by: uuid.UUID, ts: int):
+        conn.execute(
+            "INSERT INTO tenant_share_requests (id, requesting_org_id, target_org_id, message, requested_by, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (req_id.bytes, requesting_org_id, target_org_id, message, requested_by.bytes, ts),
+        )
+
+    def get_share_request(self, req_id: uuid.UUID) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT id, requesting_org_id, target_org_id, status, message, requested_by, reviewed_by, "
+            "review_reason, created_at, resolved_at FROM tenant_share_requests WHERE id = ?",
+            (req_id.bytes,),
+        ).fetchone()
+
+    def list_share_requests_for_org(self, org_id: int, direction: str, status: str | None = None) -> list[sqlite3.Row]:
+        org_col = "target_org_id" if direction == "incoming" else "requesting_org_id"
+        other_col = "requesting_org_id" if direction == "incoming" else "target_org_id"
+        query = (
+            f"SELECT sr.id, sr.requesting_org_id, sr.target_org_id, sr.status, sr.message, sr.requested_by, "
+            f"sr.reviewed_by, sr.review_reason, sr.created_at, sr.resolved_at, "
+            f"o.name AS other_org_name, o.abbreviation AS other_org_abbreviation "
+            f"FROM tenant_share_requests sr JOIN organizations o ON o.id = sr.{other_col} "
+            f"WHERE sr.{org_col} = ?"
+        )
+        params: list = [org_id]
+        if status:
+            query += " AND sr.status = ?"
+            params.append(status)
+        query += " ORDER BY sr.created_at DESC"
+        return self._get_conn().execute(query, params).fetchall()
+
+    @with_txn
+    def resolve_share_request(self, conn, *, req_id: uuid.UUID, status: str, reviewed_by: uuid.UUID,
+                              review_reason: str | None, ts: int):
+        conn.execute(
+            "UPDATE tenant_share_requests SET status = ?, reviewed_by = ?, review_reason = ?, resolved_at = ? WHERE id = ?",
+            (status, reviewed_by.bytes, review_reason, ts, req_id.bytes),
+        )
+
+    @with_txn
+    def insert_share_grant(self, conn, *, req_id: uuid.UUID, collection_id: str, max_classification: int | None):
+        conn.execute(
+            "INSERT OR REPLACE INTO tenant_share_grants (request_id, collection_id, max_classification) "
+            "VALUES (?, ?, ?)",
+            (req_id.bytes, collection_id, max_classification),
+        )
+
+    def list_share_grants(self, req_id: uuid.UUID) -> list[sqlite3.Row]:
+        return self._get_conn().execute(
+            "SELECT collection_id, max_classification FROM tenant_share_grants WHERE request_id = ?",
+            (req_id.bytes,),
+        ).fetchall()
+
+    # ---- tenant invitations ----
+
+    @with_txn
+    def insert_invitation(self, conn, *, inv_id: uuid.UUID, org_id: int, user_id: uuid.UUID,
+                          invited_by: uuid.UUID, message: str | None, ts: int):
+        conn.execute(
+            "INSERT INTO tenant_invitations (id, org_id, user_id, invited_by, message, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (inv_id.bytes, org_id, user_id.bytes, invited_by.bytes, message, ts),
+        )
+
+    def get_invitation(self, inv_id: uuid.UUID) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT id, org_id, user_id, invited_by, status, message, created_at, resolved_at "
+            "FROM tenant_invitations WHERE id = ?",
+            (inv_id.bytes,),
+        ).fetchone()
+
+    def get_pending_invitation(self, user_id: uuid.UUID, org_id: int) -> sqlite3.Row | None:
+        return self._get_conn().execute(
+            "SELECT id FROM tenant_invitations WHERE user_id = ? AND org_id = ? AND status = 'pending'",
+            (user_id.bytes, org_id),
+        ).fetchone()
+
+    def list_invitations_for_org(self, org_id: int, status: str | None = None) -> list[sqlite3.Row]:
+        query = (
+            "SELECT inv.id, inv.org_id, inv.user_id, inv.invited_by, inv.status, inv.message, "
+            "inv.created_at, inv.resolved_at, u.username, u.email, u.first_name, u.last_name "
+            "FROM tenant_invitations inv JOIN users u ON u.id = inv.user_id "
+            "WHERE inv.org_id = ?"
+        )
+        params: list = [org_id]
+        if status:
+            query += " AND inv.status = ?"
+            params.append(status)
+        query += " ORDER BY inv.created_at DESC"
+        return self._get_conn().execute(query, params).fetchall()
+
+    def list_invitations_for_user(self, user_id: uuid.UUID, status: str | None = None) -> list[sqlite3.Row]:
+        query = (
+            "SELECT inv.id, inv.org_id, inv.user_id, inv.invited_by, inv.status, inv.message, "
+            "inv.created_at, inv.resolved_at, o.name AS org_name, o.abbreviation AS org_abbreviation "
+            "FROM tenant_invitations inv JOIN organizations o ON o.id = inv.org_id "
+            "WHERE inv.user_id = ?"
+        )
+        params: list = [user_id.bytes]
+        if status:
+            query += " AND inv.status = ?"
+            params.append(status)
+        query += " ORDER BY inv.created_at DESC"
+        return self._get_conn().execute(query, params).fetchall()
+
+    @with_txn
+    def resolve_invitation(self, conn, *, inv_id: uuid.UUID, status: str, ts: int):
+        conn.execute(
+            "UPDATE tenant_invitations SET status = ?, resolved_at = ? WHERE id = ?",
+            (status, ts, inv_id.bytes),
+        )
 
     # ---- conversations ----
 

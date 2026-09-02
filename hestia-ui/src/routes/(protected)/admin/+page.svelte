@@ -74,6 +74,9 @@
           <div class="admin-item" onclick={() => goto('/admin/settings/logging')}>
             <span>Logging</span><span class="chevron">›</span>
           </div>
+          <div class="admin-item" onclick={() => goto('/admin/settings/notifications')}>
+            <span>Notifications</span><span class="chevron">›</span>
+          </div>
         </div>
       </div>
     {:else}
@@ -233,4 +236,5 @@
   font-weight: 600;
   letter-spacing: 0.03em;
 }
+
 </style>

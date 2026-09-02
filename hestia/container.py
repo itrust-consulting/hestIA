@@ -12,9 +12,11 @@ from hestia.application.ingestion import IngestionPipeline
 from hestia.domain.auth.oidc import OIDCService
 from hestia.domain.auth.service import AuthenticationService
 from hestia.domain.auth.users import LDAPService, UserService
+from hestia.domain.notifications.service import NotificationService
 from hestia.domain.rag.services import DenseEncoder, Generator, Retriever, SparseEncoder
 from hestia.infrastructure.db.auth_settings_repository import AuthSettingsRepository
 from hestia.infrastructure.db.llm_settings_repository import LLMSettingsRepository
+from hestia.infrastructure.db.notification_settings_repository import NotificationSettingsRepository
 from hestia.infrastructure.db.qdrant import QdrantDB
 from hestia.infrastructure.db.sync_repository import SyncManifestRepository
 from hestia.infrastructure.db.user_repository import UserRepository, create_sqlite_connection
@@ -225,6 +227,9 @@ class Container:
         user_service, auth_service = _build_auth_stack(self.settings, user_repo)
         self.services["auth"] = auth_service
         self.services["users"] = user_service
+        notification_settings_repo = self.services.get("notification_settings")
+        self.services["notifications"] = NotificationService(user_repo, user_service, notification_settings_repo)
+        user_service.on_user_created = self.services["notifications"].send_welcome_notification
 
     def apply_connection_delete(self, connection_id: int, purpose: Optional[str] = None) -> None:
         """Drops a no-longer-needed provider from the cache, and unwires
@@ -291,10 +296,17 @@ def build_container(settings: Settings) -> Container:
     repo.initialize()
     c.services["user_repository"] = repo
 
+    # --- Notification settings (global, single row; welcome-message copy) ---
+    notification_settings_repo = NotificationSettingsRepository(get_conn, lock)
+    notification_settings_repo.initialize()
+    c.services["notification_settings"] = notification_settings_repo
+
     user_service, auth_service = _build_auth_stack(settings, repo)
     _bootstrap_admin_user(settings, repo, user_service)
     c.services["auth"] = auth_service
     c.services["users"] = user_service
+    c.services["notifications"] = NotificationService(repo, user_service, notification_settings_repo)
+    user_service.on_user_created = c.services["notifications"].send_welcome_notification
 
     close()
 

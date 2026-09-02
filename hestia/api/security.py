@@ -26,6 +26,13 @@ def assert_admin_or_moderator(user: User) -> None:
         raise HTTPException(403, "Admin or moderator access required.")
 
 
+def assert_org_member(user: User, org_id: int) -> None:
+    if user.permissions.is_admin:
+        return
+    if org_id not in {o["id"] for o in user.orgs}:
+        raise HTTPException(403, "You must be a member of this tenant.")
+
+
 def assert_tenant_moderator(user: User, org_id: int) -> None:
     if user.permissions.is_admin:
         return

@@ -7,6 +7,7 @@ import secrets
 import ssl
 import time
 import uuid
+from typing import Callable
 
 from ldap3 import ALL, SIMPLE, SUBTREE, Connection, Server, Tls
 from ldap3.utils.conv import escape_filter_chars
@@ -34,6 +35,12 @@ class UserService:
     def __init__(self, repo: UserRepository, password_min_length: int = 15):
         self.repo = repo
         self.password_min_length = password_min_length
+        # Set by the composition root (container.py) once the notification
+        # service exists, to avoid a circular import (notifications.service
+        # already imports UserService). None until then -- e.g. the
+        # bootstrap-admin account is created before this is wired, so it
+        # never gets a welcome notification, which is the desired behavior.
+        self.on_user_created: Callable[[uuid.UUID], None] | None = None
 
     def _generate_salt(self) -> bytes:
         return secrets.token_bytes(SALT_BYTES)
@@ -232,6 +239,9 @@ class UserService:
             else:
                 self.repo.add_user_to_organization(user_id=user_id, org_id=organization)
 
+        if self.on_user_created:
+            self.on_user_created(user_id)
+
         return user_id
 
     def update_user(
@@ -367,6 +377,24 @@ class UserService:
                              if owner else None,
                 })
         return {"owned": owned, "accessible": accessible}
+
+    def get_tenant_summary(self, org_id: int, user_id: uuid.UUID) -> dict:
+        """Lightweight, self-service tenant overview for any member (not just
+        moderators). Collection names are included -- any member with access
+        can already see them via search/chat, so listing them here isn't a
+        new exposure. Member names are withheld; only the headcount is given.
+        Also reports the requesting user's own classification level in this
+        tenant, since that's their own data, not someone else's."""
+        info = self.get_tenant_collection_info(org_id)
+        membership = next(
+            (m for m in self.repo.get_user_org_memberships(user_id) if m["org_id"] == org_id), None
+        )
+        return {
+            "member_count": len(self.repo.get_organization_users(org_id)),
+            "owned_collections": [c["id"] for c in info["owned"]],
+            "accessible_collections": [c["id"] for c in info["accessible"]],
+            "classification_level": membership["classification_level"] if membership else None,
+        }
 
     def get_collection_grants(self, collection_id: str) -> dict:
         """Return SQL-persisted owner and access tenants for a collection."""
