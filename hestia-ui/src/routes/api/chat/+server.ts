@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { backendFetch } from '$lib/server/backend';
+import { backendFetch, proxyResponse } from '$lib/server/backend';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
@@ -19,7 +19,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     });
 
     if (!upstream.ok || !upstream.body) {
-      return new Response(`Upstream error: ${upstream.status}`, { status: upstream.status });
+      // Matches every other route's { detail } JSON contract (via
+      // proxyResponse) instead of this route's own raw-text shape, which a
+      // caller expecting JSON would fail to parse.
+      return proxyResponse(upstream);
     }
 
     let cancelled = false;
@@ -61,7 +64,13 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       }
     });
   } catch (err: any) {
+    // Matches proxyResponse's convention of never putting raw error text in
+    // a 500 body -- this route used to leak err.message (potentially
+    // stack-adjacent internals) directly to the client here.
     console.error('API error:', err);
-    return new Response(`API error: ${err.message}`, { status: 500 });
+    return new Response(JSON.stringify({ detail: 'An internal error occurred.' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' }
+    });
   }
 };

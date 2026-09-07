@@ -17,7 +17,7 @@
   import { onMount } from 'svelte';
   import { version } from '$app/environment';
   import { startInactivityWatcher, scheduleTokenExpiration, startHeartbeat } from '$lib/auth/session';
-  import { clearIsmsState } from '$lib/stores/isms';
+  import { clearIsmsState, initIsmsNamespace } from '$lib/stores/isms';
   import { page } from '$app/state';
 
   const user = $derived(page.data.user)
@@ -87,6 +87,14 @@
 
   $effect(() => {
       if (page.data.user) startHeartbeat();
+  });
+
+  // Same reasoning as the heartbeat effect above: must react to page.data
+  // rather than run once in onMount, so a client-side login redirect (no
+  // remount of this root layout) still re-keys ISMS storage to the real
+  // user instead of leaving it on the shared guest namespace.
+  $effect(() => {
+      initIsmsNamespace(page.data.user?.id ?? null);
   });
 
   const { children } = $props();

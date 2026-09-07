@@ -131,9 +131,13 @@ class vLLMProvider(LLMProvider):
 
     @property
     def models(self) -> dict:
+        # OpenAI-compatible /v1/models contract: {"object": "list", "data":
+        # [{"id": "...", "object": "model", ...}, ...]} -- NOT Ollama's
+        # native {"models": [{"model": "..."}]} shape (see generate()/chat()
+        # comments on this same OpenAI-vs-Ollama distinction).
         j = self.http_chat.get_blocking("/v1/models")
-        model_list = j.json().get("models") or []
-        return {"models": [{"id": i, "model": m.get("model")} for i, m in enumerate(model_list)]}
+        model_list = j.json().get("data") or []
+        return {"models": [{"id": i, "model": m.get("id")} for i, m in enumerate(model_list)]}
 
     async def aclose(self) -> None:
         closed: set[int] = set()

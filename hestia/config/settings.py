@@ -21,7 +21,10 @@ class AuthSettings(BaseModel):
     lockout_duration_minutes: int = 5
     token_secret_key: str = ""          # required when auth is enabled
     token_encoding_alg: str = "HS256"
-    token_lifetime_minutes: int = 360
+    token_lifetime_minutes: int = 60  # was 360 -- see M1 in the full-stack audit: with logout now
+                                       # able to revoke a token (see revoke_token/is_token_revoked),
+                                       # this only bounds exposure for tokens minted before that
+                                       # existed, or never explicitly logged out
     audit_logs: bool = False
 
 
@@ -34,6 +37,7 @@ class OIDCSettings(BaseModel):
     role_mapping: dict[str, list[str]] | None = None  # OIDC role → local role
     org_claim: str = "organization"     # userinfo claim for tenant auto-assignment
     org_mapping: dict[str, str] | None = None  # OIDC org name → hestia tenant name
+    redirect_uri_allowlist: list[str] = []  # exact redirect_uri values callers may request
 
 
 class LDAPSettings(BaseModel):
@@ -60,7 +64,7 @@ class Settings(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     # --- app ---
-    version: str = "alpha_v0.2.3"
+    version: str = "alpha_v0.3.0"
     port: int = 5556
 
     # --- backends ---
@@ -195,7 +199,7 @@ def _load_auth_settings() -> AuthSettings:
         lockout_duration_minutes=int(os.getenv("AUTH_LOCKOUT_DURATION", "5")),
         token_secret_key=os.getenv("AUTH_SECRET_KEY", ""),
         token_encoding_alg=os.getenv("AUTH_ENCODING_ALGORITHM", "HS256"),
-        token_lifetime_minutes=int(os.getenv("AUTH_TOKEN_LIFETIME", "360")),
+        token_lifetime_minutes=int(os.getenv("AUTH_TOKEN_LIFETIME", "60")),
         audit_logs=os.getenv("AUTH_AUDIT_LOGS", "false").lower() == "true",
     )
     if len(settings.token_secret_key) < 32:
@@ -216,6 +220,7 @@ def _load_oidc_settings() -> OIDCSettings:
         role_mapping=_parse_ldap_group_mapping(os.getenv("OIDC_ROLE_MAPPING")),
         org_claim=os.getenv("OIDC_ORG_CLAIM", "organization"),
         org_mapping=_parse_str_mapping(os.getenv("OIDC_ORG_MAPPING")),
+        redirect_uri_allowlist=_parse_list(os.getenv("OIDC_REDIRECT_ALLOWLIST", "")),
     )
 
 

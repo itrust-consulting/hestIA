@@ -93,6 +93,62 @@ class TestGetParser:
             pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
         MockP.assert_called_once()
 
+    def test_itrust_pdf_returns_itr_parser(self, pipeline, tmp_path):
+        f = tmp_path / "test.pdf"
+        f.write_bytes(b"")
+        with patch("hestia.infrastructure.parsers.pdf.ITRPDFParser") as MockP:
+            MockP.return_value = MagicMock()
+            pipeline._get_parser(f, itrust_template=True, selected_sheets=None)
+        MockP.assert_called_once()
+
+    def test_xlsx_extension_returns_xlsx_parser(self, pipeline, tmp_path):
+        f = tmp_path / "test.xlsx"
+        f.write_bytes(b"")
+        with patch("hestia.infrastructure.parsers.xlsx.XLSXParser") as MockP:
+            MockP.return_value = MagicMock()
+            pipeline._get_parser(f, itrust_template=False, selected_sheets=["Sheet1"])
+        MockP.assert_called_once_with(file=str(f), selected_sheets=["Sheet1"])
+
+    def test_itrust_xlsx_returns_itr_xlsx_parser(self, pipeline, tmp_path):
+        f = tmp_path / "test.xlsx"
+        f.write_bytes(b"")
+        with patch("hestia.infrastructure.parsers.xlsx.ITRXLSXParser") as MockP:
+            MockP.return_value = MagicMock()
+            pipeline._get_parser(f, itrust_template=True, selected_sheets=None)
+        MockP.assert_called_once()
+
+    def test_json_extension_dispatched(self, pipeline, tmp_path):
+        f = tmp_path / "data.json"
+        f.write_bytes(b"")
+        with patch("hestia.infrastructure.parsers.json.JSONParser") as MockP:
+            MockP.return_value = MagicMock()
+            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+        MockP.assert_called_once()
+
+    def test_txt_extension_dispatched(self, pipeline, tmp_path):
+        f = tmp_path / "data.txt"
+        f.write_bytes(b"")
+        with patch("hestia.infrastructure.parsers.txt.TXTParser") as MockP:
+            MockP.return_value = MagicMock()
+            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+        MockP.assert_called_once()
+
+    def test_md_extension_dispatched(self, pipeline, tmp_path):
+        f = tmp_path / "data.md"
+        f.write_bytes(b"")
+        with patch("hestia.infrastructure.parsers.md.MarkdownParser") as MockP:
+            MockP.return_value = MagicMock()
+            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+        MockP.assert_called_once()
+
+    def test_pptx_extension_dispatched(self, pipeline, tmp_path):
+        f = tmp_path / "data.pptx"
+        f.write_bytes(b"")
+        with patch("hestia.infrastructure.parsers.pptx.PPTXParser") as MockP:
+            MockP.return_value = MagicMock()
+            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+        MockP.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # IngestionPipeline._build_chunks
@@ -221,6 +277,66 @@ class TestIngest:
                 pipeline.ingest(req)
 
         mock_parser.close.assert_called_once()
+
+    def test_original_filename_overrides_temp_path_source(self, pipeline, tmp_path):
+        # Sync Folder / upload flows may write to a temp path; the *original*
+        # filename must end up in source / source_uri, not the temp one.
+        tmp_file = tmp_path / "tmp_upload_ab12.md"
+        tmp_file.write_text("# Section\nSome content.")
+
+        mock_parser = MagicMock()
+        mock_parser.to_markdown.return_value = "# Section\nSome content."
+        mock_parser.get_metadata.return_value = {
+            "source": "tmp_upload_ab12", "source_uri": str(tmp_file),
+        }
+        mock_parser.close.return_value = None
+
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])]
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])]
+
+        req = IngestionRequest(
+            file_path=str(tmp_file),
+            collection="test-col",
+            tenants=["org1"],
+            original_filename="Real Report.md",
+        )
+
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            result = pipeline.ingest(req)
+
+        assert result.source == "Real Report"
+        payload = pipeline.db.upsert.call_args[0][1][0]["payload"]
+        assert payload["source"] == "Real Report"
+        assert payload["source_uri"] == "Real Report.md"
+
+    def test_metadata_overrides_are_applied_and_empty_values_ignored(self, pipeline, tmp_path):
+        md_file = tmp_path / "doc.md"
+        md_file.write_text("# Section\nSome content.")
+
+        mock_parser = MagicMock()
+        mock_parser.to_markdown.return_value = "# Section\nSome content."
+        mock_parser.get_metadata.return_value = {
+            "source": "doc", "source_uri": "doc.md", "title": "Original Title",
+        }
+        mock_parser.close.return_value = None
+
+        pipeline.dense_encoder.encode_batch.return_value = [DenseVector(vector=[0.1])]
+        pipeline.sparse_encoder.encode_documents.return_value = [SparseVector(indices=[0], values=[1.0])]
+
+        req = IngestionRequest(
+            file_path=str(md_file),
+            collection="test-col",
+            tenants=["org1"],
+            metadata_overrides={"title": "User Edited Title", "author": ""},
+        )
+
+        with patch.object(pipeline, "_get_parser", return_value=mock_parser):
+            pipeline.ingest(req)
+
+        payload = pipeline.db.upsert.call_args[0][1][0]["payload"]
+        assert payload["doc_info"]["title"] == "User Edited Title"
+        # An override with an empty-string value must not stomp existing metadata.
+        assert "author" not in payload["doc_info"] or payload["doc_info"]["author"] != ""
 
 
 # ---------------------------------------------------------------------------

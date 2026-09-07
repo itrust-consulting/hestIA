@@ -106,7 +106,7 @@ async def parse_document(
         import traceback
         tb = traceback.format_exc()
         _log.warning("parse_document_failed", extra={"file": file.filename, "error": str(exc), "traceback": tb})
-        return {"metadata": {}, "markdown": "", "filename": file.filename, "parse_error": str(exc), "traceback": tb}
+        return {"metadata": {}, "markdown": "", "filename": file.filename, "parse_error": str(exc)}
     finally:
         if parser is not None:
             parser.close()
@@ -219,12 +219,7 @@ def list_collections(
     if perms.is_admin:
         return {"collections": all_collections}
 
-    allowed = perms.allowed_collections
-    if "*" in allowed and allowed["*"].access:
-        return {"collections": all_collections}
-
-    permitted = {name for name, perm in allowed.items() if perm.access}
-    return {"collections": [c for c in all_collections if c["name"] in permitted]}
+    return {"collections": [c for c in all_collections if perms.can_read_collection(c["name"])]}
 
 
 @router.get("/collections/document-counts")
@@ -238,12 +233,7 @@ def get_document_counts(
     if perms.is_admin:
         return {"counts": counts}
 
-    allowed = perms.allowed_collections
-    if "*" in allowed and allowed["*"].access:
-        return {"counts": counts}
-
-    permitted = {name for name, perm in allowed.items() if perm.access}
-    return {"counts": {name: c for name, c in counts.items() if name in permitted}}
+    return {"counts": {name: c for name, c in counts.items() if perms.can_read_collection(name)}}
 
 
 @router.get("/collections/{name}")
@@ -252,6 +242,9 @@ def get_collection(
     h: RequestHandler = Depends(get_handler),
     user: User = Depends(get_current_user),
 ):
+    if not user.permissions.can_read_collection(name):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Access to this collection is not permitted.")
     result = h.container.require_db_provider().get_collection(name)
     if result is None:
         from fastapi import HTTPException

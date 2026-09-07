@@ -56,3 +56,18 @@ class TestMarkdownParser:
         p = MarkdownParser(file=str(md_no_frontmatter))
         body = p.to_markdown()
         assert "Just a heading" in body
+
+    def test_get_metadata_applies_mask(self, md_file):
+        p = MarkdownParser(file=str(md_file))
+        meta = p.get_metadata(mask_name="rag_default")
+        assert "title" in meta
+
+
+class TestMarkdownParserEmptyDoc:
+
+    def test_to_markdown_raises_when_doc_is_none(self):
+        from hestia.domain.exceptions import ValidationError
+        p = MarkdownParser.__new__(MarkdownParser)
+        p.doc = None
+        with pytest.raises(ValidationError, match="Empty document"):
+            p.to_markdown()

@@ -4,6 +4,16 @@ import adapter from '@sveltejs/adapter-node';
 const config = {
 	kit: {
 		adapter: adapter(),
+		// Explicit rather than relying on the (identical) framework default --
+		// this is the only CSRF defense on state-changing BFF routes (no
+		// separate anti-CSRF token scheme layered on top), so it should be a
+		// visible, deliberate setting rather than an implicit one.
+		// trustedOrigins (not the deprecated checkOrigin) is SvelteKit's
+		// current API for this; an empty list keeps origin-checking on with
+		// no cross-origin exceptions.
+		csrf: {
+			trustedOrigins: []
+		},
 		csp: {
 			mode: 'nonce',
 			directives: {

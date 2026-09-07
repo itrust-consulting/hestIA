@@ -258,6 +258,11 @@
 
       const compactionContextWindow = settingsCompactionContextWindow.trim() ? parseInt(settingsCompactionContextWindow, 10) : null;
       const compactionSummaryLength = settingsCompactionSummaryLength.trim() ? parseInt(settingsCompactionSummaryLength, 10) : null;
+      // Duplicated (not shared -- no cross-language codegen here) from the
+      // backend's equivalent check in hestia/api/routers/llm_settings.py's
+      // update_connection. Keep both in sync -- this copy only pre-empts a
+      // round-trip for an invalid pair; the backend's is the actual
+      // enforcement.
       if (
         settingsCompactionEnabled &&
         compactionContextWindow !== null &&

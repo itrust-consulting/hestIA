@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import random
@@ -18,6 +19,17 @@ _log = logging.getLogger("hestia.system")
 _RETRYABLE_STATUS_CODES = {429, 503}
 _MAX_RETRIES = 3
 _BASE_DELAY_S = 1.0
+
+# A single retry for the interactive (chat/generate/embed) path, on a dropped
+# or reset connection only -- not on timeouts or HTTP error responses, which
+# don't get better on retry. Mirrors a known failure mode: a pooled
+# keep-alive connection silently killed by a remote reverse proxy surfaces
+# here as ConnectError/ReadError only once httpx tries to reuse it, and a
+# fresh connection on the next attempt succeeds immediately. Kept to one
+# retry and a short fixed delay -- this sits on the request path a user is
+# actively waiting on.
+_INTERACTIVE_MAX_ATTEMPTS = 2
+_INTERACTIVE_RETRY_DELAY_S = 0.05
 
 
 def _retry_delay(response: httpx.Response, attempt: int) -> float:
@@ -59,68 +71,95 @@ class HttpClient:
 
     @asynccontextmanager
     async def _post_stream(self, endpoint: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None):
+        # Retry is only safe for a failure that happens BEFORE we hand the
+        # response to the caller (connecting, or raise_for_status()) -- once
+        # already_yielded is True, the caller may already be consuming
+        # chunks, and this generator can't yield a second time anyway
+        # (illegal for @asynccontextmanager). A ConnectError/ReadError raised
+        # from inside the caller's `async with` block is thrown back in here
+        # at the yield point and must propagate, not retry.
         url = self.base_url + endpoint
-        try:
-            async with self._client.stream(
-                "POST", url, json=payload, headers=self._auth_headers(headers),
-            ) as r:
-                r.raise_for_status()
-                yield r
-        except httpx.TimeoutException:
-            _log.warning("http_timeout", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Request timed out: POST {endpoint}")
-        except httpx.ConnectError:
-            _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Could not connect to provider: {self.base_url}")
-        except httpx.ReadError:
-            # a pooled keep-alive connection can be closed by the peer at any
-            # time without notice -- httpx only discovers this when it tries
-            # to reuse that connection for the next request
-            _log.warning("http_read_error", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
-        except httpx.HTTPStatusError as e:
-            _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
-            raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")
+        for attempt in range(_INTERACTIVE_MAX_ATTEMPTS):
+            already_yielded = False
+            try:
+                async with self._client.stream(
+                    "POST", url, json=payload, headers=self._auth_headers(headers),
+                ) as r:
+                    r.raise_for_status()
+                    already_yielded = True
+                    yield r
+                    return
+            except httpx.TimeoutException:
+                _log.warning("http_timeout", extra={"url": url, "method": "POST"})
+                raise ProviderError(f"Request timed out: POST {endpoint}")
+            except (httpx.ConnectError, httpx.ReadError) as e:
+                if already_yielded or attempt == _INTERACTIVE_MAX_ATTEMPTS - 1:
+                    if isinstance(e, httpx.ConnectError):
+                        _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
+                        raise ProviderError(f"Could not connect to provider: {self.base_url}")
+                    # a pooled keep-alive connection can be closed by the peer
+                    # at any time without notice -- httpx only discovers this
+                    # when it tries to reuse that connection for the next request
+                    _log.warning("http_read_error", extra={"url": url, "method": "POST"})
+                    raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
+                _log.warning("http_retrying_after_connection_error",
+                             extra={"url": url, "method": "POST", "attempt": attempt})
+                await asyncio.sleep(_INTERACTIVE_RETRY_DELAY_S)
+            except httpx.HTTPStatusError as e:
+                _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
+                raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")
 
     async def post(self, endpoint: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None, stream: bool = False):
         if stream:
             return self._post_stream(endpoint, payload, headers)
         url = self.base_url + endpoint
-        try:
-            r = await self._client.post(url, json=payload, headers=self._auth_headers(headers))
-            r.raise_for_status()
-            return r
-        except httpx.TimeoutException:
-            _log.warning("http_timeout", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Request timed out: POST {endpoint}")
-        except httpx.ConnectError:
-            _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Could not connect to provider: {self.base_url}")
-        except httpx.ReadError:
-            _log.warning("http_read_error", extra={"url": url, "method": "POST"})
-            raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
-        except httpx.HTTPStatusError as e:
-            _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
-            raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")
+        for attempt in range(_INTERACTIVE_MAX_ATTEMPTS):
+            try:
+                r = await self._client.post(url, json=payload, headers=self._auth_headers(headers))
+                r.raise_for_status()
+                return r
+            except httpx.TimeoutException:
+                _log.warning("http_timeout", extra={"url": url, "method": "POST"})
+                raise ProviderError(f"Request timed out: POST {endpoint}")
+            except (httpx.ConnectError, httpx.ReadError) as e:
+                if attempt < _INTERACTIVE_MAX_ATTEMPTS - 1:
+                    _log.warning("http_retrying_after_connection_error",
+                                 extra={"url": url, "method": "POST", "attempt": attempt})
+                    await asyncio.sleep(_INTERACTIVE_RETRY_DELAY_S)
+                    continue
+                if isinstance(e, httpx.ConnectError):
+                    _log.warning("http_connection_error", extra={"url": url, "method": "POST"})
+                    raise ProviderError(f"Could not connect to provider: {self.base_url}")
+                _log.warning("http_read_error", extra={"url": url, "method": "POST"})
+                raise ProviderError(f"Connection to provider was lost: POST {endpoint}")
+            except httpx.HTTPStatusError as e:
+                _log.warning("http_error_response", extra={"url": url, "method": "POST", "status_code": e.response.status_code})
+                raise ProviderError(f"Provider returned {e.response.status_code}: POST {endpoint}")
 
     async def get(self, endpoint: str):
         url = self.base_url + endpoint
-        try:
-            r = await self._client.get(url, headers=self._auth_headers())
-            r.raise_for_status()
-            return r
-        except httpx.TimeoutException:
-            _log.warning("http_timeout", extra={"url": url, "method": "GET"})
-            raise ProviderError(f"Request timed out: GET {endpoint}")
-        except httpx.ConnectError:
-            _log.warning("http_connection_error", extra={"url": url, "method": "GET"})
-            raise ProviderError(f"Could not connect to provider: {self.base_url}")
-        except httpx.ReadError:
-            _log.warning("http_read_error", extra={"url": url, "method": "GET"})
-            raise ProviderError(f"Connection to provider was lost: GET {endpoint}")
-        except httpx.HTTPStatusError as e:
-            _log.warning("http_error_response", extra={"url": url, "method": "GET", "status_code": e.response.status_code})
-            raise ProviderError(f"Provider returned {e.response.status_code}: GET {endpoint}")
+        for attempt in range(_INTERACTIVE_MAX_ATTEMPTS):
+            try:
+                r = await self._client.get(url, headers=self._auth_headers())
+                r.raise_for_status()
+                return r
+            except httpx.TimeoutException:
+                _log.warning("http_timeout", extra={"url": url, "method": "GET"})
+                raise ProviderError(f"Request timed out: GET {endpoint}")
+            except (httpx.ConnectError, httpx.ReadError) as e:
+                if attempt < _INTERACTIVE_MAX_ATTEMPTS - 1:
+                    _log.warning("http_retrying_after_connection_error",
+                                 extra={"url": url, "method": "GET", "attempt": attempt})
+                    await asyncio.sleep(_INTERACTIVE_RETRY_DELAY_S)
+                    continue
+                if isinstance(e, httpx.ConnectError):
+                    _log.warning("http_connection_error", extra={"url": url, "method": "GET"})
+                    raise ProviderError(f"Could not connect to provider: {self.base_url}")
+                _log.warning("http_read_error", extra={"url": url, "method": "GET"})
+                raise ProviderError(f"Connection to provider was lost: GET {endpoint}")
+            except httpx.HTTPStatusError as e:
+                _log.warning("http_error_response", extra={"url": url, "method": "GET", "status_code": e.response.status_code})
+                raise ProviderError(f"Provider returned {e.response.status_code}: GET {endpoint}")
 
     @staticmethod
     async def iter_sse_json(r: httpx.Response) -> AsyncIterator[Dict[str, Any]]:

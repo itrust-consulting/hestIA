@@ -8,6 +8,7 @@
   import ConfirmDeleteModal from '$lib/components/modals/ConfirmDeleteModal.svelte';
   import { api } from '$lib/api/client';
   import { marked } from '$lib/render/markdown';
+  import DOMPurify from 'isomorphic-dompurify';
   import { addToast } from '$lib/stores/toast';
   import EditIcon from '$lib/components/icons/editIcon.svelte';
   import { tooltip } from '$lib/actions/tooltip';
@@ -27,8 +28,8 @@
   let insertCursor     = $state(0);
 
   const isAdmin     = $derived(page.data.user?.permissions?.is_admin === true);
-  const rendered    = $derived(marked.parse(data.content) as string);
-  const editRendered = $derived(marked.parse(editContent) as string);
+  const rendered    = $derived(DOMPurify.sanitize(marked.parse(data.content) as string));
+  const editRendered = $derived(DOMPurify.sanitize(marked.parse(editContent) as string));
 
   function getMermaidTheme(): 'dark' | 'default' {
     // Layout applies the .dark class in its own onMount, which fires AFTER ours
@@ -56,25 +57,29 @@
   }
 
   // @MRS-086
-  onMount(async () => {
-    const mod = await import('mermaid');
-    mermaidLib = mod.default;
-    mermaidLib.initialize({ startOnLoad: false, theme: getMermaidTheme() });
+  onMount(() => {
+    let observer: MutationObserver | undefined;
 
-    // Re-render diagrams whenever the user toggles light/dark mode
-    const observer = new MutationObserver(() => {
+    (async () => {
+      const mod = await import('mermaid');
+      mermaidLib = mod.default;
       mermaidLib.initialize({ startOnLoad: false, theme: getMermaidTheme() });
-      rerenderMermaid();
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
-    return () => observer.disconnect();
+      // Re-render diagrams whenever the user toggles light/dark mode
+      observer = new MutationObserver(() => {
+        mermaidLib.initialize({ startOnLoad: false, theme: getMermaidTheme() });
+        rerenderMermaid();
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    })();
+
+    return () => observer?.disconnect();
   });
 
   $effect(() => {
     rendered;
     if (mermaidLib && contentEl) {
-      const nodes = Array.from(contentEl.querySelectorAll('pre.mermaid:not([data-processed])'));
+      const nodes = Array.from(contentEl.querySelectorAll<HTMLElement>('pre.mermaid:not([data-processed])'));
       if (nodes.length) {
         // Persist source so rerenderMermaid() can restore it on theme toggle
         nodes.forEach(n => { if (!n.dataset.mermaidSrc) n.dataset.mermaidSrc = n.textContent ?? ''; });
@@ -86,7 +91,7 @@
   $effect(() => {
     editRendered;
     if (mermaidLib && previewEl) {
-      const nodes = Array.from(previewEl.querySelectorAll('pre.mermaid:not([data-processed])'));
+      const nodes = Array.from(previewEl.querySelectorAll<HTMLElement>('pre.mermaid:not([data-processed])'));
       if (nodes.length) {
         nodes.forEach(n => { if (!n.dataset.mermaidSrc) n.dataset.mermaidSrc = n.textContent ?? ''; });
         mermaidLib.run({ nodes });

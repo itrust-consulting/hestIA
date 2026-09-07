@@ -375,6 +375,24 @@ class TestRunEncodeSparse:
 
         assert slot["sparse_out"] == SparseVector(indices=[], values=[])
 
+    def test_encode_is_offloaded_to_a_thread_not_run_on_the_event_loop(self):
+        # Regression test: svc.encode is synchronous, CPU-bound BM25
+        # tokenize+score work and used to run directly on the event loop.
+        svc = MagicMock()
+        svc.encode.return_value = SparseVector(indices=[0], values=[1.0])
+        container = MagicMock()
+        container.services = {"encSparse": svc}
+        runner = Runner(container=container)
+        node = Node(id="n1", type="EncodeSparse", inputs={"data": "hello", "collection": "col"}, outputs={})
+        slot = {}
+
+        with patch("hestia.handler.asyncio.to_thread", wraps=asyncio.to_thread) as mock_to_thread:
+            asyncio.run(runner._run_encode_sparse(node, slot, stream=False))
+
+        mock_to_thread.assert_awaited_once()
+        assert mock_to_thread.await_args.args[0] == svc.encode
+        assert slot["vector"] == SparseVector(indices=[0], values=[1.0])
+
 
 # ---------------------------------------------------------------------------
 # Runner._run_retrieve
@@ -744,6 +762,20 @@ class TestWrapStream:
         assert last["freed_tokens"] == 750
         assert last["needs_compaction"] is False
 
+    def test_final_persist_is_offloaded_to_a_thread(self):
+        # Same regression as PersistChat.run's non-streaming path: the final
+        # persist inside the stream generator used to call _persist directly
+        # on the event loop.
+        pc, req = self._make_persist_chat()
+        chunks = ["hello"]
+
+        with patch("hestia.handler.asyncio.to_thread", wraps=asyncio.to_thread) as mock_to_thread:
+            output = asyncio.run(self._collect(pc._wrap_stream(self._aiter(chunks), req, {})))
+
+        mock_to_thread.assert_awaited_once()
+        assert mock_to_thread.await_args.args[0] == pc._persist
+        assert len(output) > 0  # stream still completes normally
+
 
 # ---------------------------------------------------------------------------
 # PersistChat._persist
@@ -861,6 +893,20 @@ class TestPersistChatRun:
         # inside it once consumed (already covered by TestWrapStream), not here.
         assert hasattr(result, "__anext__")
         users_svc.append_conversation_message.assert_not_called()
+
+    def test_persist_is_offloaded_to_a_thread_not_run_on_the_event_loop(self):
+        # Regression test: _persist runs synchronous sqlite3 I/O and used to
+        # be called directly on the event loop from this async method,
+        # blocking every other in-flight request for its duration.
+        pc, runner, req, users_svc = self._make_persist_chat()
+        runner.run = AsyncMock(return_value=("assistant reply", {}))
+
+        with patch("hestia.handler.asyncio.to_thread", wraps=asyncio.to_thread) as mock_to_thread:
+            result, slot = asyncio.run(pc.run("plan", stream=False))
+
+        mock_to_thread.assert_awaited_once()
+        assert mock_to_thread.await_args.args[0] == pc._persist
+        assert result == "assistant reply"  # return value still surfaces through the await
 
 
 # ---------------------------------------------------------------------------
@@ -1170,3 +1216,44 @@ class TestStreamWithBudgetNotice:
 
         assert len(chunks) == 1
         assert b"vector search failed" in chunks[0]
+
+    def test_unexpected_non_hestia_exception_during_retrieval_degrades_gracefully(self):
+        # Regression test: only HestiaError used to be caught here, so a bug
+        # in a node handler (or any un-wrapped third-party exception) would
+        # propagate out of an already-started StreamingResponse body instead
+        # of surfacing as an in-band error frame.
+        users = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        users.get_messages_after_boundary.return_value = [
+            {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
+        ]
+        generator = MagicMock()
+        h = self._handler(users, generator)
+        h.runner.run = AsyncMock(side_effect=RuntimeError("bug in a node handler"))
+        req = self._req()
+
+        chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        assert len(chunks) == 1
+        assert b"Something went wrong" in chunks[0]
+
+    def test_unexpected_exception_mid_stream_degrades_gracefully(self):
+        users = MagicMock()
+        users.get_conversation_context_state.return_value = {}
+        users.get_messages_after_boundary.return_value = [
+            {"role": "user", "content": "hi", "created_at": 1, "rowid": 1}
+        ]
+        generator = MagicMock()
+        h = self._handler(users, generator)
+
+        async def broken_stream():
+            yield b'{"content": "partial"}\n'
+            raise RuntimeError("provider connection dropped mid-chunk")
+
+        h.runner.run = AsyncMock(return_value=(broken_stream(), {}))
+        req = self._req()
+
+        chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        assert chunks[0] == b'{"content": "partial"}\n'
+        assert b"Something went wrong" in chunks[1]

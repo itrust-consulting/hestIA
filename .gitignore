@@ -1,7 +1,11 @@
 app/data/corpus_stats/
 *.db
-app/logs/
+app/
 dump/
 test_docs/
 __pycache__/
 .claude/
+.coverage
+coverage.xml
+coverage.json
+htmlcov/

@@ -17,14 +17,8 @@ async def search(
     c: Container = Depends(get_container),
     user: User = Depends(get_current_user),
 ):
-    perms = user.permissions
-    if not perms.is_admin:
-        allowed = perms.allowed_collections
-        wildcard = allowed.get("*")
-        if not (wildcard and wildcard.access):
-            perm = allowed.get(req.collection)
-            if not perm or not perm.access:
-                raise HTTPException(403, "Access to this collection is not permitted.")
+    if not user.permissions.can_read_collection(req.collection):
+        raise HTTPException(403, "Access to this collection is not permitted.")
     retriever = c.require_service("search")
 
     if req.mode == "semantic":

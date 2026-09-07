@@ -9,7 +9,7 @@ import {
 
 import { activeConversationId, loadConversations, forceEvictStaleHeadNow } from '$lib/stores/conversations';
 import { setContextBudget, announceCompaction } from '$lib/stores/contextBudget';
-import { activeCorpusName, migrateNewChatSelection } from '$lib/stores/isms';
+import { activeCorpusName, isIsmsActive, migrateNewChatSelection } from '$lib/stores/isms';
 import { api } from '$lib/api/client';
 import type { ContentPart } from '$lib/types';
 
@@ -100,7 +100,7 @@ export async function streamFromHistoryInto(
       messages: payloadMessages,
       model: 'ministral-3:14b',
       model_kwargs: {},
-      collection: get(activeCorpusName),
+      collection: get(isIsmsActive) ? get(activeCorpusName) : undefined,
       query_kwargs: { limit: 20 },
       stream: true,
       conversation_id: get(activeConversationId),

@@ -32,8 +32,3 @@ def ready(c: Container = Depends(get_container)) -> Dict[str, Any]:
 @router.get("/models")
 def models(c: Container = Depends(get_container)) -> Dict[str, Any]:
     return Response(json.dumps(c.providers["llm"].models), media_type="application/json")
-
-
-@router.get("/collections")
-def collections(c: Container = Depends(get_container)) -> Dict[str, Any]:
-    return Response(json.dumps(c.require_db_provider().collections), media_type="application/json")

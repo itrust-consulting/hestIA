@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from unittest.mock import MagicMock, patch
 
@@ -100,6 +101,15 @@ class TestGetAuthorizationUrl:
         assert "profile" in url
         assert "email" in url
 
+    def test_no_pkce_params_when_challenge_omitted(self, oidc_service):
+        url = oidc_service.get_authorization_url("https://app/callback", "st")
+        assert "code_challenge" not in url
+
+    def test_pkce_params_included_when_challenge_given(self, oidc_service):
+        url = oidc_service.get_authorization_url("https://app/callback", "st", code_challenge="abc123")
+        assert "code_challenge=abc123" in url
+        assert "code_challenge_method=S256" in url
+
 
 # ---------------------------------------------------------------------------
 # OIDCService.exchange_code
@@ -109,12 +119,12 @@ class TestExchangeCode:
 
     def test_returns_token_data(self, oidc_service):
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()):
-            result = oidc_service.exchange_code("auth-code", "https://app/callback")
+            result = asyncio.run(oidc_service.exchange_code("auth-code", "https://app/callback"))
         assert result["access_token"] == "access-tok"
 
     def test_posts_correct_grant_type(self, oidc_service):
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()) as mock_post:
-            oidc_service.exchange_code("auth-code", "https://app/callback")
+            asyncio.run(oidc_service.exchange_code("auth-code", "https://app/callback"))
         payload = mock_post.call_args.kwargs["data"]
         assert payload["grant_type"] == "authorization_code"
         assert payload["client_id"] == "hestia-client"
@@ -126,7 +136,17 @@ class TestExchangeCode:
         bad_resp.raise_for_status.side_effect = req.HTTPError("401")
         with patch("hestia.domain.auth.oidc.requests.post", return_value=bad_resp):
             with pytest.raises(req.HTTPError):
-                oidc_service.exchange_code("bad-code", "https://app/callback")
+                asyncio.run(oidc_service.exchange_code("bad-code", "https://app/callback"))
+
+    def test_no_code_verifier_key_when_omitted(self, oidc_service):
+        with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()) as mock_post:
+            asyncio.run(oidc_service.exchange_code("auth-code", "https://app/callback"))
+        assert "code_verifier" not in mock_post.call_args.kwargs["data"]
+
+    def test_includes_code_verifier_when_given(self, oidc_service):
+        with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()) as mock_post:
+            asyncio.run(oidc_service.exchange_code("auth-code", "https://app/callback", code_verifier="verifier-123"))
+        assert mock_post.call_args.kwargs["data"]["code_verifier"] == "verifier-123"
 
 
 # ---------------------------------------------------------------------------
@@ -137,12 +157,12 @@ class TestGetUserInfo:
 
     def test_returns_user_info(self, oidc_service):
         with patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response()):
-            result = oidc_service.get_user_info("tok-123")
+            result = asyncio.run(oidc_service.get_user_info("tok-123"))
         assert result["email"] == "alice@example.com"
 
     def test_sends_bearer_header(self, oidc_service):
         with patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response()) as mock_get:
-            oidc_service.get_user_info("my-token")
+            asyncio.run(oidc_service.get_user_info("my-token"))
         headers = mock_get.call_args.kwargs["headers"]
         assert headers["Authorization"] == "Bearer my-token"
 
@@ -151,7 +171,7 @@ class TestGetUserInfo:
         bad_resp.raise_for_status.side_effect = req.HTTPError("401")
         with patch("hestia.domain.auth.oidc.requests.get", return_value=bad_resp):
             with pytest.raises(req.HTTPError):
-                oidc_service.get_user_info("expired-token")
+                asyncio.run(oidc_service.get_user_info("expired-token"))
 
 
 # ---------------------------------------------------------------------------
@@ -188,14 +208,14 @@ class TestAuthenticateOIDCErrors:
 
     def test_nack_when_oidc_not_configured(self, mock_user_service):
         svc = AuthenticationService(local=mock_user_service)
-        result = svc.authenticate_oidc("code", "https://app/callback")
+        result = asyncio.run(svc.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
 
     def test_nack_on_token_exchange_failure(self, auth_service):
         bad_resp = MagicMock()
         bad_resp.raise_for_status.side_effect = req.HTTPError("400")
         with patch("hestia.domain.auth.oidc.requests.post", return_value=bad_resp):
-            result = auth_service.authenticate_oidc("bad-code", "https://app/callback")
+            result = asyncio.run(auth_service.authenticate_oidc("bad-code", "https://app/callback"))
         assert not result.success
         assert "token exchange" in result.message.lower()
 
@@ -203,7 +223,7 @@ class TestAuthenticateOIDCErrors:
         resp = MagicMock()
         resp.json.return_value = {}
         with patch("hestia.domain.auth.oidc.requests.post", return_value=resp):
-            result = auth_service.authenticate_oidc("code", "https://app/callback")
+            result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
         assert "access_token" in result.message
 
@@ -212,14 +232,14 @@ class TestAuthenticateOIDCErrors:
         bad_userinfo.raise_for_status.side_effect = req.HTTPError("401")
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get", return_value=bad_userinfo):
-            result = auth_service.authenticate_oidc("code", "https://app/callback")
+            result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
         assert "user info" in result.message.lower()
 
     def test_nack_when_email_missing(self, auth_service):
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response(email=None)):
-            result = auth_service.authenticate_oidc("code", "https://app/callback")
+            result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
         assert "email" in result.message.lower()
 
@@ -240,7 +260,7 @@ class TestAuthenticateOIDCSuccess:
         }
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response()):
-            result = auth_service.authenticate_oidc("code", "https://app/callback")
+            result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
 
         assert result.success
         assert result.user_id == existing_id
@@ -255,7 +275,7 @@ class TestAuthenticateOIDCSuccess:
         # empty roles list → no mapping match → falls back to ["user"]
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response(roles=[])):
-            result = auth_service.authenticate_oidc("code", "https://app/callback")
+            result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
 
         assert result.success
         assert result.user_id == new_id
@@ -273,7 +293,7 @@ class TestAuthenticateOIDCSuccess:
 
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response(roles=["hestia-admin"])):
-            result = auth_service.authenticate_oidc("code", "https://app/callback")
+            result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
 
         assert result.success
         kwargs = mock_user_service.create_user.call_args.kwargs
@@ -287,7 +307,7 @@ class TestAuthenticateOIDCSuccess:
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get",
                    return_value=_userinfo_response(preferred_username=None)):
-            auth_service.authenticate_oidc("code", "https://app/callback")
+            asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
 
         kwargs = mock_user_service.create_user.call_args.kwargs
         assert kwargs["username"] == "alice@example.com"
@@ -303,7 +323,7 @@ class TestAuthenticateOIDCSuccess:
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response()), \
              patch("hestia.domain.auth.service.audit") as mock_audit:
-            auth_service.authenticate_oidc("code", "https://app/callback")
+            asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
 
         mock_audit.auth_attempt.assert_called_once_with(
             username="alice", success=True, source="oidc"
@@ -317,7 +337,7 @@ class TestAuthenticateOIDCSuccess:
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
              patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response(roles=[])), \
              patch("hestia.domain.auth.service.audit") as mock_audit:
-            auth_service.authenticate_oidc("code", "https://app/callback")
+            asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
 
         mock_audit.auth_attempt.assert_called_once_with(
             username="alice", success=True, source="oidc", reason="auto-provisioned"

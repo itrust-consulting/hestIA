@@ -52,3 +52,27 @@ class TestCSVParser:
         f.write_text("A,B\n1,2\n,\n3,4\n")
         p = CSVParser(file=str(f))
         assert len(p.doc) == 2
+
+    def test_get_metadata_applies_mask(self, csv_file):
+        p = CSVParser(file=str(csv_file))
+        meta = p.get_metadata(mask_name="rag_default")
+        assert "source" in meta
+
+
+class TestCSVParserEmptyDoc:
+
+    def test_get_metadata_when_doc_is_none_skips_columns_and_row_count(self):
+        p = CSVParser.__new__(CSVParser)
+        p.doc = None
+        p.filepath = "some/file.csv"
+        meta = p.get_metadata()
+        assert "columns" not in meta
+        assert "row_count" not in meta
+        assert meta["source"] == "file"
+
+    def test_to_markdown_raises_when_doc_is_none(self):
+        from hestia.domain.exceptions import ValidationError
+        p = CSVParser.__new__(CSVParser)
+        p.doc = None
+        with pytest.raises(ValidationError, match="Empty document"):
+            p.to_markdown()

@@ -10,6 +10,7 @@ from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
 from hestia.domain.exceptions import ProviderError
+from hestia.domain.exceptions import ValidationError as DomainValidationError
 from hestia.domain.rag.chunk import RESERVED_DOC_INFO_KEYS
 from hestia.domain.rag.types import DenseVector, HybridQuery, Query, SparseVector
 from hestia.infrastructure.db.protocol import DBProvider
@@ -183,7 +184,7 @@ class QdrantDB(DBProvider):
                 quantization=quantization, acorn=acorn,
             )
         except ValidationError as e:
-            raise ProviderError(f"Invalid search parameter options: {e}") from e
+            raise DomainValidationError(f"Invalid search parameter options: {e}") from e
 
         query_type = type(query).__name__
         _log.debug("qdrant_search", extra={

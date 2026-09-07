@@ -13,7 +13,6 @@ export const isMutatingFront = writable<boolean>(false);
 
 export function pushMessage(role: ChatMessage['role'], content: string) {
   const msg_id = crypto.randomUUID().replace(/-/g, "");
-  console.log("this is the assigned msg_id: " + msg_id) 
   messages.update((m) => [
     ...m,
     { id: msg_id, role, content, createdAt: Date.now() }

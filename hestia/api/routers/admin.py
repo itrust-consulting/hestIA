@@ -187,7 +187,9 @@ def create_organization(
     assert_admin(user)
     if not req.name or not req.abbreviation:
         raise HTTPException(400, "Organization name and abbreviation required")
-    h.container.services.get("users").create_org(name=req.name, abbreviation=req.abbreviation)
+    created = h.container.services.get("users").create_org(name=req.name, abbreviation=req.abbreviation)
+    if not created:
+        raise HTTPException(409, "A tenant with that name or abbreviation already exists.")
     audit.admin_action(
         actor_id=str(user.id), action="org_create", target=req.name,
         detail={"abbreviation": req.abbreviation},

@@ -103,12 +103,12 @@ class AuthenticationService:
                                   reason="invalid_credentials")
         return AuthResult.nack()
 
-    def authenticate_oidc(self, code: str, redirect_uri: str) -> AuthResult:
+    async def authenticate_oidc(self, code: str, redirect_uri: str, code_verifier: str | None = None) -> AuthResult:
         if not self.oidc:
             return AuthResult.nack("OIDC not configured.")
 
         try:
-            token_data = self.oidc.exchange_code(code, redirect_uri)
+            token_data = await self.oidc.exchange_code(code, redirect_uri, code_verifier=code_verifier)
         except Exception as e:
             _log.warning("oidc_token_exchange_failed", extra={"error": str(e)})
             return AuthResult.nack("OIDC token exchange failed.")
@@ -118,12 +118,10 @@ class AuthenticationService:
             return AuthResult.nack("OIDC response missing access_token.")
 
         try:
-            user_info = self.oidc.get_user_info(access_token)
+            user_info = await self.oidc.get_user_info(access_token)
         except Exception as e:
             _log.warning("oidc_userinfo_failed", extra={"error": str(e)})
             return AuthResult.nack("Failed to fetch OIDC user info.")
-
-        _log.info("oidc_userinfo_debug", extra={"user_info": user_info})  # TODO: remove
 
         email = user_info.get("email")
         if not email:

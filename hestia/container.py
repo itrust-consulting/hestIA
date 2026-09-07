@@ -225,11 +225,14 @@ class Container:
             return
         self.settings.auth, self.settings.oidc, self.settings.ldap = _auth_settings_from_row(row)
         user_service, auth_service = _build_auth_stack(self.settings, user_repo)
-        self.services["auth"] = auth_service
-        self.services["users"] = user_service
         notification_settings_repo = self.services.get("notification_settings")
-        self.services["notifications"] = NotificationService(user_repo, user_service, notification_settings_repo)
-        user_service.on_user_created = self.services["notifications"].send_welcome_notification
+        notifications = NotificationService(user_repo, notification_settings_repo)
+        user_service.on_user_created = notifications.send_welcome_notification
+        # Build every replacement service fully before swapping any of them
+        # in, and swap all three with one dict update -- a concurrent
+        # request reading self.services mid-update must never observe a new
+        # auth service paired with a stale user/notifications service.
+        self.services.update({"auth": auth_service, "users": user_service, "notifications": notifications})
 
     def apply_connection_delete(self, connection_id: int, purpose: Optional[str] = None) -> None:
         """Drops a no-longer-needed provider from the cache, and unwires
@@ -305,7 +308,7 @@ def build_container(settings: Settings) -> Container:
     _bootstrap_admin_user(settings, repo, user_service)
     c.services["auth"] = auth_service
     c.services["users"] = user_service
-    c.services["notifications"] = NotificationService(repo, user_service, notification_settings_repo)
+    c.services["notifications"] = NotificationService(repo, notification_settings_repo)
     user_service.on_user_created = c.services["notifications"].send_welcome_notification
 
     close()

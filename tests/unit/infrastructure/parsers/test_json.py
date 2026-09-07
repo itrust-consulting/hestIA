@@ -43,6 +43,17 @@ class TestJSONParserMetadata:
         meta = p.get_metadata()
         assert "body" not in meta
 
+    def test_get_metadata_applies_mask(self, dict_file):
+        p = JSONParser(file=str(dict_file))
+        meta = p.get_metadata(mask_name="rag_default")
+        assert "source" in meta
+
+    def test_get_metadata_on_non_dict_doc_skips_meta_extraction(self, list_file):
+        p = JSONParser(file=str(list_file))
+        meta = p.get_metadata()
+        assert "source" in meta
+        assert "title" not in meta
+
 
 class TestJSONParserToMarkdown:
 
@@ -61,3 +72,27 @@ class TestJSONParserToMarkdown:
         f.write_text("{invalid json")
         with pytest.raises(Exception):
             JSONParser(file=str(f))
+
+    def test_scalar_doc_renders_as_plain_string(self, tmp_path):
+        f = tmp_path / "scalar.json"
+        f.write_text(json.dumps(42))
+        p = JSONParser(file=str(f))
+        md = p.to_markdown()
+        assert md == "42"
+
+    def test_nested_dict_value_renders_as_code_block(self, tmp_path):
+        f = tmp_path / "nested.json"
+        f.write_text(json.dumps({"title": "Doc", "nested": {"a": 1}}))
+        p = JSONParser(file=str(f))
+        md = p.to_markdown()
+        assert "## nested" in md
+        assert "```json" in md
+
+
+class TestJSONParserEmptyDoc:
+
+    def test_to_markdown_raises_when_doc_is_none(self):
+        p = JSONParser.__new__(JSONParser)
+        p.doc = None
+        with pytest.raises(ValidationError, match="Empty document"):
+            p.to_markdown()

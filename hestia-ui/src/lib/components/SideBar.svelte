@@ -126,18 +126,6 @@
         >
             <span class="agent-item-label"><BookIcon /> Ask My Docs</span>
         </div>
-        {#if isAdmin}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="sidebar-item" onclick={() => open("audit")}>
-            Audit Assistant
-        </div>
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="sidebar-item" onclick={() => open("asset")}>
-            Asset Manager
-        </div>
-        {/if}
     </div>
 
     <div id="sidebar-list" class="sidebar-list" role="list">
@@ -191,7 +179,7 @@
 </aside>
 
 
-<ISMSModal open={openModal === "isms"} onClose={close} isAdmin={true}/>
+<ISMSModal open={openModal === "isms"} onClose={close} />
 {#if isAdmin}
 <AuditModal open={openModal === "audit"} onClose={close} />
 <AssetModal open={openModal === "asset"} onClose={close} />
