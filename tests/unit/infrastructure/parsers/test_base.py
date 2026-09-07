@@ -129,3 +129,35 @@ class TestBaseParserHelpers:
         post = p.dumps()
         import frontmatter
         assert isinstance(post, frontmatter.Post)
+
+    def test_parse_raises_on_unsupported_file_type(self, tmp_path):
+        f = tmp_path / "sample.docx"
+        f.write_text("not really a docx")
+        p = _ConcreteParser()
+        with pytest.raises(ValidationError, match="not supported"):
+            p.parse(str(f))
+
+    def test_close_is_a_noop(self, tmp_path):
+        f = tmp_path / "sample.txt"
+        f.write_text("Hello world")
+        p = _ConcreteParser(file=str(f))
+        assert p.close() is None
+
+    def test_dump_writes_to_explicit_output_path(self, tmp_path):
+        f = tmp_path / "sample.txt"
+        f.write_text("Hello world")
+        p = _ConcreteParser(file=str(f))
+        out_path = tmp_path / "out.md"
+        p.dump(output_path=out_path)
+        assert out_path.exists()
+        assert "Hello world" in out_path.read_text()
+
+    def test_dump_writes_to_default_dump_dir_when_no_output_path(self, tmp_path):
+        f = tmp_path / "sample.txt"
+        f.write_text("Hello world")
+        p = _ConcreteParser(file=str(f))
+        dump_dir = tmp_path / "dumped"
+        p.dump(dump_dir=str(dump_dir))
+        expected = dump_dir / "sample.md"
+        assert expected.exists()
+        assert "Hello world" in expected.read_text()

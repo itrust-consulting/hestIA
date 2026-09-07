@@ -15,6 +15,16 @@ class Permissions(BaseModel):
     moderated_tenants: list[int] = Field(default_factory=list)
     role_assignable_tenants: list[int] = Field(default_factory=list)
 
+    def can_read_collection(self, collection_id: str) -> bool:
+        """Whether this user has (specific-or-wildcard) read access to a
+        collection — the same wildcard-falls-back-to-specific lookup used by
+        chat/search/collection-listing. A specific grant always wins over the
+        wildcard, including an explicit deny (access=False)."""
+        if self.is_admin:
+            return True
+        perm = self.allowed_collections.get(collection_id) or self.allowed_collections.get("*")
+        return bool(perm and perm.access)
+
 
 class Role(str, Enum):
     ADMIN = "admin"

@@ -54,6 +54,19 @@ ROUTER_REGISTRY: Dict[str, RouterSpec] = {
 
 # @MRS-002
 def include_routers(app: FastAPI, enabled_services: set[str]) -> None:
+    seen_routes: set[tuple[str, str]] = set()
     for name, spec in ROUTER_REGISTRY.items():
         if spec.always_on or (spec.service and spec.service in enabled_services):
+            for route in spec.router.routes:
+                full_path = spec.prefix + route.path
+                for method in getattr(route, "methods", None) or ():
+                    key = (method, full_path)
+                    if key in seen_routes:
+                        raise RuntimeError(
+                            f"Duplicate route registration: {method} {full_path} "
+                            f"(router '{name}' collides with an earlier router). "
+                            "Two routers claiming the same path can silently bypass "
+                            "whichever one has the stricter auth dependency."
+                        )
+                    seen_routes.add(key)
             app.include_router(spec.router, prefix=spec.prefix, tags=list(spec.tags))

@@ -76,6 +76,10 @@ def update_connection(
     assert_admin(user)
     if not req.base_url.strip():
         raise HTTPException(400, "Base URL is required")
+    # Duplicated (not shared -- no cross-language codegen here) in the
+    # frontend at hestia-ui/.../admin/settings/connections/+page.svelte's
+    # save handler. Keep both in sync -- the frontend copy only pre-empts a
+    # round-trip for an invalid pair; this is the actual enforcement.
     if (
         req.compaction_enabled
         and req.compaction_context_window is not None

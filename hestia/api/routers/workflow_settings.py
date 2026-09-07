@@ -19,6 +19,11 @@ router = APIRouter()
 # implicitly by the old ExecType Literal[...] path-param type, back when
 # only the 4 built-in names were ever accepted. Now that any name can be
 # created, every handler below validates it explicitly first.
+#
+# Duplicated (not shared -- no cross-language codegen here) in the frontend
+# at hestia-ui/src/routes/(protected)/admin/settings/workflows/+page.svelte's
+# NAME_PATTERN. Keep both in sync -- the frontend copy only pre-empts a
+# round-trip for a bad name; this is the actual enforcement.
 _NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 _STARTER_YAML = """entrypoint: Chat1

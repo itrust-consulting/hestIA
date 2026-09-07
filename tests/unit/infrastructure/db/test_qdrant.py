@@ -6,7 +6,7 @@ import httpx
 import pytest
 from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
-from hestia.domain.exceptions import ProviderError
+from hestia.domain.exceptions import ProviderError, ValidationError as DomainValidationError
 from hestia.infrastructure.db.qdrant import QdrantDB, _retry_on_transient_error
 from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 
@@ -125,6 +125,16 @@ class TestSearch:
         query = SparseVector(indices=[0, 1], values=[0.5, 0.3])
         db.search("col", query)
         assert mock_client.search.called or mock_client.query_points.called
+
+    def test_malformed_search_params_raise_domain_validation_error_not_provider_error(self, db, mock_client):
+        # hnsw_ef must be an int|None — a non-numeric value fails pydantic
+        # validation building SearchParams. This is a client input mistake,
+        # not an upstream Qdrant failure, so it must not surface as a 502.
+        query = DenseVector(vector=[0.1, 0.2])
+        with pytest.raises(DomainValidationError):
+            db.search("col", query, options={"hnsw_ef": "not-a-number"})
+        mock_client.query_points.assert_not_called()
+        mock_client.search.assert_not_called()
 
     def test_retries_and_recovers_from_stale_connection(self, db, mock_client, monkeypatch):
         # A stale pooled connection to Qdrant (e.g. the peer closing an idle

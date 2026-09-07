@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -179,7 +180,9 @@ class Runner:
         svc = self._svc("encSparse")
         data = self._resolve(node.inputs.get("data"), slot)
         collection = self._resolve(node.inputs.get("collection"), slot)
-        slot[node.outputs.get("vector", "vector")] = svc.encode(data, collection)
+        # BM25 tokenize+score is synchronous, CPU-bound work -- offload so it
+        # doesn't block the event loop on every RAG chat/generate turn.
+        slot[node.outputs.get("vector", "vector")] = await asyncio.to_thread(svc.encode, data, collection)
 
     async def _run_retrieve(self, node, slot, stream):
         svc = self._svc("search")
@@ -268,7 +271,10 @@ class PersistChat:
         result, slot = await self.runner.run(plan, stream=stream)
         if stream:
             return self._wrap_stream(result, self.req, slot), slot
-        self._persist(self.req, result, slot)
+        # Every chat turn hits this -- offload the synchronous sqlite3 write
+        # so it doesn't block the event loop (and every other in-flight
+        # request) for its duration.
+        await asyncio.to_thread(self._persist, self.req, result, slot)
         return result, slot
 
     def _wrap_stream(self, iterable, req: ExecutionRequest, slot: dict):
@@ -327,8 +333,8 @@ class PersistChat:
 
             used = _extract_used_citekeys(final_text)
             citations = [c for c in cite_list if _normalize_citekey(c["key"]) in used]
-            c_id, user_msg_id, assistant_msg_id = self._persist(
-                req, final_text, slot, citations=citations, thinking=thinking_text or None
+            c_id, user_msg_id, assistant_msg_id = await asyncio.to_thread(
+                self._persist, req, final_text, slot, citations=citations, thinking=thinking_text or None
             )
             usage_fields = await self._usage_fields(req, c_id)
             yield (json.dumps({
@@ -591,3 +597,11 @@ class RequestHandler:
             # Surface the failure as a normal in-band content frame instead.
             _log.warning("chat_stream_failed", extra={"conversation_id": req.conversation_id})
             yield (json.dumps({"content": f"\n\n⚠️ {e.message}"}) + "\n").encode("utf-8")
+        except Exception:
+            # Same rationale as above, but for anything that isn't a domain
+            # HestiaError (a bug in a node handler, an un-wrapped third-party
+            # exception) -- without this, such an error propagates out of an
+            # already-started StreamingResponse body and the connection just
+            # terminates with no explanation to the user.
+            _log.error("chat_stream_failed_unexpected", extra={"conversation_id": req.conversation_id}, exc_info=True)
+            yield (json.dumps({"content": "\n\n⚠️ Something went wrong generating this reply."}) + "\n").encode("utf-8")

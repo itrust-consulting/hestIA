@@ -1,0 +1,39 @@
+active: true
+authors: ACR
+complexity: 1-5
+derived: false
+execution_type: Manual
+expected_outcome: ''
+header: |
+  Local setup
+level: 35.2
+links: []
+normative: true
+platform: Linux/Windows/dockerized environment
+ref: ''
+references:
+- path: docs/specs/tst/assets
+  type: file
+release: alpha
+reviewed: null
+test_data: see referenced files
+text: |
+  ## Preconditions and setup actions
+  -
+
+  ## Test steps
+  1. Prepare environment
+  2. boot
+  3. verify health checks
+  4. navigate to localhost:5173 and login
+  5. First requests (non-RAG and RAG)
+  6. Logout
+
+  ## Expected outcome
+  1. Required artefacts created upon first booting -> system initialization
+  2. Health checks ok
+  3. Successful login with provisioned default admin creds.
+  4. Received valid responses.
+  5. Successful logout.
+verification_method: Test (T)
+version: 0.1

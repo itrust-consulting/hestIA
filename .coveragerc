@@ -1,0 +1,14 @@
+# exclude_lines below also strips one-line `...`-bodied stubs: Protocol
+# interface methods (infrastructure/db/protocol.py, infrastructure/llm/protocol.py)
+# and @overload type-signature declarations (vllm.py/ollama.py) -- these are
+# never executed at runtime, only the real implementations below them are.
+
+[run]
+source = hestia
+branch = True
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    ^\s*(async )?def .*: \.\.\.$

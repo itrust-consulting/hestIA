@@ -200,6 +200,46 @@ class TestGetCollection:
         resp = client.get("/collections/missing")
         assert resp.status_code == 404
 
+    def test_user_without_collection_access_gets_403(self):
+        # Regression test: this endpoint previously returned the full
+        # document listing to any authenticated user regardless of tenant
+        # membership or collection ACL.
+        user = _make_user(allowed_collections={
+            "other-col": CollectionPermission(access=True),
+        })
+        handler = MagicMock()
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/col1")
+        assert resp.status_code == 403
+        handler.container.require_db_provider.return_value.get_collection.assert_not_called()
+
+    def test_user_with_specific_access_gets_data(self):
+        user = _make_user(allowed_collections={
+            "col1": CollectionPermission(access=True),
+        })
+        handler = MagicMock()
+        handler.container.require_db_provider.return_value = MagicMock(get_collection=MagicMock(return_value={
+            "name": "col1", "documents": [{"source_uri": "a.pdf"}],
+        }))
+        handler.container.services.get.return_value = None
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/col1")
+        assert resp.status_code == 200
+        assert len(resp.json()["documents"]) == 1
+
+    def test_user_with_wildcard_access_gets_data(self):
+        user = _make_user(allowed_collections={
+            "*": CollectionPermission(access=True),
+        })
+        handler = MagicMock()
+        handler.container.require_db_provider.return_value = MagicMock(get_collection=MagicMock(return_value={
+            "name": "col1", "documents": [],
+        }))
+        handler.container.services.get.return_value = None
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/col1")
+        assert resp.status_code == 200
+
 
 # ---------------------------------------------------------------------------
 # POST /parse
@@ -230,6 +270,29 @@ class TestParseDocument:
         data = resp.json()
         assert "metadata" in data
         assert "markdown" in data
+
+    def test_parse_failure_does_not_leak_traceback(self):
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+
+        from io import BytesIO
+        client = TestClient(_app(user=user, handler=handler))
+
+        mock_parser = MagicMock()
+        mock_parser.get_metadata.side_effect = RuntimeError("boom: /internal/path/leak")
+        mock_parser.close.return_value = None
+
+        with patch("hestia.api.routers.ingestion._get_parser_direct", return_value=mock_parser):
+            resp = client.post(
+                "/parse",
+                data={"itrust_template": "false"},
+                files={"file": ("doc.txt", BytesIO(b"hello world"), "text/plain")},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["parse_error"] == "boom: /internal/path/leak"
+        assert "traceback" not in data
 
 
 # ---------------------------------------------------------------------------

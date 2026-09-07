@@ -3,7 +3,10 @@
   import Modal from '$lib/components/Modal.svelte';
   import { tooltip } from '$lib/actions/tooltip';
   import { goto } from '$app/navigation';
-  import { unreadCount, notifications, notificationsLoading, fetchNotifications, markRead, markAllRead } from '$lib/stores/notifications';
+  import {
+    unreadCount, notifications, notificationsLoading, fetchNotifications, markRead, markAllRead,
+    hasMoreNotifications, isLoadingMoreNotifications, loadMoreNotifications
+  } from '$lib/stores/notifications';
   import { renderChatContent } from '$lib/render/renderChatContent';
   import { sendHeartbeat } from '$lib/auth/session';
   import type { Notification } from '$lib/types';
@@ -35,14 +38,20 @@
     return `${days}d ago`;
   }
 
-  function toggle() {
+  async function toggle() {
     open = !open;
     if (open) {
       // Refresh the unread count immediately rather than waiting for the
-      // next 45s heartbeat tick -- otherwise a badge that just changed
-      // (e.g. a new notification arrived) only updates on reload.
-      fetchNotifications();
-      sendHeartbeat();
+      // next heartbeat tick -- otherwise a badge that just changed (e.g. a
+      // new notification arrived) only updates on reload.
+      //
+      // Sequenced rather than fired in parallel: both calls set
+      // unreadCount independently, and racing them means whichever
+      // response happens to land last wins. Awaiting sendHeartbeat first
+      // means fetchNotifications' list-derived count -- matching the items
+      // about to render in the dropdown -- is always the final value.
+      await sendHeartbeat();
+      await fetchNotifications();
     }
   }
 
@@ -109,6 +118,15 @@
               </div>
             </div>
           {/each}
+          {#if $hasMoreNotifications}
+            <button
+              class="notif-load-more"
+              onclick={() => loadMoreNotifications()}
+              disabled={$isLoadingMoreNotifications}
+            >
+              {$isLoadingMoreNotifications ? 'Loading…' : 'Load more'}
+            </button>
+          {/if}
         {/if}
       </div>
     </div>
@@ -254,6 +272,27 @@
     margin: .25rem 0 0;
     font-size: .7rem;
     color: var(--color-neutral-400);
+  }
+
+  .notif-load-more {
+    display: block;
+    width: 100%;
+    padding: .65rem .9rem;
+    text-align: center;
+    font-size: .75rem;
+    font-weight: 500;
+    color: var(--color-blue-600, #2563eb);
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--color-neutral-100);
+    cursor: pointer;
+  }
+  .notif-load-more:hover:not(:disabled) {
+    background: var(--color-neutral-50);
+  }
+  .notif-load-more:disabled {
+    color: var(--color-neutral-400);
+    cursor: default;
   }
 
   .notif-modal-body {

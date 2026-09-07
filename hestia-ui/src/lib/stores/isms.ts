@@ -1,9 +1,14 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 
-// ---- namespacing (swap userId when you add auth) ----
-const ns = 'hestia:guest:isms'; // later: `hestia:user:${userId}:isms`
-const STORAGE_KEY = `${ns}:byConversation`;
+// ---- namespacing ----
+// Starts under a shared "guest" key at module-init time, before the logged-in
+// user is known (this store is created at import time, ahead of any
+// component's access to page.data.user) -- initIsmsNamespace() below re-keys
+// it once the real user id is available, so corpus selections don't bleed
+// from one account to the next on a shared/kiosk machine.
+let ns = 'hestia:guest:isms';
+let STORAGE_KEY = `${ns}:byConversation`;
 
 // Key used for the corpus selection of a chat that hasn't been sent yet
 // (activeConversationId is still null, so there's no real id to key on).
@@ -124,5 +129,19 @@ export function requestOpenIsmsModal() {
 export function clearIsmsState() {
   // Call this on logout or when switching organizations
   byConversation.set({});
+  currentKey.set(NEW_CHAT_KEY);
+}
+
+/** Re-keys storage to the given (real) user, loading whatever that user
+ *  already has persisted instead of continuing to read/write under the
+ *  shared guest key this module started with. Call once the user is known
+ *  (e.g. from the root layout reacting to page.data.user) -- a no-op if
+ *  already namespaced to this exact user. */
+export function initIsmsNamespace(userId: string | null) {
+  const newNs = userId ? `hestia:user:${userId}:isms` : 'hestia:guest:isms';
+  if (newNs === ns) return;
+  ns = newNs;
+  STORAGE_KEY = `${ns}:byConversation`;
+  byConversation.set(loadMap());
   currentKey.set(NEW_CHAT_KEY);
 }

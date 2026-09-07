@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import uuid
 
-from hestia.domain.auth.users import UserService, new_uuid, now_epoch
+from hestia.domain.auth.users import new_uuid, now_epoch
 from hestia.domain.exceptions import NotFoundError, ValidationError
 from hestia.infrastructure.db.notification_settings_repository import (
     DEFAULT_WELCOME_BODY, DEFAULT_WELCOME_TITLE, NotificationSettingsRepository,
 )
-from hestia.infrastructure.db.user_repository import UserRepository
+from hestia.infrastructure.db.user_repository import ModeratorConflictError, UserRepository
 
 _log = logging.getLogger("hestia.system")
 
@@ -28,10 +29,8 @@ def _load_data(raw: str | None) -> dict:
 
 class NotificationService:
 
-    def __init__(self, repo: UserRepository, user_service: UserService,
-                settings_repo: NotificationSettingsRepository):
+    def __init__(self, repo: UserRepository, settings_repo: NotificationSettingsRepository):
         self.repo = repo
-        self.users = user_service
         self.settings_repo = settings_repo
 
     # ---- notification helpers ----
@@ -175,7 +174,12 @@ class NotificationService:
             raise ValidationError("You already have a pending request for this tenant.")
 
         req_id = new_uuid()
-        self.repo.insert_join_request(req_id=req_id, user_id=user_id, org_id=org_id, message=message, ts=now_epoch())
+        try:
+            self.repo.insert_join_request(req_id=req_id, user_id=user_id, org_id=org_id, message=message, ts=now_epoch())
+        except sqlite3.IntegrityError:
+            # A concurrent call (double-click, retry) won the race between
+            # the pending-request check above and this insert.
+            raise ValidationError("You already have a pending request for this tenant.")
 
         requester = self.repo.get_user_by_id(user_id)
         requester_name = f"{requester['first_name']} {requester['last_name']}" if requester else "A user"
@@ -211,15 +215,25 @@ class NotificationService:
         user_id = uuid.UUID(bytes=req["user_id"])
         org_id = req["org_id"]
 
-        self.users.add_user_to_org(user_id=user_id, org_id=org_id)
-        self.users.set_member_classification(user_id, org_id, classification_level or 0)
-        if tenant_role:
-            self.users.set_member_tenant_role(user_id, org_id, tenant_role)
+        # One-moderator-per-tenant is a read-then-decide business rule, kept
+        # as a pre-flight check (as before) rather than folded into the
+        # transactional grant below -- the grant itself only needs to be
+        # atomic with the request's resolution, not with this check.
+        if tenant_role == "moderator":
+            existing = self.repo.get_org_tenant_moderator(org_id)
+            if existing and bytes(existing["user_id"]) != user_id.bytes:
+                raise ValidationError("Tenant already has a moderator.")
 
-        self.repo.resolve_join_request(
-            req_id=request_id, status="approved", reviewed_by=reviewer_id, review_reason=None,
-            granted_tenant_role=tenant_role, granted_classification_level=classification_level, ts=now_epoch(),
-        )
+        try:
+            ok = self.repo.approve_join_request_and_grant(
+                req_id=request_id, user_id=user_id, org_id=org_id,
+                classification_level=classification_level or 0, tenant_role=tenant_role,
+                reviewer_id=reviewer_id, ts=now_epoch(),
+            )
+        except ModeratorConflictError:
+            raise ValidationError("Tenant already has a moderator.")
+        if not ok:
+            raise ValidationError("This request has already been resolved.")
 
         org = self.repo.get_organization_by_id(org_id)
         self._notify(
@@ -238,10 +252,12 @@ class NotificationService:
         if req["status"] != "pending":
             raise ValidationError("This request has already been resolved.")
 
-        self.repo.resolve_join_request(
+        ok = self.repo.resolve_join_request(
             req_id=request_id, status="rejected", reviewed_by=reviewer_id, review_reason=reason,
             granted_tenant_role=None, granted_classification_level=None, ts=now_epoch(),
         )
+        if not ok:
+            raise ValidationError("This request has already been resolved.")
 
         org = self.repo.get_organization_by_id(req["org_id"])
         self._notify(
@@ -280,10 +296,13 @@ class NotificationService:
             raise NotFoundError("Tenant not found.")
 
         req_id = new_uuid()
-        self.repo.insert_share_request(
-            req_id=req_id, requesting_org_id=requesting_org_id, target_org_id=target_org_id,
-            message=message, requested_by=requested_by, ts=now_epoch(),
-        )
+        try:
+            self.repo.insert_share_request(
+                req_id=req_id, requesting_org_id=requesting_org_id, target_org_id=target_org_id,
+                message=message, requested_by=requested_by, ts=now_epoch(),
+            )
+        except sqlite3.IntegrityError:
+            raise ValidationError("A pending share request between these tenants already exists.")
 
         self._notify_org_moderators(
             target_org_id, type="share_request_received",
@@ -312,20 +331,22 @@ class NotificationService:
         target_org_id = req["target_org_id"]
         requesting_org_id = req["requesting_org_id"]
 
-        shared_ids = []
+        grants = []
         for c in collections:
             collection_id = c.get("collection_id")
             max_classification = c.get("max_classification")
             owner = self.repo.get_collection_owner(collection_id)
             if not owner or owner["id"] != target_org_id:
                 raise ValidationError(f"Collection '{collection_id}' is not owned by this tenant.")
-            self.users.add_tenant_collection(requesting_org_id, collection_id, role="access", max_classification=max_classification)
-            self.repo.insert_share_grant(req_id=request_id, collection_id=collection_id, max_classification=max_classification)
-            shared_ids.append(collection_id)
+            grants.append((collection_id, max_classification))
 
-        self.repo.resolve_share_request(
-            req_id=request_id, status="approved", reviewed_by=reviewer_id, review_reason=None, ts=now_epoch(),
+        ok = self.repo.approve_share_request_and_grant(
+            req_id=request_id, requesting_org_id=requesting_org_id,
+            grants=grants, reviewer_id=reviewer_id, ts=now_epoch(),
         )
+        if not ok:
+            raise ValidationError("This request has already been resolved.")
+        shared_ids = [collection_id for collection_id, _ in grants]
 
         target_org = self.repo.get_organization_by_id(target_org_id)
         self._notify_org_moderators(
@@ -342,9 +363,11 @@ class NotificationService:
         if req["status"] != "pending":
             raise ValidationError("This request has already been resolved.")
 
-        self.repo.resolve_share_request(
+        ok = self.repo.resolve_share_request(
             req_id=request_id, status="rejected", reviewed_by=reviewer_id, review_reason=reason, ts=now_epoch(),
         )
+        if not ok:
+            raise ValidationError("This request has already been resolved.")
 
         target_org = self.repo.get_organization_by_id(req["target_org_id"])
         self._notify_org_moderators(
@@ -391,10 +414,13 @@ class NotificationService:
             raise ValidationError("This user already has a pending invitation to this tenant.")
 
         inv_id = new_uuid()
-        self.repo.insert_invitation(
-            inv_id=inv_id, org_id=org_id, user_id=target_id, invited_by=invited_by,
-            message=message, ts=now_epoch(),
-        )
+        try:
+            self.repo.insert_invitation(
+                inv_id=inv_id, org_id=org_id, user_id=target_id, invited_by=invited_by,
+                message=message, ts=now_epoch(),
+            )
+        except sqlite3.IntegrityError:
+            raise ValidationError("This user already has a pending invitation to this tenant.")
 
         self._notify(
             user_id=target_id, type="tenant_invitation_received",
@@ -422,7 +448,9 @@ class NotificationService:
             raise NotFoundError("Invitation not found.")
         if inv["status"] != "pending":
             raise ValidationError("This invitation has already been resolved.")
-        self.repo.resolve_invitation(inv_id=invitation_id, status="cancelled", ts=now_epoch())
+        ok = self.repo.resolve_invitation(inv_id=invitation_id, status="cancelled", ts=now_epoch())
+        if not ok:
+            raise ValidationError("This invitation has already been resolved.")
 
     def accept_invitation(self, invitation_id: uuid.UUID, user_id: uuid.UUID) -> None:
         inv = self.repo.get_invitation(invitation_id)
@@ -432,9 +460,9 @@ class NotificationService:
             raise ValidationError("This invitation has already been resolved.")
 
         org_id = inv["org_id"]
-        self.users.add_user_to_org(user_id=user_id, org_id=org_id)
-        self.users.set_member_classification(user_id, org_id, 0)
-        self.repo.resolve_invitation(inv_id=invitation_id, status="accepted", ts=now_epoch())
+        ok = self.repo.accept_invitation_and_grant(inv_id=invitation_id, user_id=user_id, org_id=org_id, ts=now_epoch())
+        if not ok:
+            raise ValidationError("This invitation has already been resolved.")
 
         org = self.repo.get_organization_by_id(org_id)
         invitee = self.repo.get_user_by_id(user_id)
@@ -454,7 +482,9 @@ class NotificationService:
             raise ValidationError("This invitation has already been resolved.")
 
         org_id = inv["org_id"]
-        self.repo.resolve_invitation(inv_id=invitation_id, status="declined", ts=now_epoch())
+        ok = self.repo.resolve_invitation(inv_id=invitation_id, status="declined", ts=now_epoch())
+        if not ok:
+            raise ValidationError("This invitation has already been resolved.")
 
         org = self.repo.get_organization_by_id(org_id)
         invitee = self.repo.get_user_by_id(user_id)

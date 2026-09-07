@@ -7,6 +7,7 @@
   import { tooltip } from '$lib/actions/tooltip';
   import { fromDataTransferItems, ACCEPTED_EXTS, type SelectedFile } from '$lib/upload/folderSelect';
   import { sha256Hex } from '$lib/upload/hash';
+  import { extractSheets, splitToSheets } from '$lib/upload/spreadsheet';
   import { DOCUMENT_CLASSIFICATION_OPTIONS } from '$lib/classification';
   import { LANGUAGE_OPTIONS, guessLanguage } from '$lib/language';
   import {
@@ -128,25 +129,6 @@
       ? sheetContents[activeSheet]
       : markdownContent
   );
-
-  function _extractSheets(md: string): string[] {
-    const names: string[] = [];
-    for (const line of md.split('\n')) {
-      const m = /^## (.+)$/.exec(line.trim());
-      if (m) names.push(m[1].trim());
-    }
-    return names;
-  }
-
-  function _splitToSheets(md: string, sheets: string[]): Record<string, string> {
-    const result: Record<string, string> = {};
-    const sections = md.split(/\n(?=## )/);
-    for (const section of sections) {
-      const name = /^## (.+)/.exec(section.trimStart())?.[1]?.trim();
-      if (name && sheets.includes(name)) result[name] = section.trimStart();
-    }
-    return result;
-  }
 
   function onDragOver(e: DragEvent) {
     if (autoRunning) return;
@@ -349,10 +331,10 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? `${res.status}`);
       markdownContent = data.markdown ?? '';
-      const sheets = _extractSheets(markdownContent);
+      const sheets = extractSheets(markdownContent);
       allSheets      = sheets;
       selectedSheets = [...sheets];
-      sheetContents  = sheets.length > 1 ? _splitToSheets(markdownContent, sheets) : {};
+      sheetContents  = sheets.length > 1 ? splitToSheets(markdownContent, sheets) : {};
       activeSheet    = sheets.length > 1 ? sheets[0] : null;
       if (data.parse_error) {
         parseError     = data.parse_error;

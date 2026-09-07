@@ -8,8 +8,10 @@ export async function GET({ url, cookies }) {
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     const storedState = cookies.get('oidc_state');
+    const codeVerifier = cookies.get('oidc_verifier');
 
     cookies.delete('oidc_state', { path: '/' });
+    cookies.delete('oidc_verifier', { path: '/' });
 
     if (!code) {
         redirect(302, '/login?error=oidc_no_code');
@@ -27,7 +29,7 @@ export async function GET({ url, cookies }) {
         const res = await fetch(`${API_URL}/auth/oidc/callback`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, redirect_uri: callbackUrl, state })
+            body: JSON.stringify({ code, redirect_uri: callbackUrl, state, code_verifier: codeVerifier })
         });
         if (!res.ok) throw new Error(`Backend returned ${res.status}`);
         data = await res.json();

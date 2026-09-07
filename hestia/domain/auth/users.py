@@ -201,6 +201,13 @@ class UserService:
             raise ValidationError("Username too short")
         if auth_source == "local" and len(password) < self.password_min_length:
             raise ValidationError("Password too short")
+        # Pre-check rather than letting the UNIQUE constraint surface as a
+        # raw sqlite3.IntegrityError -- a double-submit of this form would
+        # otherwise show the admin a generic 500 instead of a clear message.
+        if self.repo.get_user_by_username(username):
+            raise ValidationError("That username is already taken.")
+        if self.repo.get_user_by_email(email):
+            raise ValidationError("That email is already registered.")
 
         user_id = new_uuid()
         salt = self._generate_salt()
@@ -305,8 +312,8 @@ class UserService:
             org["member_count"] = len(self.repo.get_organization_users(org["id"]))
         return orgs
 
-    def create_org(self, name: str, abbreviation: str):
-        self.repo.insert_organization(name=name, abbreviation=abbreviation, created_ts=now_epoch())
+    def create_org(self, name: str, abbreviation: str) -> bool:
+        return self.repo.insert_organization(name=name, abbreviation=abbreviation, created_ts=now_epoch())
 
     def update_org(self, org_id: int, name: str, abbreviation: str):
         self.repo.update_organization(id=org_id, name=name, abbreviation=abbreviation)

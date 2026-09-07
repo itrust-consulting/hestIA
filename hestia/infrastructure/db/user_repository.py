@@ -1,8 +1,26 @@
+import random
 import sqlite3
 import threading
+import time
 import uuid
 
 BUSY_TIMEOUT_MS = 5000
+
+# Retry/backoff for with_txn below. The in-process _db_lock already
+# serializes every write from this process, so an OperationalError here can
+# only come from a SEPARATE process holding the SQLite file lock (e.g. if
+# this ever runs with multiple workers/replicas against the same db file) --
+# these attempts are insurance against that, not against in-process
+# contention, which busy_timeout/the lock already handle.
+_TXN_RETRY_ATTEMPTS = 3
+_TXN_RETRY_BASE_DELAY_S = 0.05
+
+
+class ModeratorConflictError(Exception):
+    """Raised when granting a join request would create a second tenant
+    moderator. Kept as a repository-level exception (not a domain one) so
+    this module stays free of a dependency on the domain layer -- callers
+    translate it into whatever domain error fits their context."""
 
 
 def create_sqlite_connection(db_path: str) -> tuple[callable, callable, threading.Lock]:
@@ -34,17 +52,26 @@ def with_txn(fn):
     def wrapper(self, *args, **kwargs):
         with self._db_lock:
             conn = self._get_conn()
-            try:
-                conn.execute("BEGIN;")
-                result = fn(self, conn, *args, **kwargs)
-                conn.commit()
-                return result
-            except Exception:
+            for attempt in range(_TXN_RETRY_ATTEMPTS):
                 try:
-                    conn.rollback()
+                    conn.execute("BEGIN;")
+                    result = fn(self, conn, *args, **kwargs)
+                    conn.commit()
+                    return result
+                except sqlite3.OperationalError:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    if attempt == _TXN_RETRY_ATTEMPTS - 1:
+                        raise
+                    time.sleep(_TXN_RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, _TXN_RETRY_BASE_DELAY_S))
                 except Exception:
-                    pass
-                raise
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    raise
     return wrapper
 
 
@@ -56,6 +83,7 @@ class UserRepository:
 
     @with_txn
     def initialize(self, conn: sqlite3.Connection):
+        self._migrate_rename_collection_tenants(conn)
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -227,23 +255,69 @@ class UserRepository:
             CREATE INDEX IF NOT EXISTS idx_share_requests_requesting ON tenant_share_requests(requesting_org_id);
             CREATE INDEX IF NOT EXISTS idx_invitations_org ON tenant_invitations(org_id, status);
             CREATE INDEX IF NOT EXISTS idx_invitations_user ON tenant_invitations(user_id, status);
+
+            CREATE TABLE IF NOT EXISTS revoked_tokens (
+              jti           TEXT PRIMARY KEY,
+              revoked_at    INTEGER NOT NULL
+            );
+
+            -- Backstops file_join_request/invite_user/file_share_request's
+            -- check-then-insert against a concurrent double-submit (the
+            -- check itself runs outside any transaction, so it can't close
+            -- this race on its own) -- a second pending request for the
+            -- same pair now fails fast with IntegrityError instead of
+            -- silently creating a duplicate.
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_join_requests_one_pending
+              ON tenant_join_requests(user_id, org_id) WHERE status = 'pending';
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_invitations_one_pending
+              ON tenant_invitations(user_id, org_id) WHERE status = 'pending';
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_requests_one_pending
+              ON tenant_share_requests(requesting_org_id, target_org_id) WHERE status = 'pending';
             """
         )
-        # executescript commits implicitly; run ALTER TABLE migrations separately
-        for ddl in [
-            "ALTER TABLE user_orgs ADD COLUMN classification_level INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE user_orgs ADD COLUMN tenant_role TEXT DEFAULT NULL",
-            "ALTER TABLE tenant_collections ADD COLUMN role TEXT NOT NULL DEFAULT 'access'",
-            "ALTER TABLE collection_tenants RENAME TO tenant_collections",
-            "ALTER TABLE tenant_collections ADD COLUMN max_classification INTEGER DEFAULT NULL",
-            "ALTER TABLE users ADD COLUMN last_login_at INTEGER DEFAULT NULL",
-            "ALTER TABLE users ADD COLUMN last_seen_at INTEGER DEFAULT NULL",
-        ]:
-            try:
+        # executescript commits implicitly; run ADD-COLUMN migrations separately
+        self._migrate_add_columns(conn)
+
+    def _migrate_rename_collection_tenants(self, conn: sqlite3.Connection) -> None:
+        """One-time migration from this feature's earlier table name
+        (collection_tenants) to the current one (tenant_collections). Must
+        run BEFORE the `CREATE TABLE IF NOT EXISTS tenant_collections` in
+        `initialize()` -- that statement would otherwise silently create a
+        new, empty tenant_collections table first (since collection_tenants
+        doesn't match that name), and the rename would then fail because its
+        target already exists, orphaning the old table's data under its old
+        name instead of migrating it. No-op if collection_tenants doesn't
+        exist, or tenant_collections already does (already migrated, or a
+        fresh install that never had the old name)."""
+        tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "collection_tenants" in tables and "tenant_collections" not in tables:
+            conn.execute("ALTER TABLE collection_tenants RENAME TO tenant_collections")
+            conn.commit()
+
+    def _migrate_add_columns(self, conn: sqlite3.Connection) -> None:
+        """Guarded, idempotent ADD COLUMN migrations. Each checks the target
+        column via PRAGMA table_info before altering, rather than relying on
+        a blanket try/except to tell "already migrated" apart from a genuine
+        failure -- the latter used to be silently swallowed too."""
+
+        def _add_column_if_missing(table: str, column: str, ddl: str) -> None:
+            cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if column not in cols:
                 conn.execute(ddl)
                 conn.commit()
-            except Exception:
-                pass  # already migrated
+
+        _add_column_if_missing("user_orgs", "classification_level",
+                                "ALTER TABLE user_orgs ADD COLUMN classification_level INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing("user_orgs", "tenant_role",
+                                "ALTER TABLE user_orgs ADD COLUMN tenant_role TEXT DEFAULT NULL")
+        _add_column_if_missing("tenant_collections", "role",
+                                "ALTER TABLE tenant_collections ADD COLUMN role TEXT NOT NULL DEFAULT 'access'")
+        _add_column_if_missing("tenant_collections", "max_classification",
+                                "ALTER TABLE tenant_collections ADD COLUMN max_classification INTEGER DEFAULT NULL")
+        _add_column_if_missing("users", "last_login_at",
+                                "ALTER TABLE users ADD COLUMN last_login_at INTEGER DEFAULT NULL")
+        _add_column_if_missing("users", "last_seen_at",
+                                "ALTER TABLE users ADD COLUMN last_seen_at INTEGER DEFAULT NULL")
 
     # ---- users ----
 
@@ -261,6 +335,15 @@ class UserRepository:
     @with_txn
     def touch_last_seen(self, conn, *, id: uuid.UUID, ts: int):
         conn.execute("UPDATE users SET last_seen_at = ? WHERE id = ?", (ts, id.bytes))
+
+    @with_txn
+    def revoke_token(self, conn, *, jti: str, ts: int):
+        conn.execute("INSERT OR IGNORE INTO revoked_tokens (jti, revoked_at) VALUES (?, ?)", (jti, ts))
+
+    def is_token_revoked(self, jti: str) -> bool:
+        return self._get_conn().execute(
+            "SELECT 1 FROM revoked_tokens WHERE jti = ?", (jti,)
+        ).fetchone() is not None
 
     def get_user_activity(self, id: uuid.UUID) -> sqlite3.Row | None:
         """Last login/seen + conversation/message counts for one user --
@@ -392,9 +475,14 @@ class UserRepository:
     # ---- organizations ----
 
     @with_txn
-    def insert_organization(self, conn, *, name: str, abbreviation: str, created_ts: int):
-        conn.execute("INSERT OR IGNORE INTO organizations (name, abbreviation, created_at) VALUES (?, ?, ?)",
-                     (name, abbreviation, created_ts))
+    def insert_organization(self, conn, *, name: str, abbreviation: str, created_ts: int) -> bool:
+        """Returns False if a tenant with this name or abbreviation already
+        exists (the INSERT OR IGNORE silently no-ops) -- without this, a
+        caller has no way to tell "created" apart from "already existed,
+        nothing happened", which used to look identical from the outside."""
+        cur = conn.execute("INSERT OR IGNORE INTO organizations (name, abbreviation, created_at) VALUES (?, ?, ?)",
+                            (name, abbreviation, created_ts))
+        return cur.rowcount > 0
 
     @with_txn
     def update_organization(self, conn, *, id: int, name: str, abbreviation: str):
@@ -668,13 +756,57 @@ class UserRepository:
     @with_txn
     def resolve_join_request(self, conn, *, req_id: uuid.UUID, status: str, reviewed_by: uuid.UUID,
                              review_reason: str | None, granted_tenant_role: str | None,
-                             granted_classification_level: int | None, ts: int):
-        conn.execute(
+                             granted_classification_level: int | None, ts: int) -> bool:
+        """Returns False (no-op) if the request was already resolved by a
+        concurrent call -- the WHERE clause is the authoritative guard
+        against double-resolution, not the caller's earlier read."""
+        cur = conn.execute(
             "UPDATE tenant_join_requests SET status = ?, reviewed_by = ?, review_reason = ?, "
-            "granted_tenant_role = ?, granted_classification_level = ?, resolved_at = ? WHERE id = ?",
+            "granted_tenant_role = ?, granted_classification_level = ?, resolved_at = ? "
+            "WHERE id = ? AND status = 'pending'",
             (status, reviewed_by.bytes, review_reason, granted_tenant_role,
              granted_classification_level, ts, req_id.bytes),
         )
+        return cur.rowcount > 0
+
+    @with_txn
+    def approve_join_request_and_grant(self, conn, *, req_id: uuid.UUID, user_id: uuid.UUID, org_id: int,
+                                       classification_level: int, tenant_role: str | None,
+                                       reviewer_id: uuid.UUID, ts: int) -> bool:
+        """Resolves the join request and grants tenant membership in one
+        transaction. The status UPDATE below runs first and is the
+        authoritative guard against a concurrent approve/reject of the same
+        request (its WHERE clause only matches a still-pending row); the
+        one-moderator-per-tenant check runs against this same connection,
+        inside this same transaction, so two concurrent moderator-grants for
+        the same tenant can no longer both succeed -- returns False if the
+        request was already resolved, raises ModeratorConflictError if
+        granting would create a second moderator (both cases roll back
+        cleanly via with_txn)."""
+        cur = conn.execute(
+            "UPDATE tenant_join_requests SET status = 'approved', reviewed_by = ?, review_reason = NULL, "
+            "granted_tenant_role = ?, granted_classification_level = ?, resolved_at = ? "
+            "WHERE id = ? AND status = 'pending'",
+            (reviewer_id.bytes, tenant_role, classification_level, ts, req_id.bytes),
+        )
+        if cur.rowcount == 0:
+            return False
+
+        if tenant_role == "moderator":
+            existing = conn.execute(
+                "SELECT user_id FROM user_orgs WHERE org_id = ? AND tenant_role = 'moderator'",
+                (org_id,),
+            ).fetchone()
+            if existing and bytes(existing["user_id"]) != user_id.bytes:
+                raise ModeratorConflictError("Tenant already has a moderator.")
+
+        conn.execute("INSERT OR IGNORE INTO user_orgs (user_id, org_id) VALUES (?, ?)", (user_id.bytes, org_id))
+        conn.execute("UPDATE user_orgs SET classification_level = ? WHERE user_id = ? AND org_id = ?",
+                     (classification_level, user_id.bytes, org_id))
+        if tenant_role:
+            conn.execute("UPDATE user_orgs SET tenant_role = ? WHERE user_id = ? AND org_id = ?",
+                         (tenant_role, user_id.bytes, org_id))
+        return True
 
     # ---- tenant share requests ----
 
@@ -713,11 +845,46 @@ class UserRepository:
 
     @with_txn
     def resolve_share_request(self, conn, *, req_id: uuid.UUID, status: str, reviewed_by: uuid.UUID,
-                              review_reason: str | None, ts: int):
-        conn.execute(
-            "UPDATE tenant_share_requests SET status = ?, reviewed_by = ?, review_reason = ?, resolved_at = ? WHERE id = ?",
+                              review_reason: str | None, ts: int) -> bool:
+        """Returns False (no-op) if the request was already resolved by a
+        concurrent call."""
+        cur = conn.execute(
+            "UPDATE tenant_share_requests SET status = ?, reviewed_by = ?, review_reason = ?, resolved_at = ? "
+            "WHERE id = ? AND status = 'pending'",
             (status, reviewed_by.bytes, review_reason, ts, req_id.bytes),
         )
+        return cur.rowcount > 0
+
+    @with_txn
+    def approve_share_request_and_grant(
+        self, conn, *, req_id: uuid.UUID, requesting_org_id: int,
+        grants: list[tuple[str, int | None]], reviewer_id: uuid.UUID, ts: int,
+    ) -> bool:
+        """Resolves the share request and grants every approved collection in
+        one transaction. The status UPDATE runs first and is the
+        authoritative guard against a concurrent approve/reject of the same
+        request -- returns False without granting anything if it was already
+        resolved."""
+        cur = conn.execute(
+            "UPDATE tenant_share_requests SET status = 'approved', reviewed_by = ?, review_reason = NULL, "
+            "resolved_at = ? WHERE id = ? AND status = 'pending'",
+            (reviewer_id.bytes, ts, req_id.bytes),
+        )
+        if cur.rowcount == 0:
+            return False
+
+        for collection_id, max_classification in grants:
+            conn.execute(
+                "INSERT OR REPLACE INTO tenant_collections (collection_id, org_id, role, max_classification) "
+                "VALUES (?, ?, 'access', ?)",
+                (collection_id, requesting_org_id, max_classification),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO tenant_share_grants (request_id, collection_id, max_classification) "
+                "VALUES (?, ?, ?)",
+                (req_id.bytes, collection_id, max_classification),
+            )
+        return True
 
     @with_txn
     def insert_share_grant(self, conn, *, req_id: uuid.UUID, collection_id: str, max_classification: int | None):
@@ -786,11 +953,34 @@ class UserRepository:
         return self._get_conn().execute(query, params).fetchall()
 
     @with_txn
-    def resolve_invitation(self, conn, *, inv_id: uuid.UUID, status: str, ts: int):
-        conn.execute(
-            "UPDATE tenant_invitations SET status = ?, resolved_at = ? WHERE id = ?",
+    def resolve_invitation(self, conn, *, inv_id: uuid.UUID, status: str, ts: int) -> bool:
+        """Returns False (no-op) if the invitation was already resolved by a
+        concurrent call -- e.g. an admin cancelling at the same moment the
+        invited user accepts."""
+        cur = conn.execute(
+            "UPDATE tenant_invitations SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'",
             (status, ts, inv_id.bytes),
         )
+        return cur.rowcount > 0
+
+    @with_txn
+    def accept_invitation_and_grant(self, conn, *, inv_id: uuid.UUID, user_id: uuid.UUID, org_id: int, ts: int) -> bool:
+        """Resolves the invitation and grants tenant membership in one
+        transaction. The status UPDATE runs first and is the authoritative
+        guard against a concurrent cancel/decline of the same invitation --
+        returns False without granting membership if it was already
+        resolved."""
+        cur = conn.execute(
+            "UPDATE tenant_invitations SET status = 'accepted', resolved_at = ? WHERE id = ? AND status = 'pending'",
+            (ts, inv_id.bytes),
+        )
+        if cur.rowcount == 0:
+            return False
+
+        conn.execute("INSERT OR IGNORE INTO user_orgs (user_id, org_id) VALUES (?, ?)", (user_id.bytes, org_id))
+        conn.execute("UPDATE user_orgs SET classification_level = 0 WHERE user_id = ? AND org_id = ?",
+                     (user_id.bytes, org_id))
+        return True
 
     # ---- conversations ----
 

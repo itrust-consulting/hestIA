@@ -1,5 +1,4 @@
-import { browser } from '$app/environment';
-import DOMPurify from 'dompurify';
+import DOMPurify from 'isomorphic-dompurify';
 import { marked } from './markdown';
 import { renderKatex } from './katex';
 import type { Citation } from '$lib/types';
@@ -11,7 +10,7 @@ export function stripThinkingPreamble(text: string): string {
 export function renderChatContent(md: string): string {
   const html = marked.parse(md) as string;
   const withMath = renderKatex(html);
-  return browser ? DOMPurify.sanitize(withMath) : withMath;
+  return DOMPurify.sanitize(withMath);
 }
 
 function escAttr(s: string): string {

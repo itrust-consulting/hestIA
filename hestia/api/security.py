@@ -11,8 +11,14 @@ from hestia.api.dependencies import get_container
 from hestia.container import Container
 from hestia.domain.auth.models import User
 from hestia.domain.auth.users import now_epoch
+from hestia.domain.exceptions import ConfigurationError
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+# Symmetric algorithms only -- matches this app's shared-secret signing
+# model. Never pass an unvalidated algorithm string into jwt.decode's
+# algorithms=, since PyJWT trusts whatever is in that list, including "none".
+_ALLOWED_JWT_ALGORITHMS = {"HS256", "HS384", "HS512"}
 
 
 # @MRS-003
@@ -79,8 +85,14 @@ def create_access_token(
     algorithm: str = "HS256",
     expiration_time: int = 360,
 ) -> str:
+    if algorithm not in _ALLOWED_JWT_ALGORITHMS:
+        raise ConfigurationError(f"Unsupported JWT signing algorithm: '{algorithm}'")
     expire = datetime.now(timezone.utc) + timedelta(minutes=expiration_time)
-    payload = {"sub": user_id.hex, "exp": expire}
+    # jti lets a specific token be revoked (see get_current_user below and
+    # /logout in auth.py) despite the token itself being a stateless JWT --
+    # without it, "logout" can only delete the browser's cookie and the
+    # captured token would otherwise stay valid for its full lifetime.
+    payload = {"sub": user_id.hex, "exp": expire, "jti": uuid.uuid4().hex}
     return jwt.encode(payload, key, algorithm=algorithm)
 
 
@@ -92,6 +104,9 @@ def get_current_user(
     auth_svc = c.services.get("auth")
     user_svc = c.services.get("users")
     auth_config = auth_svc.config if auth_svc else None
+
+    if auth_config.token_encoding_alg not in _ALLOWED_JWT_ALGORITHMS:
+        raise HTTPException(500, "Invalid token signing algorithm configured.")
 
     try:
         payload = jwt.decode(
@@ -107,6 +122,10 @@ def get_current_user(
         raise HTTPException(401, "Token expired")
     except jwt.DecodeError:
         raise HTTPException(401, "Invalid token")
+
+    jti = payload.get("jti")
+    if jti and auth_svc.local.repo.is_token_revoked(jti):
+        raise HTTPException(401, "Token has been revoked")
 
     user = user_svc.load_user_profile(user_id)
     if not user:

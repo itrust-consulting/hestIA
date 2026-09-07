@@ -16,6 +16,10 @@
     rag_chat: 'RAG Chat',
   };
 
+  // Duplicated (not shared -- no cross-language codegen here) from the
+  // backend's _NAME_PATTERN in hestia/api/routers/workflow_settings.py.
+  // Keep both in sync -- this copy only pre-empts a round-trip for a bad
+  // name; the backend's is the actual enforcement.
   const NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
   let resetting = $state<string | null>(null);

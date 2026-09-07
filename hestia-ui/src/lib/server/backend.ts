@@ -32,6 +32,37 @@ export async function proxyBinaryResponse(upstream: Response): Promise<Response>
   return new Response(upstream.body, { status: upstream.status, headers });
 }
 
+// FastAPI's default validation handler puts a *list* of structured error
+// objects ({loc, msg, type, input}) in `detail` for a 422, unlike every
+// other backend error handler (which puts a plain string there). Every
+// frontend form that surfaces `detail` in a toast assumes it's already
+// display-ready text, so a raw validation error would otherwise render as
+// "[object Object]" -- flatten it here, once, instead of in every caller.
+function flattenValidationDetail(rawBody: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || !('detail' in parsed)) return null;
+  const detail = (parsed as { detail: unknown }).detail;
+  if (!Array.isArray(detail)) return null;
+
+  return detail
+    .map((entry) => {
+      if (entry && typeof entry === 'object' && 'msg' in entry) {
+        const loc = Array.isArray((entry as { loc?: unknown }).loc)
+          ? (entry as { loc: unknown[] }).loc.join('.')
+          : '';
+        const msg = (entry as { msg: unknown }).msg;
+        return loc ? `${loc}: ${msg}` : String(msg);
+      }
+      return typeof entry === 'string' ? entry : JSON.stringify(entry);
+    })
+    .join('; ');
+}
+
 export async function proxyResponse(upstream: Response): Promise<Response> {
   const body = await upstream.text();
   if (upstream.status >= 500) {
@@ -40,6 +71,15 @@ export async function proxyResponse(upstream: Response): Promise<Response> {
       status: upstream.status,
       headers: { 'content-type': 'application/json' }
     });
+  }
+  if (upstream.status >= 400) {
+    const flattened = flattenValidationDetail(body);
+    if (flattened !== null) {
+      return new Response(JSON.stringify({ detail: flattened }), {
+        status: upstream.status,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
   }
   return new Response(body, {
     status: upstream.status,

@@ -1,0 +1,31 @@
+active: true
+authors: ACR
+complexity: 1-5
+derived: false
+execution_type: Automated/Manual
+expected_outcome: ''
+header: |
+  OIDC authentication
+level: 35.8
+links: []
+normative: true
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
+ref: ''
+references:
+- path: docs/specs/tst/assets
+  type: file
+release: alpha
+reviewed: null
+test_data: see referenced files
+text: |
+  ## Preconditions and setup actions
+  - System initialized
+
+  ## Test steps
+  1. Log in using available credentials.
+  2. Test configurations?
+
+  ## Expected outcome
+  1.
+verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+version: 0.1

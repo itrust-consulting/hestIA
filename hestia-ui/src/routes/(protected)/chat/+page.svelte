@@ -55,10 +55,21 @@
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  onMount(async () => {
-    await loadConversations();
-    const cid = get(page).url.searchParams.get('cid');
-    if (cid) openConversation(cid);
+  let chatLoadError: string | null = null;
+
+  async function loadInitialChatData() {
+    chatLoadError = null;
+    try {
+      await loadConversations();
+      const cid = get(page).url.searchParams.get('cid');
+      if (cid) openConversation(cid);
+    } catch (e) {
+      chatLoadError = e instanceof Error ? e.message : 'Failed to load your conversations.';
+    }
+  }
+
+  onMount(() => {
+    loadInitialChatData();
   });
   onMount(() => {
     loadCorpora(get(page).data.user);
@@ -390,7 +401,14 @@
     {/if}
   <!-- Messages -->
     <main class="chat-interface">
-    
+
+      {#if chatLoadError}
+        <div class="chat-load-error">
+          <p>{chatLoadError}</p>
+          <button type="button" on:click={loadInitialChatData}>Retry</button>
+        </div>
+      {/if}
+
       <div class="chatbox">
         <VList
           bind:this={vlist}
@@ -540,6 +558,35 @@
   font-size: var(--text-sm);
   font-weight: 400;
   color: var(--color-neutral-400);
+}
+
+.chat-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-red-50, #fef2f2);
+  color: var(--color-red-700, #b91c1c);
+  font-size: var(--text-sm);
+}
+
+.chat-load-error p {
+  margin: 0;
+}
+
+.chat-load-error button {
+  flex-shrink: 0;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-md, 6px);
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  cursor: pointer;
 }
 
 .corpus-picker {

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from hestia.api.schemas.base import APIModel, Request, Response
+from hestia.api.schemas.base import APIModel, Request
 from hestia.domain.rag.types import DenseVector, HybridQuery, Query, SparseVector
 
 
@@ -17,13 +17,6 @@ class GenerateRequest(Request):
     collection: Optional[str] = None
     query_kwargs: Optional[Dict[str, Any]] = None
     stream: bool = False
-
-
-class GenerateData(APIModel):
-    response: str
-
-
-GenerateResponse = Response[GenerateData]
 
 
 # ---- Chat ----
@@ -70,20 +63,6 @@ class SearchRequest(Request):
     query: List[float | int] | Dict[str, Any]
     collection: str
     options: Dict[str, Any] = None
-
-
-class QueryPoints(APIModel):
-    id: str
-    score: float
-    payload: Optional[Dict[str, Any]]
-    vector: Optional[Union[List[float], List[List[float]]]]
-
-
-class SearchData(APIModel):
-    points: List[QueryPoints]
-
-
-SearchResponse = Response[Any]
 
 
 # ---- User management ----

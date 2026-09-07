@@ -1,0 +1,30 @@
+active: true
+authors: ACR
+complexity: 1-5
+derived: false
+execution_type: Automated/Manual
+expected_outcome: ''
+header: |
+  Unauthorized user access
+level: 35.17
+links: []
+normative: true
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
+ref: ''
+references:
+- path: docs/specs/tst/assets
+  type: file
+release: alpha
+reviewed: null
+test_data: see referenced files
+text: |
+  ## Preconditions and setup actions
+  -
+
+  ## Test steps
+  1. Access any page without valid access token.
+
+  ## Expected outcome
+  1. No page is accessible and user is always redirected to the login page.
+verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+version: 0.1

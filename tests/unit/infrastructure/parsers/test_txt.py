@@ -42,3 +42,18 @@ class TestTXTParser:
         f.write_text("")
         p = TXTParser(file=str(f))
         assert p.doc == ""
+
+    def test_get_metadata_applies_mask(self, txt_file):
+        p = TXTParser(file=str(txt_file))
+        meta = p.get_metadata(mask_name="rag_default")
+        assert "source" in meta
+
+
+class TestTXTParserEmptyDoc:
+
+    def test_to_markdown_raises_when_doc_is_none(self):
+        from hestia.domain.exceptions import ValidationError
+        p = TXTParser.__new__(TXTParser)
+        p.doc = None
+        with pytest.raises(ValidationError, match="Empty document"):
+            p.to_markdown()
