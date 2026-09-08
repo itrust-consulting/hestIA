@@ -1,0 +1,38 @@
+active: true
+authors: ACR
+complexity: 1-5
+derived: false
+execution_type: Automated/Manual
+expected_outcome: ''
+header: |
+  User management
+level: 35.24
+links: []
+normative: true
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
+ref: ''
+references:
+- path: docs/specs/tst/assets
+  type: file
+release: alpha
+reviewed: null
+test_data: see referenced files
+text: |
+  ## Preconditions and setup actions
+  - System initialized and logged in as admin
+
+  ## Test steps
+  1. Navigate to the admin dashboard > Users
+  2. Create a test user.
+  3. Inspect test user and verify that information is correctly displayed.
+  4. Modify user information and save changes.
+  5. Verify that changes were successfully adopted.
+  6. Delete test user.
+  7. Verify that test user is no longer listed in the user overview.
+
+  ## Expected outcome
+  1. All users are listed in the overview.
+  2. User information is correctly displayed (Profile information, activity, tenants)
+  3. All CRUD operations sucessful.
+verification_method: Test (T)
+version: 0.1

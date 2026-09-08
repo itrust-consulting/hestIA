@@ -1,0 +1,38 @@
+active: true
+authors: ACR
+complexity: 1-5
+derived: false
+execution_type: Automated/Manual
+expected_outcome: ''
+header: |
+  Moderator tenant management.
+level: 35.26
+links: []
+normative: true
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
+ref: ''
+references:
+- path: docs/specs/tst/assets
+  type: file
+release: alpha
+reviewed: null
+test_data: see referenced files
+text: |
+  ## Preconditions and setup actions
+  - TST-060, Steps 1-8
+  - Logged in as 'Moderator'
+
+  ## Test steps
+  1. Navigate to admin dashboard > Tenants.
+  2. Verify that only assigned tenant ('TEST') is listed in the overview.
+  3. Inspect tenant 'TEST'.
+  4. Modify tenant information and save changes.
+  5. Verify that changes have been adopted.
+  6. Invite a user to the tenant. (Step requires the users stored email.)
+  7. Verify that an invitation has been send and is pending.
+  8. Remove 'User' from tenant.
+  
+  ## Expected outcome
+  1.
+verification_method: Test (T)
+version: 0.1
