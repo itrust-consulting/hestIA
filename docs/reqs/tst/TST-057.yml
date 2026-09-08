@@ -39,5 +39,5 @@ text: |
   3. All message pairs are present, in correct chronological order, with no duplicates or gaps, regardless of how far back the user scrolls.
   4. Re-scrolling to previously viewed history after it has been scrolled away from for a while (steps 5-6) still displays the correct, complete messages, with no data loss or visible corruption.
   5. With 'Ask My Docs' activated, pagination behaves identically (steps 1-4 above), and messages retrieved from documents (including citations) are preserved correctly when scrolled away from and reloaded.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+verification_method: Test (T)
 version: 0.1

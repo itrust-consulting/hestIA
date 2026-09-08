@@ -40,5 +40,5 @@ text: |
 
   ## Expected outcome
   1. All operations persisted and messages are ordered correctly.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+verification_method: Test (T)
 version: 0.1
