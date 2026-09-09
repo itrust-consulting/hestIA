@@ -1,10 +1,12 @@
 # Functional Architecture Document (FAD)
 
 Service: hestIA
-Version: alpha_v0.3
+Version: alpha_v0.4
 Classification: INTERNAL
-Date: 2026-06-15
+Date: 2026-09-09
 Issuer: iTrust Luxembourg
+
+Revision note: This revision incorporates the findings of an architecture conformance review conducted against the implemented codebase (2026-09-09). Six functional components were added (FC-20 through FC-25) to document previously unrecorded administration and collaboration capabilities; several existing functional descriptions and constraints were corrected where implementation diverged from the prior text. See the accompanying Architecture Conformance Review for the full discrepancy analysis.
 
 ---
 
@@ -33,19 +35,20 @@ This Functional Architecture Document (FAD) describes what hestIA does in functi
 ## 2 Functional Overview
 
 ### 2.1 Functional Scope
-hestIA provides a managed AI assistance capability over organisationally controlled document corpora, enforcing classification-based access control at every interaction. The system accepts document uploads, transforms them into retrievable knowledge, and responds to user queries by synthesising retrieved knowledge with AI-generated language. It supports multi-tenant operations, ensuring that knowledge visibility is governed by organisational membership and individually assigned classification clearance levels. All interactions — document ingest, query, administration, and conversation management — are subject to authentication and policy enforcement without exception.
+hestIA provides a managed AI assistance capability over organisationally controlled document corpora, enforcing classification-based access control at every interaction that touches a document collection. The system accepts document uploads, transforms them into retrievable knowledge, and responds to user queries by synthesising retrieved knowledge with AI-generated language. It supports multi-tenant operations, ensuring that knowledge visibility is governed by organisational membership and individually assigned classification clearance levels. Document ingest, query, administration, and conversation management are subject to authentication without exception, and to policy enforcement whenever a document collection is involved (see FC-03). One documented function, Help Content Management (FC-17), is implemented by the presentation tier outside this authenticated backend boundary; see A-16. The AI generation, embedding, and vector-search capabilities are provided by one or more independently configurable backend connections (see FC-22) rather than by a single fixed "LLM Server" and "Vector Database" instance; this document uses those terms to denote the currently active connection(s) for each purpose.
 
 ### 2.2 Functional Domains
 
 | Domain | Description |
 |--------|-------------|
-| Identity and Access | Authentication of users via configurable credential schemes; issuance and validation of session tokens; role and classification-level assignment; execution of access policy decisions on every request |
+| Identity and Access | Authentication of users via configurable credential schemes (local, directory, federated); issuance, validation, and revocation of session tokens; account self-service; role and classification-level assignment; execution of access policy decisions on collection-scoped requests |
 | Document Intelligence | Ingestion of heterogeneous document formats; extraction of content and metadata; segmentation into addressable knowledge units; semantic and keyword encoding for retrieval |
-| AI Interaction | Orchestrated AI workflows for single-turn generation and multi-turn conversational queries; retrieval-augmented prompt construction; AI response generation and delivery |
+| AI Interaction | Orchestrated AI workflows for single-turn generation and multi-turn conversational queries; retrieval-augmented prompt construction; AI response generation and delivery; bounded, token-budgeted conversation context with automatic and on-demand compaction |
 | Knowledge Management | Storage and lifecycle management of document collections; retrieval of knowledge units using hybrid search; conversation history persistence and management |
-| Administration | Lifecycle management of users, organisations, collection grants, and organisational memberships; help content management |
-| Observability | Structured system logging with request traceability; security audit logging of all sensitive actions; health and readiness status exposure |
-| Extensibility | Registration and invocation of domain-specific agent tools within orchestrated workflows; composable workflow graph definition without platform modification |
+| Collaboration and Notifications | User-initiated requests to join organisations or share collection access across organisations, subject to moderator approval; in-app notification delivery and inbox management, including administrator broadcasts |
+| Administration | Lifecycle management of users, organisations, collection grants, and organisational memberships; runtime configuration of authentication/security settings, AI and vector-database backend connections, workflow graph definitions, and system logging; help content management |
+| Observability | Structured system logging with request traceability; security audit logging of sensitive actions mediated by the backend; queryable and exportable log access; health and readiness status exposure |
+| Extensibility | Declarative, administrator-editable composition of AI workflow graphs from a fixed vocabulary of processing node types; workflow graphs are strictly linear (no conditional branching) and new node types require platform code changes |
 
 ---
 
@@ -57,7 +60,7 @@ hestIA provides a managed AI assistance capability over organisationally control
 |-------------|------|-------------|
 | FC-01 | API Gateway | Single system entry point; authenticates all inbound requests; assigns correlation identifiers; routes requests to appropriate functions |
 | FC-02 | Authentication | Validates user credentials via one of three configurable modes (local, directory, federated); issues and validates short-lived session tokens |
-| FC-03 | Access Policy Enforcement | Evaluates per-request access decisions based on platform roles, organisational membership, and document classification clearance; returns ALLOW, FILTER, or DENY decisions |
+| FC-03 | Access Policy Enforcement | Evaluates collection-scoped access decisions based on organisational membership, collection grants, and document classification clearance; returns ALLOW, FILTER, or DENY decisions |
 | FC-04 | Request Handling | Receives authenticated and authorised requests; selects workflow templates; drives workflow execution; persists conversation outcomes; emits audit entries |
 | FC-05 | Workflow Orchestration | Executes declaratively defined directed execution graphs; coordinates typed processing nodes in sequence or composition |
 | FC-06 | Document Ingestion | Accepts source documents; extracts text and structural metadata; segments content into chunks; encodes chunks for storage in the knowledge base |
@@ -71,9 +74,15 @@ hestIA provides a managed AI assistance capability over organisationally control
 | FC-14 | User Administration | Manages the full lifecycle of user accounts: creation, retrieval, update, deactivation |
 | FC-15 | Organisation and Membership Administration | Manages tenant organisations and their membership: creation, update, member add/remove, role and classification-level assignment |
 | FC-16 | Collection Grant Administration | Manages which organisations have access to which document collections and under what conditions |
-| FC-17 | Help Content Management | Manages a set of markdown-based help sections and associated images; readable by all authenticated users; writable by administrators only |
-| FC-18 | Logging and Audit | Emits structured system logs with correlation identifiers; records security-relevant audit events to a dedicated, persisted audit trail |
+| FC-17 | Help Content Management | Manages a set of markdown-based help sections and associated images; readable by all authenticated users; writable by administrators only. Implemented in the presentation tier against its own local content store, outside the hestIA backend's policy-enforcement and audit boundary (see A-16) |
+| FC-18 | Logging and Audit | Emits structured system logs with correlation identifiers; records security-relevant audit events to a dedicated, file-based audit trail |
 | FC-19 | Health and Readiness | Exposes unauthenticated liveness and readiness status; reports active services and available models and collections |
+| FC-20 | Tenant Collaboration Workflows | Manages user-initiated requests to join an organisation, requests to share collection access between organisations, and direct member invitations, each subject to moderator approval |
+| FC-21 | Notification Management | Delivers and manages in-app notifications arising from collaboration workflows and administrator broadcasts; maintains per-user read state and a configurable new-user welcome message |
+| FC-22 | Platform Connection Administration | Manages the lifecycle of backend connections providing generation, embedding, reranking, and vector-database capability; supports connectivity testing and live activation without service restart |
+| FC-23 | Authentication and Security Configuration Administration | Manages the active authentication mode and its associated password policy, token signing configuration, directory-service configuration, and federated-identity configuration; changes take effect on the next request without service restart |
+| FC-24 | Workflow Graph Administration | Manages the declarative YAML definitions of AI workflow graphs, allowing administrators to view, create, update, and reset the graphs used by FC-05 without platform code changes |
+| FC-25 | System Log Administration | Provides administrator query, filtered export, and live verbosity control over system and audit logs |
 
 ---
 
@@ -83,23 +92,23 @@ hestIA provides a managed AI assistance capability over organisationally control
 - Description: The single functional entry point to hestIA. Every inbound interaction passes through this function before reaching any other.
 - Inputs: All inbound requests from user interfaces or integrating systems.
 - Outputs: Authenticated, correlated requests routed to the appropriate downstream function; error responses for unauthenticated or malformed requests.
-- Behaviour: Assigns a unique correlation identifier to each request and propagates it through the processing chain. Invokes FC-02 to validate session tokens on all protected operations. Rejects requests that fail authentication before routing. Passes health and readiness probes directly to FC-19 without authentication.
+- Behaviour: Assigns a unique correlation identifier to each request and propagates it through the processing chain. Invokes FC-02 to validate session tokens on all protected operations. Rejects requests that fail authentication before routing. Passes health and readiness probes directly to FC-19 without authentication. Routes for functions bound to a configurable backend purpose — Document Ingestion, Direct Vector Search, Vector Encoding Exposure, and AI Generation — are exposed only when at least one connection has been configured for the corresponding purpose (see FC-22); in a deployment lacking such a connection, the corresponding routes are not available.
 
 ---
 
 **FC-02 — Authentication**
-- Description: Verifies the identity of users and issues session tokens, supporting three mutually exclusive credential validation modes: local credential store, directory service (LDAP/Active Directory), and federated identity (OIDC).
-- Inputs: User credentials (username and password, or directory-bound credentials, or OIDC exchange artefacts); bearer tokens on subsequent requests.
-- Outputs: Short-lived JWT access tokens on successful authentication; validation outcome (valid/invalid) on token verification; error responses for failed, expired, or rate-limited attempts.
-- Behaviour: Applies rate limiting to login attempts to mitigate brute-force attacks. Enforces account expiry. Triggers mandatory-password-change flows where required. Validates JWT signatures, expiry, and subject identity on every protected request. Only one authentication mode is active per deployment.
+- Description: Verifies the identity of users and issues session tokens, supporting three mutually exclusive credential validation modes: local credential store, directory service (LDAP/Active Directory), and federated identity (OIDC). Also provides session termination and account self-service.
+- Inputs: User credentials (username and password, or directory-bound credentials, or OIDC exchange artefacts); bearer tokens on subsequent requests; self-service profile and password-change requests.
+- Outputs: Short-lived JWT access tokens on successful authentication; validation outcome (valid/invalid) on token verification; error responses for failed, expired, or rate-limited attempts; caller's own profile record.
+- Behaviour: Local authentication tries the local credential store first, falling back to the directory service when the user is directory-sourced; a first-time directory login auto-provisions a local profile. Applies rate limiting to login attempts, keyed by the attempted username, and separately to all federated-identity (OIDC) authorize/callback/logout requests, keyed by client IP address, to mitigate brute-force attacks (see A-08). Enforces account expiry. Validates JWT signatures (restricted to an HMAC algorithm allowlist), expiry, and subject identity on every protected request; permission and profile data are re-derived fresh on every request with no caching. Supports session termination (logout) via server-side revocation of the individual token's identifier, independent of the token's remaining lifetime. A client-driven heartbeat call updates the caller's last-activity timestamp (consumed by FC-14's presence indicator) and returns the caller's current unread notification count (FC-21) as a side effect. Exactly one authentication mode is active at any given time; unlike a fixed deployment-time choice, the active mode and its full configuration (password policy, token signing parameters, directory-service parameters, federated-identity parameters) are administrator-configurable at runtime through FC-23 and take effect on the next request without a service restart (see A-04).
 
 ---
 
 **FC-03 — Access Policy Enforcement**
-- Description: Evaluates whether a requesting user is permitted to perform a requested operation and, if so, whether retrieval results must be filtered by classification level.
-- Inputs: Authenticated user identity with associated roles, organisational memberships, and per-collection classification levels; the target resource and operation.
-- Outputs: A policy decision of ALLOW, FILTER, or DENY. FILTER decisions carry a maximum classification constraint applied to retrieval queries.
-- Behaviour: Applies a two-layer policy model. The first layer evaluates the platform-level role (administrator or user). The second layer evaluates the user's tenant role (moderator, co-moderator, member) and their assigned classification level within the relevant organisation. Policy is evaluated on every request; no caching of decisions is performed. Access to a collection requires both an active organisational grant (FC-16) and a user classification level meeting or exceeding the document's classification. DENY outcomes terminate request processing before any knowledge base or AI interaction occurs.
+- Description: Evaluates whether a requesting user may retrieve knowledge from a target document collection and, if so, whether results must be filtered by classification level. This function is the single collection-access gate invoked by retrieval-touching workflows (FC-05, FC-12); it is a narrower function than platform- and tenant-role authorisation, which is enforced by dedicated guards on the administration functions (FC-14 through FC-17, FC-20 through FC-25).
+- Inputs: The requesting user's pre-computed permission set — derived from platform role, organisational memberships, tenant role, and per-tenant classification level — and, where applicable, a target document collection.
+- Outputs: A policy decision of ALLOW, FILTER, or DENY. FILTER decisions carry a maximum classification constraint applied to retrieval queries. Requests that do not target a collection (e.g. non-RAG generation or chat) receive ALLOW unconditionally from this function.
+- Behaviour: An administrator's permission set grants unrestricted collection access; for all other users, access to a collection requires an active organisational grant (FC-16) and is bounded by the user's classification clearance and any per-grant classification cap, whichever is lower. No grant on the target collection results in DENY. A grant with a classification cap results in FILTER, carrying that cap as a hard constraint applied by FC-07 at retrieval time. The permission set consulted by this function is recomputed fresh from stored roles, memberships, and grants on every request; no caching of permissions or of policy decisions is performed, so a change to any of them takes effect on the immediately following request (see A-02). DENY outcomes terminate request processing before any knowledge base or AI interaction occurs. Every decision is recorded as a policy-decision audit entry (FC-18).
 
 ---
 
@@ -112,10 +121,10 @@ hestIA provides a managed AI assistance capability over organisationally control
 ---
 
 **FC-05 — Workflow Orchestration**
-- Description: Executes directed execution graphs defined declaratively as YAML artefacts. Each graph is composed of typed processing nodes; the engine traverses the graph, invoking each node function in dependency order.
+- Description: Executes directed execution graphs defined declaratively as YAML artefacts. Each graph is composed of typed processing nodes; the engine traverses the graph, invoking each node function in strict linear order.
 - Inputs: A resolved workflow graph; the input context assembled by FC-04 (query, history, policy filters, parameters).
 - Outputs: The accumulated result context after full graph traversal, including generated response, retrieved chunks, and citation map.
-- Behaviour: Supports the following node types in current-generation workflows: EncodeDense (query semantic encoding), EncodeSparse (query keyword encoding), Retrieve (knowledge base query via FC-07), Augment (prompt construction via FC-08), Generate (single-turn AI invocation via FC-09), Chat (multi-turn AI invocation via FC-09). Additionally accommodates extensibility node types — ToolCall, Branch, QueryStructured — for agentic workflows. Graphs are composable; new workflow patterns can be registered without modifying platform logic.
+- Behaviour: The engine implements exactly six node types: EncodeDense (query semantic encoding), EncodeSparse (query keyword encoding), Retrieve (knowledge base query via FC-07), Augment (prompt construction via FC-08), Generate (single-turn AI invocation via FC-09), and Chat (multi-turn AI invocation via FC-09). This vocabulary is fixed; introducing a new node type requires a platform code change, not a workflow-definition change. Graphs must form a single linear chain through every declared node — the engine has no conditional-branching support. Each request is routed by its workflow kind (generate, rag_generate, chat, or rag_chat) to exactly one of four graph definitions; introducing a fifth workflow kind likewise requires a platform code change. Within this fixed vocabulary and fixed set of workflow kinds, graph composition — node sequencing, prompt content, and slot wiring — is declarative and administrator-editable at runtime without platform code changes (see FC-24).
 
 ---
 
@@ -131,7 +140,7 @@ hestIA provides a managed AI assistance capability over organisationally control
 - Description: Queries the knowledge base to identify the most relevant chunks for a given encoded query, subject to access-policy-derived constraints.
 - Inputs: Encoded query vectors (dense and/or sparse); access policy filter (maximum classification constraint from FC-03); target collection identifier; retrieval parameters (result count, mode).
 - Outputs: A ranked list of chunk payloads including content, source reference, classification level, and position metadata.
-- Behaviour: Supports three retrieval modes: semantic (dense vector similarity), keyword (sparse vector matching), and hybrid (fusion of both). In hybrid mode, results from semantic and keyword searches are merged using a reciprocal rank fusion strategy. Access policy filters are applied as hard payload constraints, ensuring that chunks whose classification exceeds the user's clearance are excluded at the retrieval layer, not post-hoc. Returns a ranked list bounded by the requested result count.
+- Behaviour: Supports three retrieval modes: semantic (dense vector similarity), keyword (sparse vector matching), and hybrid (fusion of both). In hybrid mode, results from semantic and keyword searches are merged using reciprocal rank fusion by default, with an alternative distribution-based score fusion strategy available as a configurable option. Access policy filters are applied as hard payload constraints, ensuring that chunks whose classification exceeds the user's clearance are excluded at the retrieval layer, not post-hoc. Returns a ranked list bounded by the requested result count.
 
 ---
 
@@ -152,10 +161,10 @@ hestIA provides a managed AI assistance capability over organisationally control
 ---
 
 **FC-10 — Conversation Management**
-- Description: Persists and manages multi-turn conversation histories, enabling continuity across interactions and bounded context loading for AI generation.
-- Inputs: Messages (role, content, citations, thinking) to be persisted; conversation identifiers for retrieval and lifecycle operations; user identity.
-- Outputs: Stored conversation records; retrieved conversation lists and message histories; updated or deleted records.
-- Behaviour: Creates new conversations with a system-generated or user-supplied title. Appends user and assistant messages to conversation records after each exchange. Loads the most recent N message pairs (default: 10) for inclusion in the LLM context window; full conversation history is retained in storage regardless of the context window limit. Supports renaming conversations, deleting conversations, and deleting individual messages. Conversation records are scoped to the owning user.
+- Description: Persists and manages multi-turn conversation histories, enabling continuity across interactions and token-budgeted context loading for AI generation.
+- Inputs: Messages (role, content, citations, thinking) to be persisted; conversation identifiers for retrieval and lifecycle operations; user identity; optional explicit compaction requests.
+- Outputs: Stored conversation records; retrieved conversation lists and message histories; updated or deleted records; a rolling summary of compacted history.
+- Behaviour: Creates new conversations with a system-generated or user-supplied title. Appends user and assistant messages to conversation records after each exchange. History supplied to the LLM context window is bounded by a token budget derived from the active generation connection's context window (with a safety margin), not by a fixed message-pair count. When automatic compaction is enabled for the active generation connection and the budget would be exceeded, the system folds the oldest portion of history into an LLM-generated rolling summary before the next turn begins, retaining a minimum number of the most recent messages in full; a user may also request compaction explicitly on demand, which is not bound by that retained-message minimum. Full conversation history is retained in storage regardless of any compaction applied to a given context window. Supports renaming conversations, deleting conversations, and deleting individual messages. Conversation records are scoped to the owning user.
 
 ---
 
@@ -187,7 +196,7 @@ hestIA provides a managed AI assistance capability over organisationally control
 - Description: Manages the full lifecycle of user accounts within the platform.
 - Inputs: User account data (username, credentials, roles, metadata); user identifiers for retrieval, update, and deactivation operations.
 - Outputs: Created, retrieved, updated, or deactivated user records.
-- Behaviour: Restricted to users holding the administrator platform role. Supports creation of new user accounts with initial role assignment. Supports retrieval of individual or all user records. Supports update of account attributes including credential resets and role changes. Supports account deactivation. Changes to user records take effect on the next request evaluated by FC-03, as no permission caching exists.
+- Behaviour: Restricted to users holding the administrator platform role. Supports creation of new user accounts with initial role assignment. Supports retrieval of individual or all user records, annotated with a derived online/offline presence indicator based on a periodically updated last-activity timestamp (see FC-02). Supports update of account attributes including credential resets and role changes. Supports account deactivation. Changes to user records take effect on the next request evaluated by FC-03, as no permission caching exists.
 
 ---
 
@@ -211,15 +220,15 @@ hestIA provides a managed AI assistance capability over organisationally control
 - Description: Manages a set of contextual help resources, comprising markdown-formatted help sections and associated image assets.
 - Inputs: Help section content (markdown text, section identifier); image assets; read requests from authenticated users.
 - Outputs: Stored or updated help section records; help section listings and content for read operations; stored image assets.
-- Behaviour: Read access (listing and retrieval of help sections and images) is available to all authenticated users. Write operations (create, update, delete sections and images) are restricted to administrators. Functions as a lightweight, in-platform content management capability requiring no external CMS dependency.
+- Behaviour: Read access (listing and retrieval of help sections and images) is available to all authenticated users. Write operations (create, update, delete sections and images) are restricted to administrators. Functions as a lightweight, in-platform content management capability requiring no external CMS dependency. Unlike every other function in this document, FC-17 is implemented entirely within the presentation tier against its own local content store, not by the hestIA backend: it does not pass through FC-01/FC-03, and its write operations do not produce entries in the audit trail (FC-18). The administrator-only write restriction is enforced solely by the presentation tier checking the administrator flag on the caller's authenticated profile (see A-16).
 
 ---
 
 **FC-18 — Logging and Audit**
 - Description: Provides two complementary logging capabilities: structured operational system logging for traceability and debugging, and a dedicated security audit trail for compliance and incident investigation.
-- Inputs: Log emission requests from all other functions, carrying correlation identifiers, event types, resource references, user identities, and outcomes.
-- Outputs: Structured JSON system log entries written to the system log; audit event records written to a dedicated audit log file and persisted in the User Store.
-- Behaviour: System logs carry the correlation identifier assigned by FC-01, enabling full request traceability across all functions. Audit logs capture security-relevant events in six categories: authentication events, document access events, AI interaction events, data modification events, administrative actions, and policy decisions. Audit records include user identifier, action type, timestamp, target resource, and outcome. Audit log writes are unconditional and cannot be suppressed by request parameters.
+- Inputs: Log emission requests from all other backend functions, carrying correlation identifiers, event types, resource references, user identities, and outcomes.
+- Outputs: Structured JSON system log entries written to a rotating system log; structured JSON audit event records written to a separate, daily-rotated audit log with an extended retention period; query and export results for FC-25.
+- Behaviour: System logs carry the correlation identifier assigned by FC-01, enabling full request traceability across all backend functions. Audit logs capture security-relevant events in four categories: authentication and logout events, AI interaction events (request/response metadata, not content), administrative actions, and policy decisions. Audit records include user identifier, action type, timestamp, target resource, and outcome. Audit log writes are unconditional for every function that passes through the backend and cannot be suppressed by request parameters or by lowering system-log verbosity; the audit log's own verbosity is fixed independently of system-log level changes made through FC-25. As noted under FC-17, help content changes are not mediated by the backend and therefore do not produce audit entries.
 
 ---
 
@@ -231,10 +240,58 @@ hestIA provides a managed AI assistance capability over organisationally control
 
 ---
 
+**FC-20 — Tenant Collaboration Workflows**
+- Description: Manages user-initiated requests to join an organisation, requests by one organisation's moderators to share one of its collections with another organisation, and moderator-initiated direct invitations of a user into an organisation. Each request type follows a file/approve-or-reject lifecycle.
+- Inputs: Join request (requesting user, target organisation); share request (requesting organisation, target organisation, target collection); invitation (inviting organisation, invitee); approval or rejection decisions from an authorised moderator.
+- Outputs: Created, approved, or rejected request records; resulting organisational membership, tenant role, and classification level (join/invitation) or collection grant (share request); notification events delivered via FC-21.
+- Behaviour: A user may file a join request against any organisation without prior moderator involvement; the request is visible only to that organisation's moderators, who may approve (creating a membership) or reject it. A moderator may file a share request against another organisation for a collection their own organisation owns; the target organisation's moderators approve or reject it, and approval creates a collection grant scoped to the requesting organisation (see FC-16). A moderator may invite a specific user directly; the invitation is visible to the invitee, who accepts or declines it. Each organisation permits at most one active moderator at a time, enforced across all three workflows. All state transitions raise a notification (FC-21) to the relevant moderators or requester.
+
+---
+
+**FC-21 — Notification Management**
+- Description: Delivers and manages in-app notifications generated by tenant collaboration events (FC-20) and by administrator broadcasts, and maintains a configurable message shown to newly created users.
+- Inputs: Notification-triggering events from FC-20 and from user creation (FC-14); administrator broadcast content; read/mark-as-read requests from users; welcome-message configuration updates from administrators.
+- Outputs: Per-user notification inbox listings; unread notification count; updated read state; stored welcome-message configuration.
+- Behaviour: Notifications are targeted at a specific user (collaboration events, new-user welcome) or, for administrator broadcasts, at all users with no specific target. Users may list their notifications, retrieve an unread count, and mark individual or all notifications as read. Administrators may issue a broadcast notification and view broadcast history, and may configure the title and body of the message automatically sent to each newly created user. Delivery is in-app only; no external channel (e-mail, push, webhook) is provided.
+
+---
+
+**FC-22 — Platform Connection Administration**
+- Description: Manages the lifecycle of backend connections that provide AI generation, embedding, reranking, and vector-database capability to the rest of the platform.
+- Inputs: Connection configuration (purpose, backend type, endpoint, credentials, model, generation and context-compaction parameters); connectivity test requests; activation requests; administrator credentials.
+- Outputs: Created, updated, or deleted connection records; connectivity test results; live model listings for a connection; the currently active connection per purpose.
+- Behaviour: Restricted to administrators. A purpose (generation, embedding, reranking, or vector database) may have multiple configured connections, of which at most one is active at any time. Creating, updating, deleting, or activating a connection takes effect immediately by rewiring the corresponding live backend service in place; no service restart is required. A connection's configuration may be tested for connectivity before it is saved or activated. Per-connection generation parameters include whether automatic conversation-context compaction is enabled and its associated model and thresholds (see FC-10).
+
+---
+
+**FC-23 — Authentication and Security Configuration Administration**
+- Description: Manages the platform's active authentication mode and its full associated configuration, including password policy, session-token signing configuration, directory-service configuration, and federated-identity configuration.
+- Inputs: Desired authentication mode; password policy parameters; token signing algorithm, key, and lifetime; directory-service connection and group-mapping configuration; federated-identity provider and claim-mapping configuration; connectivity test requests.
+- Outputs: Current configuration (with secrets masked); updated configuration; connectivity test results for the directory service or federated-identity provider.
+- Behaviour: Restricted to administrators. Reading the configuration never exposes stored secrets in cleartext. Saving a configuration change rebuilds the platform's authentication service stack from the new configuration and swaps it into the running service atomically, without a restart; the change takes effect starting with the next request. Changing the active authentication mode or the token signing key invalidates all previously issued session tokens. A configuration may be tested for directory-service or federated-identity-provider connectivity, using not-yet-saved values, before being committed. Changes to the login rate-limit thresholds are persisted immediately but, at the current implementation stage, only take effect in the running rate limiter after a service restart — a known gap between saved and applied configuration for this one setting.
+
+---
+
+**FC-24 — Workflow Graph Administration**
+- Description: Manages the declarative YAML definitions of the AI workflow graphs executed by FC-05, allowing administrators to inspect, author, modify, and reset them without platform code changes.
+- Inputs: Workflow identifier; YAML graph definition (new or replacement); reset request.
+- Outputs: Listing of all workflow graphs (built-in and custom), including whether a graph's live copy has diverged from its shipped default; stored or replaced graph definitions; a built-in graph reset to its shipped default, or a custom graph deleted.
+- Behaviour: Restricted to administrators. A submitted graph definition is validated against the fixed node-type vocabulary and the requirement that all declared nodes form a single linear chain (see FC-05) before being accepted. Accepted changes are persisted to the platform's persistent configuration storage and take effect on the next workflow execution, without a service restart. A built-in workflow (generate, rag_generate, chat, rag_chat) may be reset to its shipped default; a custom, administrator-created workflow may be permanently deleted. Built-in shared node fragments underlying all workflow graphs are not administrator-editable and are refreshed from the shipped release on every platform start; the seeded, administrator-editable copies of the four built-in graph definitions are, by contrast, seeded only once and are never overwritten by a subsequent platform update, so that administrator edits survive upgrades and restarts.
+
+---
+
+**FC-25 — System Log Administration**
+- Description: Provides administrator query, filtered export, and live verbosity control over the system and audit logs produced by FC-18.
+- Inputs: Log query filters (level, search text, time range); export format selection; desired system log verbosity level.
+- Outputs: Paginated log query results; a streamed export file (line-delimited or tabular format); current and updated log verbosity level.
+- Behaviour: Restricted to administrators. Log queries and exports operate over the system and/or audit logs, filtered by level, free-text search, and time range. Log exports and verbosity changes are themselves recorded as administrative-action audit entries; plain log queries are not. System log verbosity may be changed live, without a restart; the change is not persisted and reverts to its configured default on the next restart. Audit log verbosity is fixed and is not affected by this function, consistent with FC-18's unconditional audit-writing behaviour.
+
+---
+
 ## 4 Functional Data Flows
 
 ### 4.1 High-Level Data Flow
-All interactions with hestIA originate at FC-01 (API Gateway), which authenticates requests via FC-02 and routes them to the appropriate function. For AI assistance interactions, FC-04 (Request Handling) drives a workflow via FC-05 (Workflow Orchestration), which coordinates encoding, retrieval, augmentation, and generation in sequence. Document ingestion interactions pass through FC-06, which transforms source files into encoded chunks and persists them to the knowledge base. Administrative interactions are handled by FC-14 through FC-17 under administrator or moderator authority. FC-03 (Access Policy Enforcement) is invoked on every interaction that touches protected resources, and FC-18 (Logging and Audit) receives emissions from every function throughout the request lifecycle.
+All interactions with hestIA's backend originate at FC-01 (API Gateway), which authenticates requests via FC-02 and routes them to the appropriate function; routing additionally depends on which backend connections FC-22 has configured (see FC-01 behaviour). For AI assistance interactions, FC-04 (Request Handling) drives a workflow via FC-05 (Workflow Orchestration), which coordinates encoding, retrieval, augmentation, and generation in sequence. Document ingestion interactions pass through FC-06, which transforms source files into encoded chunks and persists them to the knowledge base. Administrative interactions are handled by FC-14 through FC-17 and FC-20 through FC-25 under administrator or moderator authority; FC-17 is the sole exception, being mediated by the presentation tier rather than this backend (see A-16). FC-03 (Access Policy Enforcement) is invoked on every interaction that targets a document collection, and FC-18 (Logging and Audit) receives emissions from every backend function throughout the request lifecycle.
 
 ### 4.2 Core Data Flows
 
@@ -251,7 +308,7 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 7. On all subsequent requests, the user presents the JWT as a Bearer token.
 8. FC-01 passes the token to FC-02 for signature and expiry validation.
 9. FC-02 returns the validated user identity, which FC-01 uses to load the user's roles and permissions from the User Store.
-10. The enriched identity is passed to FC-03 for policy evaluation before the request proceeds.
+10. If the request targets a document collection, the enriched identity is passed to FC-03 for policy evaluation before the request proceeds; requests that do not target a collection proceed directly.
 11. FC-18 records authentication events (success, failure, rate-limit trigger) as audit entries.
 
 #### 4.2.2 Document Ingestion Flow
@@ -260,7 +317,7 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 
 1. An authorised user (holding a moderator role on the target organisation) submits a document upload request to FC-01, including the source file, target collection, target tenants, and classification level.
 2. FC-01 authenticates the request via FC-02.
-3. FC-03 evaluates whether the user holds the moderator role for the collection's owning organisation and whether an active collection grant exists; a DENY decision terminates processing.
+3. A dedicated moderator-role guard evaluates whether the user holds the moderator role for the collection's owning organisation and whether an active collection grant exists; failure terminates processing before FC-06 is invoked. This guard is a role check distinct from FC-03 (see FC-03 description).
 4. FC-06 receives the document and invokes the parser for the appropriate format, extracting text content, document structure, and metadata.
 5. Any caller-supplied metadata overrides are applied to the extracted metadata.
 6. FC-06 segments the parsed content into chunks at section boundaries; each chunk is linked to its neighbours and annotated with source and position metadata.
@@ -288,6 +345,26 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 13. FC-04 optionally persists the user message and assistant response to the conversation history via FC-10.
 14. FC-18 records the AI interaction and document access events as audit entries.
 
+#### 4.2.4 Tenant Collaboration Flow
+
+1. A user submits a request to FC-01: to join an organisation, to invite another user (if a moderator of the inviting organisation), or — if a moderator — to request that another organisation share access to one of their organisation's collections.
+2. FC-01 authenticates the request via FC-02.
+3. FC-20 records the request and notifies the relevant party via FC-21: the target organisation's moderators for a join or share request, or the invitee for an invitation.
+4. An authorised moderator approves or rejects the request via FC-01/FC-20.
+5. On approval, FC-20 updates organisational membership, tenant role, and classification level (join/invitation) or creates a collection grant (share request), invoking FC-15 or FC-16 respectively.
+6. FC-21 notifies the original requester of the outcome.
+7. FC-18 records the administrative action as an audit entry.
+
+#### 4.2.5 Runtime Configuration Change Flow
+
+1. An administrator submits a configuration change to FC-01: an authentication/security setting (FC-23), a backend connection (FC-22), or a workflow graph (FC-24).
+2. FC-01 authenticates the request via FC-02; the administrator role is verified before proceeding.
+3. Where applicable (authentication settings, backend connections), the administrator may first invoke a connectivity test against the proposed configuration without persisting it.
+4. On save, the new configuration is persisted to the platform's persistent configuration storage.
+5. The corresponding live service (authentication stack, backend connection, or workflow graph cache) is rebuilt and swapped into the running system in place.
+6. The change takes effect starting with the next request that uses the affected function; no service restart occurs.
+7. FC-18 records the configuration change as an administrative-action audit entry.
+
 ### 4.3 Data Objects
 
 | Data Object | Description |
@@ -298,7 +375,7 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 | Sparse Vector | Keyword-weighted term index representation of a chunk or query, scored against the collection corpus vocabulary |
 | Query | A search request comprising one or both vector forms and optional payload filters, targeting a specific collection |
 | Execution Graph | A YAML-defined directed acyclic graph of typed processing nodes specifying a complete AI workflow |
-| User | Platform account record: unique identifier, username, platform role, organisational memberships (each carrying tenant role and classification level) |
+| User | Platform account record: unique identifier, username, platform role, organisational memberships (each carrying tenant role and classification level), last-activity timestamp |
 | Permission | Derived access descriptor for a user: map of permitted collections to maximum classification level per collection |
 | Policy Result | The outcome of a per-request access evaluation: ALLOW, FILTER (with classification constraint), or DENY |
 | Conversation | A persistent, user-scoped record comprising a title and an ordered sequence of messages |
@@ -307,6 +384,11 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 | Citation | A structured reference associating a citation key with a source document name, subject, and content excerpt |
 | Audit Entry | A security event record: user identifier, action type, timestamp, target resource, and outcome |
 | Corpus | Per-collection vocabulary and document-frequency statistics used for keyword vector scoring |
+| Notification | An in-app event record: target (specific user, or none for a broadcast), category, message, read state, timestamp |
+| Collaboration Request | A join request, share request, or invitation record: requester/inviter, target organisation, optional target collection (share requests), status (pending/approved/rejected), resolving moderator |
+| Connection | A configured backend connection record: purpose (generation, embedding, reranking, vector database), backend type, endpoint, credentials, model, activation state, and (for generation connections) context-compaction parameters |
+| Security Configuration | The active authentication mode and its associated password policy, token signing configuration, directory-service configuration, and federated-identity configuration |
+| Context Summary | A rolling LLM-generated summary of conversation history folded during compaction, retained alongside the full message history |
 
 ---
 
@@ -365,6 +447,25 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 1. An administrator creates or updates help sections by supplying markdown content and a section identifier.
 2. Administrators may upload image assets for use within help sections.
 3. All authenticated users may read help sections and images at any time.
+4. Unlike the other administration workflows above, this workflow is carried out entirely by the presentation tier and is not recorded in the audit trail (see A-16).
+
+### 5.4 Tenant Collaboration Workflow
+
+*(No sequence diagram currently exists for this workflow; see Finding on diagram coverage in the accompanying Architecture Conformance Review.)*
+
+1. A user requests to join an organisation, or a moderator invites a specific user or requests that another organisation share one of its collections.
+2. The relevant organisation's moderators are notified and review the request.
+3. A moderator approves or rejects the request.
+4. On approval, membership, tenant role, and classification level are established (join/invitation) or a collection grant is created (share request), taking effect on the requester's next request per A-02.
+5. The requester is notified of the outcome. An audit record is created.
+
+### 5.5 Platform Configuration Workflow
+
+1. An administrator changes the active authentication mode or its configuration, adds/updates/activates a backend connection, or edits a workflow graph.
+2. Where supported, the administrator tests the proposed configuration's connectivity before saving.
+3. The system persists the change and rebuilds the affected live service (authentication stack, backend connection, or workflow graph) in place.
+4. The change takes effect on the next request that uses the affected function, without a service restart. An audit record is created.
+5. Changing the authentication mode or token signing key invalidates previously issued session tokens for all users.
 
 ---
 
@@ -379,7 +480,7 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 | FC-03 Access Policy Enforcement | FC-02 (validated identity), User Store (membership and grant records) |
 | FC-04 Request Handling | FC-03 (policy decision), FC-05 (workflow execution), FC-10 (conversation history), FC-18 (audit emission) |
 | FC-05 Workflow Orchestration | FC-07 (retrieval node), FC-08 (augmentation node), FC-09 (generation node) |
-| FC-06 Document Ingestion | FC-03 (moderator authority check), LLM Server (dense encoding), Vector Database (chunk storage), Corpus store (sparse encoding statistics) |
+| FC-06 Document Ingestion | Dedicated moderator-role guard (distinct from FC-03; see FC-03 description), LLM Server (dense encoding), Vector Database (chunk storage), Corpus store (sparse encoding statistics) |
 | FC-07 Document Retrieval | Vector Database (chunk search), FC-03 (classification filter input) |
 | FC-08 Prompt Augmentation | FC-07 (ranked chunk list) |
 | FC-09 AI Generation | LLM Server (text generation), FC-08 (augmented prompt, in RAG modes) |
@@ -387,26 +488,34 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 | FC-11 Document Preview | Document parsing capability (shared with FC-06, non-persisting) |
 | FC-12 Direct Vector Search | FC-03 (access policy filter), FC-07 (retrieval execution), Vector Database |
 | FC-13 Vector Encoding Exposure | LLM Server (dense embedding), Corpus store (sparse encoding statistics) |
-| FC-14 User Administration | FC-03 (administrator role check), User Store (user record persistence) |
-| FC-15 Organisation and Membership Administration | FC-03 (role check), User Store (organisation and membership record persistence) |
-| FC-16 Collection Grant Administration | FC-03 (administrator role check), User Store (grant record persistence) |
-| FC-17 Help Content Management | FC-03 (role check for writes), User Store or equivalent content store |
-| FC-18 Logging and Audit | User Store (audit record persistence); receives emissions from all other functions |
+| FC-14 User Administration | Dedicated administrator-role guard (distinct from FC-03), User Store (user record persistence) |
+| FC-15 Organisation and Membership Administration | Dedicated administrator/moderator-role guard (distinct from FC-03), User Store (organisation and membership record persistence) |
+| FC-16 Collection Grant Administration | Dedicated administrator-role guard (distinct from FC-03), User Store (grant record persistence) |
+| FC-17 Help Content Management | Presentation-tier local content store (not the backend User Store); presentation-tier check of the caller's administrator flag — does not invoke FC-03 or FC-18 |
+| FC-18 Logging and Audit | Persistent log storage (file-based, not the User Store); receives emissions from every backend function |
 | FC-19 Health and Readiness | LLM Server, Vector Database, User Store (availability probes) |
+| FC-20 Tenant Collaboration Workflows | User Store (request/membership/grant persistence), FC-21 (notification emission), FC-15/FC-16 (membership and grant creation on approval) |
+| FC-21 Notification Management | User Store (notification persistence); receives emissions from FC-20 and FC-14 |
+| FC-22 Platform Connection Administration | FC-03/administrator role check, User Store (connection record persistence); live-rewires the LLM Server and Vector Database service instances consulted by FC-06, FC-07, FC-09, FC-13, FC-19 |
+| FC-23 Authentication and Security Configuration Administration | Administrator role check, User Store (configuration persistence); live-rewires the service instances consulted by FC-02 |
+| FC-24 Workflow Graph Administration | Administrator role check, persistent workflow-template storage; invalidates the template cache consulted by FC-05 |
+| FC-25 System Log Administration | Administrator role check, persistent log storage (same store as FC-18) |
 
 ### 6.2 Dependency Description
 
-**Access Policy as a cross-cutting dependency:** FC-03 is invoked by every function that accesses protected resources. It is the single enforcement point for both platform RBAC and the tenant classification model. Any function that bypasses FC-03 would constitute a security gap; the architecture does not permit such bypass paths.
+**Access Policy as a cross-cutting dependency, scoped to collection access:** FC-03 is invoked by every function that retrieves knowledge from a document collection (FC-05's retrieval path, FC-12). It is the single enforcement point for the tenant classification model. Platform- and tenant-role authorisation for administrative functions (FC-14 through FC-17, FC-20 through FC-25) is enforced by dedicated role-check guards rather than by FC-03 itself; any administrative function found to omit its role-check guard, or any collection-retrieving function found to bypass FC-03, would constitute a security gap.
 
-**User Store as the authoritative identity and history source:** FC-02, FC-03, FC-10, FC-14, FC-15, FC-16, and FC-18 all depend on the User Store. It holds user accounts, credentials, organisational memberships, collection grants, conversation histories, and audit records. Its availability is therefore necessary for the vast majority of system functions.
+**User Store as the authoritative identity and history source:** FC-02, FC-03 (indirectly, via the permission set it consults), FC-10, FC-14, FC-15, FC-16, FC-20, FC-21, FC-22, and FC-23 all depend on the User Store. It holds user accounts, credentials, organisational memberships, collection grants, conversation histories, collaboration-workflow requests, notifications, and runtime-configurable connection and security settings. Its availability is therefore necessary for the vast majority of system functions. Logging and audit (FC-18/FC-25) are the principal exception, being backed by file-based persistent log storage rather than the User Store.
 
-**LLM Server as the AI capability source:** FC-06 (dense encoding during ingestion), FC-09 (text generation), and FC-13 (encoding exposure) all depend on the LLM Server. Its unavailability prevents document ingestion encoding, query encoding, and all AI generation. FC-19 reflects LLM Server availability in its readiness signal.
+**LLM Server as the AI capability source, delivered through configurable connections:** FC-06 (dense encoding during ingestion), FC-09 (text generation), and FC-13 (encoding exposure) all depend on an active, administrator-configured connection for the relevant purpose (generation, embedding, or reranking — see FC-22). Its unavailability prevents document ingestion encoding, query encoding, and all AI generation; if no connection is configured for a purpose at all, the dependent function is not exposed (see FC-01). FC-19 reflects connection availability in its readiness signal.
 
-**Vector Database as the knowledge persistence layer:** FC-06 (upsert) and FC-07 (retrieval) both depend on the Vector Database. Without it, no knowledge ingestion or retrieval is possible. FC-19 reflects its availability in the readiness signal.
+**Vector Database as the knowledge persistence layer, delivered through a configurable connection:** FC-06 (upsert) and FC-07 (retrieval) both depend on an active, administrator-configured vector-database connection (see FC-22). Without it, no knowledge ingestion or retrieval is possible. FC-19 reflects its availability in the readiness signal.
 
 **Corpus statistics as a local dependency of sparse encoding:** The sparse keyword encoding used in FC-06 and FC-13 depends on per-collection corpus statistics maintained on the platform's local storage. These statistics are updated with each ingestion; their loss or corruption would degrade keyword retrieval quality without preventing semantic retrieval.
 
-**FC-05 as the composition orchestrator:** All RAG and generation workflows execute through FC-05. It has no external infrastructure dependencies of its own but depends on the functions it coordinates (FC-07, FC-08, FC-09). Its correct operation depends on the validity and integrity of the registered execution graph definitions.
+**FC-05 as the composition orchestrator, within a fixed node vocabulary:** All RAG and generation workflows execute through FC-05. It has no external infrastructure dependencies of its own but depends on the functions it coordinates (FC-07, FC-08, FC-09). Its correct operation depends on the validity and integrity of the registered execution graph definitions; the graphs it can execute are bounded by the fixed, platform-defined vocabulary of node types and the four fixed workflow kinds (see FC-05, FC-24) — administrators may recompose and reconfigure graphs within that vocabulary but cannot introduce new node types or workflow kinds without a platform code change.
+
+**Runtime configuration administration (FC-22, FC-23, FC-24) as a live-rewiring layer:** Unlike a conventional deploy-time configuration model, changes accepted by these three functions take effect on the running system immediately, by rebuilding and swapping the affected service in place. This means the functional behaviour of FC-02 (authentication mode), FC-06/FC-07/FC-09/FC-13 (active backend connections), and FC-05 (workflow graph content) is not fixed for the lifetime of a deployment and can change at any time an administrator makes such a change.
 
 ---
 
@@ -418,13 +527,13 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 
 **A-03** — A user may access documents in a collection only if two independent conditions are simultaneously satisfied: the user's organisation holds an active grant for that collection, and the user's individual classification clearance level equals or exceeds the classification level of the target document chunks.
 
-**A-04** — The three authentication modes (local, directory service, federated identity) are mutually exclusive. Exactly one mode is active per deployment. Mixed-mode authentication within a single deployment is not supported.
+**A-04** — The three authentication modes (local, directory service, federated identity) are mutually exclusive. Exactly one mode is active at any given time. Mixed-mode authentication is not supported. Unlike a deployment-time-fixed choice, the active mode and its full configuration are administrator-configurable at runtime through FC-23 and take effect on the next request without a service restart; changing the mode or the token signing key invalidates all previously issued session tokens.
 
 **A-06** — Document ingestion into a collection requires the requesting user to hold the moderator role within the organisation that owns the collection. Members and co-moderators may not ingest documents.
 
-**A-07** — Conversation history supplied to the LLM context window is bounded (default: 10 message pairs). Full conversation history is retained in persistent storage and is not subject to this bound.
+**A-07** — Conversation history supplied to the LLM context window is bounded by a token budget derived from the active generation connection's context window, not by a fixed message-pair count. When the budget would be exceeded, the oldest portion of history is folded into a summary — automatically before a new turn begins (if enabled for the active connection, subject to a minimum retained-message floor) or on explicit user request (not subject to that floor). Full conversation history is retained in persistent storage and is not subject to this bound.
 
-**A-08** — Login attempts are rate-limited. No other functional endpoint is rate-limited at the current development stage.
+**A-08** — Login attempts and all federated-identity (OIDC) authorize/callback/logout requests are rate-limited; the login rate limit's thresholds are administrator-configurable via FC-23, though a change to those thresholds only takes effect in the running rate limiter after a service restart (a known gap between saved and applied configuration). No other functional endpoint is rate-limited at the current development stage.
 
 **A-09** — List operations (users, conversations, collections, etc.) return all records without pagination. This constraint is acknowledged as a scalability limitation at the current alpha stage.
 
@@ -432,10 +541,18 @@ All interactions with hestIA originate at FC-01 (API Gateway), which authenticat
 
 **A-11** — Validation of OIDC state parameters and PKCE flows during federated authentication is the responsibility of the integrating client application, not of hestIA.
 
-**A-12** — Classification clearance levels are assigned as integer values on the scale 0 (PUBLIC) through 4 (SECRET). A user with clearance level N may access documents with classification levels 0 through N inclusive.
+**A-12** — Classification clearance levels are assigned as integer values on the scale 0 (PUBLIC) through 4 (SECRET), with intermediate levels 1 (INTERNAL), 2 (RESTRICTED), and 3 (CONFIDENTIAL). A user with clearance level N may access documents with classification levels 0 through N inclusive.
 
-**A-13** — Audit logging is unconditional and non-suppressible. All security-relevant events — authentication, document access, AI interactions, data modifications, administrative actions, and policy decisions — are recorded regardless of request outcome.
+**A-13** — Audit logging is unconditional and non-suppressible for every function mediated by the hestIA backend. Authentication, AI interaction, administrative action, and policy-decision events are recorded regardless of request outcome. Help Content Management (FC-17) is the one documented function not mediated by the backend and is therefore not covered by this guarantee (see A-16).
 
-**A-14** — Execution graph definitions are the authoritative specification of AI workflow behaviour. Changes to workflow behaviour are effected by modifying graph definitions; platform logic is not modified for workflow changes.
+**A-14** — Execution graph definitions are the authoritative specification of AI workflow behaviour, within a fixed, platform-defined vocabulary of six node types and four workflow kinds (see FC-05). Within that vocabulary, changes to workflow behaviour — node sequencing, prompt content, slot wiring — are effected by modifying graph definitions through FC-24, without platform code changes. Introducing a new node type, a new workflow kind, or conditional branching is outside this vocabulary and requires a platform code change.
 
-**A-15** — The platform does not perform OIDC identity provider discovery autonomously. OIDC provider configuration must be supplied at deployment time.
+**A-15** — The platform does not perform OIDC identity provider discovery autonomously. OIDC provider configuration must be supplied by an administrator, either at initial deployment or subsequently through FC-23.
+
+**A-16** — Help Content Management (FC-17) is implemented by the presentation tier against its own local content store, independent of the hestIA backend's User Store, authentication middleware re-verification, access policy engine (FC-03), and audit trail (FC-18). Read/write access is gated only by the presentation tier's own check of the administrator flag on the caller's profile, as returned by the backend's authentication function (FC-02).
+
+**A-17** *(Assumed, based on implementation)* — The User Store, per-collection corpus statistics, and system/audit logs are persisted as an embedded database and local files on the backend's own storage volume, with in-process write serialisation. The current implementation has not been verified to support running more than one backend instance concurrently against shared persistent state; horizontal scaling of the backend would require an external, shared persistence layer not present in the current architecture.
+
+**A-18** — Functions bound to a configurable backend purpose — Document Ingestion (FC-06), Direct Vector Search (FC-12), Vector Encoding Exposure (FC-13), and AI Generation (FC-09, via FC-04/FC-05) — are available only when at least one connection has been configured for the corresponding purpose through FC-22. In a deployment lacking such a connection, the corresponding functions are not exposed rather than failing at call time.
+
+**A-19** — The Mission Requirements Specification (MRS) includes a substantial cluster of requirements outside this document's functional scope: interactive document-editing capabilities (MRS-041 through MRS-057) and CMDB/asset-management, ontology-registry, and CyFORT-component-integration capabilities (MRS-075 through MRS-103), the great majority of which the MRS itself records at 0% coverage or as rejected. This document intentionally does not describe architecture for that cluster. Three functional components introduced in this revision — Tenant Collaboration Workflows (FC-20), Notification Management (FC-21), and System Log Administration (FC-25) — currently have no corresponding MRS or SRS entry at all; they were captured here from the architecture-conformance review of the implemented codebase rather than derived from a preceding requirement. A compliance-requirements cluster (MRS-104, MRS-105, MRS-107, MRS-GDPR-001 through MRS-GDPR-012) is likewise not carried into this document or into the SDD/ICD; see `docs/rtm.csv` for the per-requirement traceability status and `reviews/baseline-integrity-review-2026-09-09.md` for the full assessment, including one requirement (MRS-106, mandating an encrypted-storage/transport deployment gate) found to directly contradict the SDD's documented as-built state rather than merely lacking a trace.
