@@ -3,7 +3,7 @@ active: true
 comments: "Chat access via API possible by using curl. \nUser mgmt, fully supported\
   \ via CLI and partially via web interface. \nDb management currently via CLI invoking\
   \ scripts.\n"
-coverage: 80
+coverage: 100
 derived: false
 header: ''
 importance: 4

@@ -138,9 +138,15 @@ class TestFormatCitations:
 
 class TestBuildPrompt:
 
-    def test_no_hits_returns_original_prompt(self):
+    def test_no_hits_renders_template_with_empty_retrieved_sections(self):
         prompt, cites = _build_prompt("original", [], "{user_prompt}{retrieved_data}{source_map}")
         assert prompt == "original"
+        assert cites == []
+
+    def test_no_hits_with_attachments_goes_through_template_placeholder(self):
+        template = "{user_prompt} | attachments=[{attached_documents}] | data=[{retrieved_data}]"
+        prompt, cites = _build_prompt("original", [], template, attachments="doc.txt")
+        assert prompt == "original | attachments=[doc.txt] | data=[]"
         assert cites == []
 
     def test_with_hits_augments_prompt(self):
@@ -483,14 +489,33 @@ class TestRunRetrieve:
 
 class TestRunAugment:
 
-    def test_no_hits_leaves_prompt_unchanged(self):
+    def test_no_hits_still_applies_default_template(self):
         runner = Runner(container=MagicMock())
         node = Node(id="n1", type="Augment", inputs={"prompt": "hello", "hits": []}, outputs={})
         slot = {}
 
         asyncio.run(runner._run_augment(node, slot, stream=False))
 
-        assert slot["prompt"] == "hello"
+        assert "hello" in slot["prompt"]
+        assert slot["prompt"] != "hello"  # still wrapped in the default template
+        assert slot["_cite_list"] == []
+
+    def test_no_hits_with_custom_non_rag_template_applies_it(self):
+        # An Augment node doesn't have to be RAG-flavored -- a template with
+        # no {retrieved_data}/{source_map} at all must still render even
+        # when there's no Retrieve node feeding hits (see graph.py's
+        # _REQUIRED_AUGMENT_PLACEHOLDERS).
+        runner = Runner(container=MagicMock())
+        node = Node(
+            id="n1", type="Augment",
+            inputs={"prompt": "hello", "hits": [], "template": "Rewritten: {user_prompt}"},
+            outputs={},
+        )
+        slot = {}
+
+        asyncio.run(runner._run_augment(node, slot, stream=False))
+
+        assert slot["prompt"] == "Rewritten: hello"
         assert slot["_cite_list"] == []
 
     def test_with_hits_sets_prompt_and_cite_list(self):

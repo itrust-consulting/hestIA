@@ -1,8 +1,7 @@
 acceptancecriteria: Users can edit metadata.
 active: true
-comments: |
-  Metadata nerichment is allowed though only specific fields are currently allowed to be set via the UI.
-coverage: 90
+comments: ''
+coverage: 100
 derived: false
 header: ''
 importance: 3

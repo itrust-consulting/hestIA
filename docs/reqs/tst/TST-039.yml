@@ -2,29 +2,36 @@ active: true
 authors: ACR
 complexity: 1-5
 derived: false
-execution_type: Automated/Manual
+execution_type: Manual
 expected_outcome: ''
 header: |
-  Distributed setup
-level: 35.4
-links: []
+  Logging coverage review
+level: 1.39
+links:
+- SRS-027: YWBQg4-UUS7inYWlM0wgi5uz0xfcJhoidS_4nGPt9AE=
 normative: true
 platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/specs/tst/assets
-  type: file
-release: alpha
-reviewed: null
+references: []
+release: beta
+reviewed: 88z28yEdkrRjs1clbwK3hO8GVtIW473z1Nq1W1vbZws=
 test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  -
+  - Source code access to the full application (audit and system logging call sites, request handlers, admin routers).
 
   ## Test steps
-  1. follow steps in SRS.
+  1. Enumerate every call site of the audit and system logging facilities in the codebase.
+  2. Enumerate the critical paths that must be logged per SRS-027: authentication, collection access decisions (including denials), document ingestion and deletion, and administrative changes (user/organization CRUD, role and classification changes, tenant/collection access grants, workflow configuration changes, log-level changes).
+  3. For each critical path, confirm a corresponding log call exists on both the success and failure branches.
+  4. For each confirmed log call, verify it captures the acting user, action, affected resource, timestamp, and correlation ID.
+  5. Identify any critical path with no log call, or whose logging is gated behind a configuration flag that is disabled by default.
+  6. Record all findings, including the file and line of each reviewed call site and any gap identified.
 
   ## Expected outcome
-  1.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+  1. Every critical path listed in SRS-027 has at least one corresponding logging call site, reachable on both success and failure.
+  2. Each reviewed log call captures the required fields (actor, action, resource, timestamp, correlation ID).
+  3. No critical path is silently unlogged, including via a default-disabled configuration flag.
+  4. Any gap found is documented with file/line references for remediation.
+verification_method: Review of design (R)
 version: 0.1

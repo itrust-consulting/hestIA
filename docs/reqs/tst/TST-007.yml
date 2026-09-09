@@ -1,43 +1,33 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
-execution_type: Manual/Automated
-expected_outcome: |
-  API documentation available; all endpoints respond with consistent structure; errors are clearly described.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify the REST API is documented, consistently structured, and covers all core capabilities
-level: 7.0
+  Local authentication - Configuration
+level: 1.7
 links:
-- SRS-007: HKbdS7odJV_kzLZIHn2V8equd3eHtjGEHVI0cxKq1hU=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: KjjiAHTRoctM7bhHG_MeiIUd_2c6MkYnE2fu4FhPZts=
-test_data: |
-  Admin credentials; API client (curl, Postman, or equivalent); at least one collection with ingested content
+reviewed: yYPe4lSsXqvYVbmSNauIwEtReI8t3onP0UNd2wuvGyE=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA backend is running on port 5555
-  - All services are active (confirmed via GET /ready)
-  - An admin account exists with known credentials
-  - An API client is available
+  - System configured with AUTH_MODE=local.
 
   ## Test steps
-  1. Call GET /openapi.json. Confirm an OpenAPI 3.x schema is returned listing all registered endpoints.
-  2. Open GET /docs in a browser and confirm the Swagger UI renders with all endpoint groups visible.
-  3. Authenticate via the API and confirm an access token is returned.
-  4. Use the token to call one endpoint from each major group (chat, upload, user management, collections). Confirm each responds with a consistently structured envelope.
-  5. Call an endpoint with a deliberately malformed request body. Confirm the error response includes a clear description of the validation failure.
+  1. Confirm the system is operating in local authentication mode (login form accepts credentials directly, no LDAP/OIDC redirect occurs).
+  2. Attempt to start the service with AUTH_SECRET_KEY unset or shorter than the required minimum length.
+  3. Restore a valid AUTH_SECRET_KEY (>= 32 characters) and restart the service.
 
   ## Expected outcome
-  1. API documentation is available and describes all supported operations with their expected inputs and outputs.
-  2. All endpoint responses follow a consistent structure.
-  3. Error responses include a description of what went wrong.
-  4. All core capabilities from dependent SRS are accessible via the API.
-verification_method: I
+  1. Login uses the local credential store directly, with no external redirect.
+  2. The service refuses to start (or fails token operations) with a missing/too-short AUTH_SECRET_KEY.
+  3. With a valid AUTH_SECRET_KEY, the service starts normally and local login succeeds.
+verification_method: Test (T)
 version: 0.1

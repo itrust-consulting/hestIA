@@ -1,4 +1,7 @@
 active: true
+comments: |
+  The time-bounded access criterion documents an already-implemented capability
+  (User.expires_at and per-tenant-role expires_at/starts_at), not new scope.
 dependence: []
 derived: false
 difficulty: 3
@@ -7,6 +10,7 @@ importance: 5
 level: 2.1
 links:
 - MRS-003: vCv0JUWyUyhA8O5vlIlPe9Yqsaf3HCEtLCjJsBrlpVU=
+- MRS-004: eURsYlBUBfsHytp_0lHcrd6uaMlKfcJNvj2mTCGkmoM=
 - MRS-063: 905dT8aZvun481a2Z3oVcttFNp7svK5RQCSNVhYrT9k=
 normative: true
 outlay: ''
@@ -36,6 +40,7 @@ text: |
   - A moderator of one organization cannot manage other organizations.
   - An administrator has unrestricted access to all collections and classification levels.
   - Each organization may have at most one moderator.
+  - A user's or a role grant's access can be bounded to a start and/or expiry date; access is denied before the start date and after the expiry date.
 type: S
 urgency: 5
 version: '0.1'

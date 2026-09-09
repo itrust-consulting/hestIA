@@ -37,7 +37,7 @@ text: |
   - Document ingestion and query processing complete successfully with all outbound internet routes blocked.
   - No requests to external hosts are observable during embedding generation or text generation.
   - The LLM backend can be switched between supported providers without modifying application source code.
-  - The embedding model can be selected via configuration; a change takes effect after a system restart without code changes.
+  - The embedding model can be selected via configuration; a change takes effect live, on the next request, without a system restart or code changes.
   - Document embeddings are stored in the knowledge base alongside classification metadata to support access-controlled retrieval.
 type: F
 urgency: 5

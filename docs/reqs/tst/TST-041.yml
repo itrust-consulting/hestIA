@@ -2,29 +2,37 @@ active: true
 authors: ACR
 complexity: 1-5
 derived: false
-execution_type: Automated/Manual
+execution_type: Automated
 expected_outcome: ''
 header: |
-  Local authentication
-level: 35.6
-links: []
+  Streaming response delivery
+level: 1.41
+links:
+- SRS-023: ep7-O9kjClvOWabVsf1b0C5CcwzthR8LcBKqx_kkJCc=
 normative: true
 platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/specs/tst/assets
+- path: docs/specs/tst/assets/formats/incident-response-procedure.pdf
   type: file
 release: alpha
-reviewed: null
+reviewed: J6ekzWL3yFaY8QvQtvUS9lXqim-k5sqj1cLc0O78SV4=
 test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - System initialized
+  - System initialized and logged in as user.
+  - A collection with content available for a RAG query.
 
   ## Test steps
-  1. Log in using available credentials.
+  1. Submit a chat request with stream=true and inspect the raw HTTP response.
+  2. Record each incremental chunk as it arrives and reassemble the full content client-side.
+  3. Submit the same prompt with stream=false and compare the reassembled streamed content to the non-streaming response.
+  4. Start a streaming request and forcibly disconnect the client mid-stream (e.g., close the connection before completion).
+  5. Confirm the server remains healthy and continues serving subsequent requests normally.
 
   ## Expected outcome
-  1.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+  1. The stream=true response uses chunked transfer encoding or Content-Type: text/event-stream, delivering tokens incrementally rather than as one blocking response.
+  2. The fully assembled streamed content is semantically equivalent to the non-streaming response for the same input.
+  3. A mid-stream client disconnect is handled gracefully server-side, with no unhandled exception or crash, and the server continues serving other requests.
+verification_method: Test (T)
 version: 0.1

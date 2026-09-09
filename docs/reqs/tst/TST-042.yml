@@ -2,30 +2,37 @@ active: true
 authors: ACR
 complexity: 1-5
 derived: false
-execution_type: Automated/Manual
+execution_type: Automated
 expected_outcome: ''
 header: |
-  LDAP authentication
-level: 35.7
-links: []
+  Hybrid retrieval mode comparison
+level: 1.42
+links:
+- SRS-024: ZvliTquyI7t6698GACekmrXpc03LA7D7WdF6Wn8QpQg=
 normative: true
 platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/specs/tst/assets
+- path: docs/specs/tst/assets/hybrid_retrieval/api-access-controls.md
   type: file
 release: alpha
-reviewed: null
+reviewed: 0BQPLJQCfOh6CRUgm0CWNNBNLvAnLkNK8kfNTgDmoZk=
 test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  -
+  - System initialized and logged in as user.
+  - A collection containing both content with an exact named-entity/technical-term match and content only conceptually related to a test query.
 
   ## Test steps
-  1. Log in using available credentials.
-  2. Test configurations?
+  1. Submit the query to /search with retrieval mode set to semantic; inspect the ranked results.
+  2. Submit the same query to /search with retrieval mode set to keyword; inspect the ranked results.
+  3. Submit the same query to /search with retrieval mode set to hybrid; inspect the ranked results.
+  4. Submit the same query via /chat and via /generate, specifying the target collection, using each of the three modes in turn.
 
   ## Expected outcome
-  1.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+  1. Semantic mode ranks passages by vector similarity; conceptually related but non-exact-match passages can rank highly.
+  2. Keyword mode ranks passages by BM25 term frequency; exact named-entity/technical-term matches rank highly.
+  3. Hybrid mode returns a merged, re-ranked result set combining both signals, distinct from either mode alone.
+  4. All three modes are accessible not only via /search but also via /chat and /generate when a collection is specified.
+verification_method: Test (T)
 version: 0.1

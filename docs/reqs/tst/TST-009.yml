@@ -1,41 +1,37 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Valid documents are ingested in a single operation; the corrupted file is reported per-document without blocking others.
+expected_outcome: ''
 header: |
-  Verify batch ingestion processes all valid files and isolates failures per document
-level: 9.0
+  OIDC authentication - Configuration
+level: 1.9
 links:
-- SRS-009: igjnfVtWJESKiB0D1mOfJhe0aOXZqmDpNrLOkh4Q0lY=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: RpW_cHCD8C49292ye571WZU7viutM7lZZlFBXLneVJY=
-test_data: |
-  A folder containing 5 valid documents (DOCX and PDF) and 1 intentionally corrupted file; moderator credentials
+reviewed: _M9kjTZgduUJkV7lOp90uXiwv53K4HRHDB9SupF4vu0=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running with the ingestion service active
-  - A named test collection exists
-  - A moderator account for the collection is available
-  - The test folder contains 5 valid documents and 1 corrupted/unreadable file
+  - System configured with AUTH_MODE=oidc.
+  - Test identity provider issues tokens with a role claim and an organization claim for at least two distinct test users.
 
   ## Test steps
-  1. Trigger batch ingestion pointing to the test folder, specifying the target collection.
-  2. Observe the ingestion output and note which files succeeded and which failed.
-  3. Verify the corrupted file is reported as failed with a descriptive message.
-  4. Query the collection with content-specific questions for each of the 5 valid documents. Confirm they are all retrievable.
+  1. Configure OIDC_PROVIDER_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_SCOPES, OIDC_ROLE_CLAIM/OIDC_ROLE_MAPPING, and OIDC_ORG_CLAIM/OIDC_ORG_MAPPING, and restart the service.
+  2. Log in as a test user and confirm the role and organization derived from the token claims match the configured mapping.
+  3. Log in as the second test user with a different claim value and confirm a different role/organization is assigned accordingly.
+  4. Attempt an OIDC redirect to a URL not present in OIDC_REDIRECT_ALLOWLIST and confirm it is rejected.
+  5. As admin, inspect the logs (admin dashboard > Logging) to check that both logins produced an audit entry.
 
   ## Expected outcome
-  1. All 5 valid documents are ingested in a single batch operation.
-  2. The corrupted file fails with a per-document error; the failure does not prevent ingestion of the remaining files.
-  3. All successfully ingested documents contribute searchable content to the collection.
-verification_method: T
+  1. The configured OIDC settings take effect after restart without code changes.
+  2. Role and organization assignment correctly follows OIDC_ROLE_MAPPING/OIDC_ORG_MAPPING based on the token's claims.
+  3. A redirect target outside OIDC_REDIRECT_ALLOWLIST is rejected.
+  4. The audit log contains a correctly-populated entry for both test users' logins.
+verification_method: Test (T)
 version: 0.1

@@ -1,7 +1,7 @@
 acceptancecriteria: Tables parsed into rows/columns.
 active: true
-comments: Tables are currently parsed into MD tables
-coverage: 75
+comments: ''
+coverage: 100
 derived: false
 header: ''
 importance: 5

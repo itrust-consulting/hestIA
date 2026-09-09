@@ -1,48 +1,84 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Deleting a document removes its vectors from Qdrant and its BM25 contribution from the sparse corpus; deleting a collection removes all vectors, sparse data, and tenant grants; deleted content is no longer retrievable.
+expected_outcome: ''
 header: |
-  Verify document and collection deletion including vector store and sparse corpus cleanup
-level: 31.0
+  Multi-step pipeline
+level: 1.31
 links:
-- SRS-008: t5iEkbl9zzQydNgIthJQB63TyB8_hHMIAVZDArrJBxE=
-- SRS-025: zY3zWH23WHtpJk7ThxSKeDOMp9GjczF8Ttwc38JiRdg=
+- SRS-017: XnxZn6IbCnPK8eU5U2MZyq6SKUNrEcezemLvjMyDzmg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: sYz-VENrbhYnk8xX62de1DYjT9QmmCfCqr9bAvN6NEU=
-test_data: |
-  Moderator account; admin account; a named test collection with at least two ingested documents with distinct, query-identifiable content; a tenant organisation with a collection grant.
+references: []
+release: alpha
+reviewed: zlhrAViVECZ-4cACSAM3dxx18sodWenaMoctb_qAeDE=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with Qdrant active
-  - A test collection exists with two ingested documents (document A and document B) with distinct content
-  - A tenant organisation has a collection grant on the test collection
+  - System initialized and logged in as admin
 
   ## Test steps
-  1. As a moderator, submit a query that retrieves content from document A. Confirm document A appears in the citations.
-  2. Call DELETE /collections/{name}/documents with the identifier for document A. Confirm 200 or 204.
-  3. Submit the same query again. Confirm document A no longer appears in the results; document B remains retrievable.
-  4. As admin, call GET /collections/{name}. Confirm the collection still exists and document B is present.
-  5. As admin, call DELETE /collections/{name}. Confirm 200 or 204.
-  6. Submit a query that would have retrieved document B. Confirm the collection no longer exists and no results are returned (404 or empty result).
-  7. Confirm the tenant organisation's collection grant for the deleted collection is no longer present in GET /organizations/{org_id}/collections.
+  1. Navigate to the admin dashboard > Workflows
+  2. Select the 'Chat' workflow.
+  3. Modify the workflow by adding nodes (see example below)
+  4. Verify that workflow changes have been adopted.
+  5. Restore the default 'Chat' workflow.
+  6. Inspect the logs (admin dashboard > Logging) to check that both the workflow modification and its restoration produced an audit entry recording the acting admin, the action, and the affected workflow.
+
+  EXAMPLE 'Chat' modification:
+
+  entrypoint: Augment1
+  exitpoints:
+    - Chat1
+  nodes:
+    - id: Augment1
+      type: Augment
+      inputs:
+        prompt: ${last_user_message}
+        template: >
+          After your normal answer, add a section titled VERIFICATION containing:
+
+          1. Restated request: restate the user's request as a single testable
+          condition.
+
+          2. Assumptions: list any assumptions you made, or write “none”.
+
+          3. Check: explain concretely why the answer satisfies the testable
+          condition.
+
+          4. Result: write either VERIFIED or NOT VERIFIED.
+
+
+          <user_prompt>
+            {user_prompt}
+          </user_prompt>
+      outputs:
+        prompt: prompt
+      position:
+        x: 38.54457364341084
+        y: -13.114341085271327
+    - id: Chat1
+      type: Chat
+      inputs:
+        history: ${history}
+        last_user_message: ?prompt
+        model: ${model}
+        options: ${model_kwargs}
+      outputs:
+        response: response
+      position:
+        x: 72
+        y: 117
+  edges:
+    - - Augment1
+      - Chat1
+
 
   ## Expected outcome
-  1. Document A is retrievable before deletion.
-  2. Document A deletion returns a success response.
-  3. Document A is absent from results; document B is unaffected.
-  4. Collection still exists after a single-document deletion.
-  5. Collection deletion returns a success response.
-  6. Post-deletion queries against the collection fail or return empty results.
-  7. Tenant grants for the deleted collection are removed.
-verification_method: T
+  1. New pipeline compositions can be introduced through configuration without modifying application source code.
+  2. The audit log contains a correctly-populated entry for the workflow modification and its restoration.
+verification_method: Test (T)
 version: 0.1

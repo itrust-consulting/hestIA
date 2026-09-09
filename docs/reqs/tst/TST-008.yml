@@ -1,48 +1,35 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
-execution_type: Manual
-expected_outcome: |
-  All supported formats ingested successfully; batch folder ingestion works; documents are immediately queryable; access control enforced.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify document ingestion across all supported formats and via batch folder upload
-level: 8.0
+  LDAP authentication - Configuration
+level: 1.8
 links:
-- SRS-008: t5iEkbl9zzQydNgIthJQB63TyB8_hHMIAVZDArrJBxE=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: okBDyg-bjg84kPCb1iumaDuQ5GRj3xviSZ4ZdTkEb98=
-test_data: |
-  Test documents in each supported format: DOCX, PDF, XLSX, XLSM, TXT, MD, CSV, JSON, PPTX;
-  a test folder containing one file per format;
-  one intentionally unsupported file (e.g. .exe);
-  moderator credentials for the test collection's owning organization
+reviewed: 8NWpvegTuqBktdqAJEzNP7qWNZVr92wwbcZfvEV8YBs=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running with the ingestion service active
-  - A named test collection exists and is accessible to the test moderator
-  - A moderator account for the collection's owner organization is available
-  - A standard user account (non-moderator) is also available for access control testing
-  - Test documents contain known content suitable for query verification
+  - System configured with AUTH_MODE=ldap.
+  - Test directory has at least two groups mapped via LDAP_GROUP_MAPPING to different hestIA roles.
 
   ## Test steps
-  1. Using the moderator account, upload each supported format (DOCX, PDF, XLSX, XLSM, TXT, MD, CSV, JSON, PPTX) individually. Confirm each upload completes without error.
-  2. Trigger a batch ingestion from the test folder. Confirm all supported files are processed in a single operation.
-  3. Submit a query relevant to content from one of the ingested documents. Confirm the document appears in the citations.
-  4. Set a classification level on one document during upload. Submit a query as a user without the required clearance. Confirm the document is not returned.
-  5. Attempt to upload a document using the standard (non-moderator) user account. Confirm the upload is rejected.
+  1. Configure LDAP_HOST, LDAP_PORT, LDAP_SEARCH_BASE, LDAP_APP_DN/LDAP_APP_PASSWORD, and LDAP_USER_DN_TEMPLATE, and restart the service.
+  2. Log in as a user belonging to the first mapped group; confirm the corresponding hestIA role is assigned.
+  3. Log in as a user belonging to the second mapped group; confirm the corresponding (different) hestIA role is assigned.
+  4. Set LDAP_USE_SSL and confirm the connection to the directory still succeeds over the encrypted transport.
 
   ## Expected outcome
-  1. All nine supported formats are ingested without errors.
-  2. Batch ingestion processes all files in the folder without individual upload calls.
-  3. Ingested documents are immediately retrievable via natural-language queries.
-  4. Classification level assigned at ingestion governs which users can retrieve the document's content.
-  5. Upload is restricted to moderators and admin users.
-verification_method: T
+  1. The configured LDAP settings take effect after restart without code changes.
+  2. A user's group membership, per LDAP_GROUP_FILTER/LDAP_GROUP_MAPPING, correctly determines their assigned hestIA role.
+  3. Directory connectivity works correctly whether LDAP_USE_SSL is enabled or not.
+verification_method: Test (T)
 version: 0.1

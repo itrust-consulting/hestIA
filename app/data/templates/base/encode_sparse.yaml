@@ -1,7 +1,0 @@
-id: ${id}
-type: EncodeSparse
-inputs:
-  data: ${data}
-  collection: ${collection}
-outputs:
-  vector: ${vector}

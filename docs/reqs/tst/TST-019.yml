@@ -1,47 +1,47 @@
 active: true
 authors: ACR
-complexity: 5
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Full corpus ingested without errors or data loss; queries return relevant results within benchmark thresholds; all services remain operational.
+expected_outcome: ''
 header: |
-  Verify ingestion, retrieval, and service stability with a documentation corpus of at least 100 GB
-level: 19.0
+  Basic conversation operations
+level: 1.19
 links:
-- SRS-019: k-RF5cmuBFZ8y1ybQVvW5hCU_Iqa7yQV-OUaD3Iz0pE=
+- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: kC7X4JeQD1u3c0sAupnAlgab-ycBR2Hih8p1wywxzIg=
-test_data: |
-  A representative documentation corpus totalling at least 100 GB distributed across multiple collections;
-  a benchmark query set with known relevant documents;
-  response-time thresholds from T1.4 stress testing;
-  system monitoring tooling (log access, service health endpoint)
+reviewed: YH7skL-36g-PeHFRsnhUZV2Ju9znLN7l3fYqpSciKXQ=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with sufficient disk storage and memory for the 100 GB target corpus
-  - Qdrant and the LLM/embedding server are running and reachable
-  - Batch ingestion tooling is available for the corpus
-  - System logs are accessible for error monitoring
-  - Response-time thresholds from the T1.4 stress test are documented
+  - System initialized and user is logged in.
+  - 'Ask My Doc' deactivated
+  - A second user account exists.
 
   ## Test steps
-  1. Ingest the full corpus in batches across multiple collections. Log any per-document ingestion errors.
-  2. After ingestion completes, call GET /ready. Confirm all services report as operational.
-  3. Inspect system logs for data-loss or corruption errors.
-  4. Submit the benchmark query set against the full corpus. Record response times for each query.
-  5. Compare recorded response times against the T1.4 benchmark thresholds.
+  1. Start a conversation ('New Chat').
+  2. Ask any question.
+  3. Rename the automatically generated conversation to 'First (Second) conversation' and refresh the page.
+  4. Ask another question.
+  5. Retry last reply.
+  6. Copy last reply.
+  7. Delete the last reply and user message.
+  8. Start new conversation.
+  9. Activate 'Ask My Docs' and select any available corpus.
+  10. Repeat steps 2-7.
+  11. Refresh page again.
+  12. Verify that all operations persisted in both conversations.
+  13. Delete a conversation and refresh page again.
+  14. Create additional conversations until more than the configured maximum (default 20) exist for this user, then retrieve the conversation list.
+  15. Log in as the second user and attempt to retrieve, rename, and delete one of the first user's conversations (e.g., by its known identifier).
 
   ## Expected outcome
-  1. The full 100 GB corpus is ingested with no data loss (all expected documents are retrievable).
-  2. All services remain operational throughout and after ingestion.
-  3. System logs contain no data-loss or corruption errors.
-  4. Query response times remain within the T1.4 benchmark thresholds.
-verification_method: T
+  1. All operations persisted and messages are ordered correctly.
+  2. The conversation list returns at most the configured maximum number of recent conversations (default 20), ordered by most recent activity.
+  3. The second user cannot retrieve, rename, or delete a conversation belonging to the first user.
+verification_method: Test (T)
 version: 0.1

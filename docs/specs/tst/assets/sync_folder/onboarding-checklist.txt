@@ -1,0 +1,5 @@
+Onboarding Checklist
+=====================
+1. Provision corporate account and MFA device.
+2. Grant baseline access per role (see access matrix).
+3. Schedule security awareness training within first week.

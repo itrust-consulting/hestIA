@@ -1,44 +1,36 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Metadata extracted automatically; overrides applied before upload; post-ingestion edits reflected in citations without re-ingesting.
+expected_outcome: ''
 header: |
-  Verify automatic metadata extraction and post-ingestion metadata editing
-level: 10.0
+  User password change
+level: '1.10'
 links:
-- SRS-010: u6bmmZEgZaZhaWdxw2FsLl_xxzd9LQJjrwmJ_hvvEac=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: dpr1uSJgsHDbQzbZZevgy8mlYVjw7fvUA4MKDyEuFsk=
-test_data: |
-  A DOCX document with known embedded metadata (title, author, subject); moderator credentials
+references: []
+release: alpha
+reviewed: kvLuTkryagaI2S_ZWPkWKsV4KC6D37PwCmDopNra9j0=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running with the ingestion and metadata services active
-  - A named test collection exists
-  - A moderator account is available
-  - The test document's original embedded metadata values (title, author, classification) are documented for comparison
+  - Logged in as a standard user with a known current password.
 
   ## Test steps
-  1. Open the document preview/parse interface and upload the test document without committing. Inspect the automatically extracted metadata fields.
-  2. Override the classification level field with a different value.
-  3. Complete the upload and confirm the override value is stored.
-  4. Submit a query whose answer appears in the test document. Inspect the citation and confirm the overridden classification is reflected.
-  5. Via the metadata management interface, edit the document title field of the already-ingested document (without re-ingesting).
-  6. Submit the same query again and confirm the updated title appears in the citation.
+  1. Navigate to the account/profile settings and select change password.
+  2. Submit the change with an incorrect current password.
+  3. Submit the change with the correct current password and a new password.
+  4. Log out, then log back in using the new password.
+  5. Attempt to log in using the old password.
 
   ## Expected outcome
-  1. Title, classification level, and author are extracted automatically without manual input.
-  2. The classification override applied before upload takes precedence over the automatically extracted value.
-  3. Post-ingestion metadata edits are applied without requiring re-ingestion.
-  4. Query citations reflect the current (edited) metadata values.
-verification_method: I
+  1. A change request with the wrong current password is rejected with a clear error; the password is not changed.
+  2. A change request with the correct current password succeeds.
+  3. The new password authenticates successfully.
+  4. The old password no longer authenticates.
+verification_method: Test (T)
 version: 0.1

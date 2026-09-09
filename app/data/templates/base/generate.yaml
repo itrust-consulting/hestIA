@@ -1,8 +1,0 @@
-id: ${id}
-type: Generate
-inputs:
-  prompt: ${prompt}
-  model: ${model}
-  options: ${model_kwargs}
-outputs:
-  response: ${response}

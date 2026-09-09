@@ -1,41 +1,36 @@
 active: true
 authors: ACR
-complexity: 1
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  All core hestIA features are accessible through the browser without direct API interaction.
+expected_outcome: ''
 header: |
-  Verify all core features are accessible through the web interface
-level: 6.0
+  OIDC authentication
+level: 1.6
 links:
-- SRS-006: E5QID7Q8QdkxDAJ5oUmyftSIoEpdFBFbZd8C2JjxGsg=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: cKUurX0W_KX4O9HVJlHmDIo62h4DVYFuilrMG-dGPYA=
-test_data: |
-  Valid standard user credentials; moderator credentials; admin credentials; at least one collection with ingested content
+reviewed: _agKGYsc8VbCYrlEGJJ8m8WVJy5sQ4hZcrlzi2IL4Ls=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is fully deployed and all dependent SRS requirements (SRS-004 through SRS-018) are satisfied
-  - User, moderator, and admin accounts are available
-  - At least one collection with ingested documents exists
+  - System configured with AUTH_MODE=oidc, OIDC_PROVIDER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET/OIDC_SCOPES set to a reachable identity provider.
+  - A test user account exists with the identity provider.
 
   ## Test steps
-  1. Open a browser and navigate to hestIA's frontend URL (e.g. http://localhost:7860).
-  2. Log in as a standard user. Navigate to the chat interface, select a collection, and submit a query.
-  3. Log out, log in as a moderator, and navigate to the document upload interface. Confirm upload is accessible.
-  4. Log out, log in as admin, and navigate to the admin panel. Confirm user and organization management are accessible.
-  5. Navigate to the help section and confirm content is displayed.
+  1. Initiate login; verify redirection to the configured OIDC provider's login page.
+  2. Authenticate with the provider using valid test-user credentials and complete the redirect back to hestIA.
+  3. Attempt the same flow using invalid provider credentials.
+  4. As admin, inspect the logs (admin dashboard > Logging) to check that both the successful and the failed OIDC login attempt produced an audit entry (actor, action, resource, timestamp, correlation ID).
 
   ## Expected outcome
-  1. All core features (chat, document upload, admin, help) are accessible through the browser.
-  2. Each feature behaves according to the role of the logged-in user.
-  3. No direct API calls are needed to use any core feature.
-verification_method: I
+  1. The login flow correctly redirects to the configured OIDC provider.
+  2. On successful provider authentication, the user is redirected back and granted access to hestIA.
+  3. Invalid provider credentials result in the provider rejecting the login; no hestIA session is created.
+  4. The audit log contains a correctly-populated entry for both the successful and the failed login attempt.
+verification_method: Test (T)
 version: 0.1

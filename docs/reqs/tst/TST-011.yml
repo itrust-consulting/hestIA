@@ -1,42 +1,39 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Sections produce separate chunks; tables are structurally retrievable; citation anchors identify document position; adjacent chunks are linked.
+expected_outcome: ''
 header: |
-  Verify that document sections, headings, tables, and hierarchy are parsed and retrievable as distinct structural units
-level: 11.0
+  Admin password reset
+level: 1.11
 links:
-- SRS-011: GXtsJ3OGd2xFQ7F4BGw3XLWCjErtKPUs1FiUrxxTNq4=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: mYkgU7vhfaaQoTyZlrYhBihgqk0is0bcV7jL_-dMLMM=
-test_data: |
-  A DOCX document with at least 5 distinct headed sections, nested headings (H1/H2), and one table with labelled columns; the document's structure is documented (section names, table column labels) for result verification
+reviewed: D1LePvvUZcUKn5tTa6Lp6W-UNvsl71N6Uar-VNOh_NM=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running with the ingestion service active
-  - A test collection exists
-  - A moderator account is available
-  - The test document structure is documented: exact section titles, heading levels, and table column names
+  - Logged in as admin.
+  - A standard test user exists with a known password.
 
   ## Test steps
-  1. Ingest the structured test document into the test collection.
-  2. Submit a query that targets content appearing exclusively in section 3 of the document. Verify the citation identifies section 3 and does not include content from other sections.
-  3. Submit a query referencing the table by column name. Verify the retrieved chunk contains the table content in a structured representation (e.g. Markdown table).
-  4. Inspect the citations from both queries and confirm each includes a structural position indicator (section heading or equivalent).
+  1. Navigate to admin dashboard > Users and open the test user.
+  2. Set a new password for the user via the admin reset action, without knowing their current password.
+  3. Log out, then log in as the test user using the new password set by the admin.
+  4. Attempt to log in as the test user using their old password.
+  5. As a standard (non-admin) user, attempt to reset another user's password.
+  6. As admin, inspect the logs (admin dashboard > Logging) to check that the admin's password reset was recorded as an administrative change, and that the denied non-admin attempt was also recorded.
 
   ## Expected outcome
-  1. Each distinct headed section produces a separate retrievable chunk; cross-section contamination is not observed.
-  2. Table content is retrieved in structured form and is identifiable by column name.
-  3. Every citation includes a structural anchor (section heading or similar) locating the chunk within the document.
-  4. Chunk adjacency links (prev/next) are present in the stored payload, enabling context reconstruction.
-verification_method: A
+  1. An administrator can set a new password for any user without knowing their current password.
+  2. The user authenticates successfully with the admin-set password.
+  3. The user's old password no longer authenticates.
+  4. A non-admin user is denied when attempting to reset another user's password.
+  5. The audit log contains a correctly-populated entry for the admin's password reset and for the denied non-admin attempt.
+verification_method: Test (T)
 version: 0.1

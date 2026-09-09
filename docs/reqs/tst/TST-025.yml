@@ -1,53 +1,52 @@
 active: true
 authors: ACR
-complexity: 4
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Admins can perform full user lifecycle operations; password reset forces a change on next login; deactivation prevents login; deletion removes the account permanently.
+expected_outcome: ''
 header: |
-  Verify admin user management — create, list, update, reset password, deactivate, and delete
-level: 25.0
+  Collection management - Access
+level: 1.25
 links:
-- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
-- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-005: -qYDaE4KUMXhB0t-IOXPcWXJqJbRU0JUVqfk1YXTkxU=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: 9ySh6W28Wl6qfvf5ourWh7JuonCKQIygzSAA21JGhzk=
-test_data: |
-  An admin account with known credentials; a moderator account for scope-restricted listing verification.
+references: []
+release: alpha
+reviewed: ZYTCtm-0IKkPhSFws6UHyXN3PT4u7ENXJzYha0C75Vg=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with the admin account active
-  - No pre-existing test user with the chosen username
+  - System initialized and logged in as admin
+  - TST-023, steps 1-7 (tenant 'TEST' created, with 'User' and 'Moderator' added and assigned their roles).
+  - Multiple tenants available (>2).
 
   ## Test steps
-  1. As admin, call POST /users/create with a new username, password, and role. Confirm 201 Created and that the returned user object matches the supplied values.
-  2. Call GET /users as admin. Confirm the new user appears in the list.
-  3. Call GET /users as a moderator. Confirm the list is scoped to members of the moderator's own organisation only.
-  4. Call GET /users/user/{uid} as admin. Confirm the full user profile is returned.
-  5. Call PATCH /users/user/{uid} as admin to update the user's display name. Confirm 200 OK and updated values.
-  6. Trigger an admin password reset for the user. Confirm the must-change-password flag is set on the user record.
-  7. Log in as the target user with the reset password. Confirm login succeeds and the system requires a password change before proceeding.
-  8. As admin, deactivate the user account (set expiry to now). Attempt to log in as the deactivated user. Confirm login is rejected.
-  9. As admin, call DELETE /users/user/{uid}. Confirm 200 or 204.
-  10. Call GET /users/user/{uid}. Confirm a 404 Not Found is returned.
+  1. Navigate to the admin dashboard > Collections.
+  2. Create a collection 'Test-admin', assign ownership to a tenant and access permissions to 'TEST'.
+  3. Verify that collection is created with the correct owner and correct access permissions for 'TEST'.
+  4. Also verify that the collection is correctly listed in the owners profile under collections, and
+  under accessible collections for 'TEST'.
+  5. Navigate to 'Manage Access' and revoke access 'TEST'.
+  6. Verify in 'TEST's profile that the collection is no longer listed under accessible collections.
+  7. Reassign ownership to 'TEST'.
+  8. Verify in the respective tenant profiles that ownership and access is correctly displayed.
+  9. Log in as 'Moderator' and navigate to admin dashboard > Collections
+  10. Verify that only 'TEST' collection is listed in the overview.
+  11. Create another collection 'Test-moderator' assign ownership to 'TEST' and access permissions to another tenant.
+  12. Verify that collection is created with the correct owner and correct access permissions.
+  13. Navigate to 'Manage Access' and revoke access.
+  14. Log back in as admin and open a collection owned by a tenant admin has never been added to, at a Restricted classification level; confirm admin can view and query its content without any explicit access grant.
+  15. Attempt to assign a second moderator to tenant 'TEST' (which already has 'Moderator' assigned).
+  16. Inspect the logs (admin dashboard > Logging) to check that the collection creations, the access grant and revocation, the ownership reassignment, and the rejected second-moderator assignment each produced an audit entry.
 
   ## Expected outcome
-  1. User is created with correct attributes.
-  2. User appears in the admin listing.
-  3. Moderator listing is org-scoped.
-  4. Full profile is returned for admin queries.
-  5. Profile fields update correctly.
-  6. Password reset sets the must-change-password flag.
-  7. First login with reset password triggers a forced password change.
-  8. Deactivated user cannot log in.
-  9. Deletion succeeds.
-  10. Deleted user returns 404.
-verification_method: T
+  1. Collection successfully created.
+  2. Access to collection correctly assigned.
+  3. Moderator role only sees assigned tenant's collections.
+  4. Admin can view and query any collection at any classification level, regardless of tenant ownership or explicit access grants.
+  5. Assigning a second moderator to a tenant that already has one is rejected.
+  6. The audit log contains a correctly-populated entry for the collection and access-grant actions performed above.
+verification_method: Test (T)
 version: 0.1

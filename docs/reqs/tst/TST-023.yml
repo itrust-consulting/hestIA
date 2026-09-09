@@ -1,50 +1,42 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Conversations are created implicitly via chat, appear in the list (capped at 20), their messages are retrievable, they can be renamed, and deletion removes them permanently.
+expected_outcome: ''
 header: |
-  Verify conversation lifecycle — create, list, rename, retrieve messages, and delete
-level: 23.0
+  Admin tenant management
+level: 1.23
 links:
-- SRS-014: e0wtYttuzfq0GRAVYiKPCFgCitcxfC3f5oQ63KnFsn0=
-- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
+- SRS-005: -qYDaE4KUMXhB0t-IOXPcWXJqJbRU0JUVqfk1YXTkxU=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: 0_hPvesrxykMIu3BEdkQUGKUAEh_-1SL6Qc9EyWi8rU=
-test_data: |
-  An authenticated user account; a collection with at least one ingested document; 21 pre-existing conversations to test the 20-item list cap.
+references: []
+release: alpha
+reviewed: 2MTGScYeJvPBd9wchqmzEfH2WtvOJ7dRTvLTmOxZ_MI=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and the user is authenticated
-  - A test collection with at least one ingested document exists and is accessible to the user
-  - The user has fewer than 20 existing conversations (clean state for part of the test)
+  - System initialized and logged in as admin.
+  - Users 'User' and 'Moderator' available in user database.
 
   ## Test steps
-  1. Submit a POST /chat request with save_chat=true and no existing conversation_id. Confirm a new conversation_id is returned in the response.
-  2. Call GET /conversations. Confirm the new conversation appears in the list with a title and timestamp.
-  3. Call GET /conversations/{cid} using the returned conversation_id. Confirm the response's `messages` array contains the question and the assistant reply from step 1 (the endpoint returns an object `{messages, has_more, next_cursor}`, not a bare array).
-  4. Submit a PATCH /conversations/{cid} request with a new title. Confirm a 200 OK is returned.
-  5. Call GET /conversations. Confirm the conversation now shows the updated title.
-  6. Ensure the user has at least 21 conversations (create more if needed). Call GET /conversations. Confirm the response contains exactly 20 items — the 20 most recent.
-  7. Call DELETE /conversations/{cid} on one conversation. Confirm a 200 or 204 response is returned.
-  8. Call GET /conversations again. Confirm the deleted conversation is no longer present.
+  1. Navigate to the admin dashboard > Tenants.
+  2. Create a new tenant 'TEST'.
+  3. Inspect new tenant and verify that information is correctly displayed.
+  4. Modify tenant information and save changes.
+  5. Verify that changes have been adopted.
+  6. Add 'User' and 'Moderator' to the tenant.
+  7. Assign 'User' role of member and 'Moderator' role of moderator.
+  8. Execute TST-024 - TST-028, using the tenant state reached at step 7 (before the moderator-removal and tenant-deletion steps below).
+  9. Remove moderator from tenant.
+  10. Delete the tenant.
+  11. Inspect the logs (admin dashboard > Logging) to check that the tenant's creation and modification, the role assignments, the moderator removal, and the tenant deletion each produced an audit entry.
 
   ## Expected outcome
-  1. A new conversation_id is returned when save_chat=true.
-  2. The new conversation appears in the list with correct metadata.
-  3. Message history is retrievable and contains both the user message and the assistant reply.
-  4. Rename returns a success response.
-  5. The renamed title is reflected in the conversation list.
-  6. GET /conversations returns exactly 20 items regardless of total conversation count.
-  7. Deletion returns a success response.
-  8. Deleted conversation is absent from subsequent list calls.
-verification_method: T
+  1. Only assigned tenant are visible to the moderator.
+  2. All CRUD operations execute successfully.
+  3. The audit log contains a correctly-populated entry for the tenant CRUD and role-assignment actions performed above.
+verification_method: Test (T)
 version: 0.1

@@ -1,42 +1,35 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  hestIA is unreachable without VPN and fully functional once connected; no application changes required.
+expected_outcome: ''
 header: |
-  Verify that hestIA is accessible over VPN and unreachable without it
-level: 3.0
+  VPN-gated remote access
+level: 1.3
 links:
 - SRS-003: msdpq9JaMt6PSkWTlIj4OdpYt5TO0EcORmWsoIvDzSk=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: pOn1Y1_O0ZQSlsflEar1fcdWeVk7u2l14kzTUbvMMME=
-test_data: |
-  VPN client configured for the organizational VPN; remote test host located outside the local network
+reviewed: WgIZOCGRwoN-JQ1Ac-255RB-tm9EOrlzjPQr1Xd4EHY=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running
-  - VPN infrastructure is configured and accessible from an external network
-  - A remote test host is available outside the local network
-  - Valid user credentials are available for login
+  - hestIA deployed and reachable only from the internal network (no public exposure), per the standard deployment.
+  - A host connected to the organizational VPN, and a separate host with no VPN connection.
 
   ## Test steps
-  1. From the remote host without VPN active, attempt to access the hestIA frontend URL. Note the result.
-  2. Connect the remote host to the organizational VPN.
-  3. Navigate to the hestIA frontend URL.
-  4. Confirm the login page loads.
-  5. Log in with valid credentials and confirm all features are accessible.
+  1. From the VPN-connected host, connect to the organizational VPN and navigate to the hestIA frontend URL.
+  2. Authenticate and use the chat and document interfaces normally.
+  3. Confirm no hestIA application configuration was changed to enable this access (VPN routing is purely infrastructure-level).
+  4. From the non-VPN host, without connecting to the VPN, attempt to reach the same hestIA URL.
 
   ## Expected outcome
-  1. hestIA is not reachable from outside the network without an active VPN connection.
-  2. After connecting to the VPN, the hestIA web interface loads and all features are accessible.
-  3. No changes to hestIA application configuration are required between steps 1 and 5.
-verification_method: T
+  1. The hestIA web interface is fully usable from the VPN-connected host.
+  2. No application-level configuration change was required to enable VPN access.
+  3. The non-VPN host cannot reach hestIA directly.
+verification_method: Test (T)
 version: 0.1

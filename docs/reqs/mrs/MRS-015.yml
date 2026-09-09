@@ -1,8 +1,7 @@
 acceptancecriteria: Sections, paragraphs, tables identified.
 active: true
-comments: |
-  Chunking currently into sections with no differention between text and tables. A modal parser is in development
-coverage: 75
+comments: ''
+coverage: 100
 derived: false
 header: ''
 importance: 5

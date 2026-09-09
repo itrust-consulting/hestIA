@@ -1,47 +1,42 @@
 active: true
 authors: ACR
-complexity: 4
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  OIDC authorize/callback completes, new user is auto-provisioned with correct org and role mapping, session is valid, logout redirects to provider.
+expected_outcome: ''
 header: |
-  Verify OIDC/SSO authentication flow including auto-provisioning and logout
-level: 20.0
+  Conversation pagination.
+level: '1.20'
 links:
-- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
-- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: IEbeApkJbj5tLhi8V8g7yH7ddA3T7pGniqQyEsTp-UY=
-test_data: |
-  A configured OIDC provider (e.g. Keycloak) with a test realm; a test user with known org-membership and role claims; a second known-existing hestIA account for re-login test; hestIA configured with the OIDC client_id, client_secret, and redirect_uri.
+references: []
+release: alpha
+reviewed: oT39mTygbNWkXh46JryhOS72KpTWIAv35knNHkMeAgM=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with OIDC authentication enabled and configured
-  - The OIDC provider is running and reachable from the test client
-  - A test user exists in the OIDC provider with known org-membership and role claims
-  - No hestIA account yet exists for that user (to trigger auto-provisioning)
+  - System initialized and user is logged in.
+  - 'Ask My Doc' deactivated
+  - TST-019 executed.
 
   ## Test steps
-  1. Navigate to GET /auth/oidc/authorize. Confirm the response is a redirect to the OIDC provider's authorization endpoint with correct client_id, redirect_uri, and scope parameters.
-  2. Complete the login at the OIDC provider. Confirm the browser is redirected to the hestIA callback URL with an authorization code.
-  3. Confirm the callback at POST /auth/oidc/callback completes successfully, returns a session token, and that a new hestIA user account has been auto-provisioned with the correct organization membership and role derived from the OIDC claims.
-  4. Use the issued session token to call a protected endpoint (e.g. GET /account). Confirm the response returns the auto-provisioned user's profile.
-  5. Log in again as the same OIDC user. Confirm no duplicate account is created and the existing account is returned.
-  6. Call GET /auth/oidc/logout. Confirm the response redirects to the OIDC provider's end-session endpoint and the local session is invalidated.
+  1. Populate conversation with >30 message pairs (user message + assistant replies).
+  2. Refresh the page (or reopen the conversation from the sidebar) and observe how many messages are rendered before scrolling.
+  3. Scroll up towards the top of the message list.
+  4. Keep scrolling up until reaching the very first message pair sent in the conversation.
+  5. Scroll back down to the bottom of the conversation, then scroll partway back up and stop without reaching the top.
+  6. Wait at least 20 seconds, then scroll back up to the top again.
+  7. Activate 'Ask My Docs' and select any available corpus.
+  8. Start a new conversation and repeat steps 1-6, including at least one question answered using retrieved document context (with citations).
 
   ## Expected outcome
-  1. Authorization redirect includes required OIDC parameters.
-  2. Callback URL is reached with a valid authorization code.
-  3. A new hestIA user account is created with org membership and roles matching the OIDC claims.
-  4. Session token grants access to protected endpoints.
-  5. Re-login returns the existing account — no duplicate is created.
-  6. Logout invalidates the session and redirects to the provider.
-verification_method: T
+  1. On initial load, only the most recent messages are rendered; the full conversation history is not loaded at once.
+  2. As the user scrolls up, older messages load progressively and are prepended above the visible ones (infinite scroll, no manual pagination controls), until the first message pair is reached and no further loading occurs.
+  3. All message pairs are present, in correct chronological order, with no duplicates or gaps, regardless of how far back the user scrolls.
+  4. Re-scrolling to previously viewed history after it has been scrolled away from for a while (steps 5-6) still displays the correct, complete messages, with no data loss or visible corruption.
+  5. With 'Ask My Docs' activated, pagination behaves identically (steps 1-4 above), and messages retrieved from documents (including citations) are preserved correctly when scrolled away from and reloaded.
+verification_method: Test (T)
 version: 0.1

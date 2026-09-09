@@ -1,51 +1,38 @@
 active: true
 authors: ACR
-complexity: 4
+complexity: 1-5
 derived: false
-execution_type: Manual/Automated
-expected_outcome: |
-  Conversations under the configured context-token budget are sent to the model unmodified. Conversations that exceed the budget have their oldest turns folded into an LLM-generated rolling summary while the most recent messages are always kept verbatim; the summary and its boundary are persisted and reused (merged, not regenerated) on subsequent turns. The kept tail never starts mid-exchange. Streaming requests surface a distinct "compacting" status before content begins. Summarization failures never break the underlying chat/generate request (fail-open).
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify automatic conversation context-budget management (summarization/compaction of long chat history)
-level: 35.1
+  API-based single document ingestion
+level: 1.36
 links:
-- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
+- SRS-026: Ub-VcCD9R_44M_46VN08jX_613jihvsBtWVAIdYJzFQ=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/reqs/tst/assets
+- path: docs/specs/tst/assets/formats/operational-notes.txt
   type: file
-release: beta
-reviewed: s_crxrcnX0g0PsnyI4dCEFS4-bYeOpkpLunMnV4NImc=
-test_data: |
-  A saved conversation (conversation_id, save_chat=true) belonging to the test user, grown via repeated POST /chat calls until its history token count exceeds the configured max_context_tokens (or max_context_tokens/summary_target_tokens temporarily lowered via MAX_CONTEXT_TOKENS/SUMMARY_TARGET_TOKENS env vars to make this reachable without an excessively long conversation).
+release: alpha
+reviewed: yrotCPmUbA3rClqp26yoLL8m8vJhggumedQQJ9BMuIE=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and the user is authenticated
-  - The user has a saved conversation (`cid`) whose accumulated message history is small enough to stay under budget for part of this test, and can be grown past the configured token budget for the rest
-  - Test environment allows lowering MAX_CONTEXT_TOKENS/SUMMARY_TARGET_TOKENS to make crossing the budget practical to set up
+  - System initialized.
+  - Valid API access token available.
+  - Target collection exists.
 
   ## Test steps
-  1. With the conversation's history well under the configured token budget, submit `POST /chat` with `save_chat=true` and the existing `conversation_id`. Confirm the request completes normally and `GET /conversations/{cid}` shows the raw message history unchanged (no summary message injected).
-  2. Grow the same conversation (via repeated `POST /chat` calls) until its stored history exceeds the configured budget, then submit one more `POST /chat` request with `stream=false`. Confirm the request still completes successfully.
-  3. Inspect the conversation's persisted context state after step 2 (e.g. via the conversation metadata / a diagnostic endpoint if available). Confirm a rolling summary has been stored along with a boundary (`boundary_created_at`/`boundary_rowid`), and that the boundary lands on a `user`-role message (the kept tail never starts with an orphaned assistant reply).
-  4. Confirm the most recent messages (at least the configured minimum keep-count) are still present verbatim in `GET /conversations/{cid}` after compaction  -  only older turns were folded away, not deleted from storage.
-  5. Submit another `POST /chat` on the same conversation, growing it past budget again. Confirm the previously stored summary is merged with the newly-folded turns into one updated summary (rolling merge), rather than the system re-summarizing the whole conversation from scratch or stacking multiple summary messages into the model context.
-  6. Repeat step 2 with `stream=true`. Confirm the streamed response begins with a distinct status frame (e.g. `{"status": "compacting"}`) before any `content`/`thinking` frames, and that this status is never emitted for a `stream=true` request whose history is under budget.
-  7. Submit `POST /generate` (no `conversation_id`, not a saved chat) with a very long prompt. Confirm no compaction/summarization is triggered  -  context-budget management applies only to saved chat/rag_chat conversations, not stateless generate calls.
-  8. Simulate a failure in the summarization step (e.g. the summarization model call errors or times out). Confirm the parent `POST /chat` request still completes successfully using the unsummarized history rather than failing the user-facing request (fail-open behaviour).
-  9. Attempt to start hestIA with `SUMMARY_TARGET_TOKENS` configured greater than or equal to `MAX_CONTEXT_TOKENS`. Confirm the application fails to start with a clear configuration error rather than running with an invalid budget.
+  1. Submit a single document, the target collection, and a classification level to the ingestion API endpoint.
+  2. Inspect the API response and confirm it indicates the document was accepted, with its ingestion status.
+  3. Submit an ingestion request with a missing or invalid parameter (e.g., unknown collection) and verify the API returns a clear error.
+  4. Once ingestion completes, query the target collection through the chat interface and verify the document's content is retrievable.
 
   ## Expected outcome
-  1. Under-budget conversations are unaffected  -  no summary is created or injected.
-  2. Requests that push a conversation over budget still complete successfully.
-  3. A rolling summary and boundary are persisted; the boundary aligns to a user-message boundary.
-  4. The most recent messages remain verbatim in storage after compaction; only the model-facing context is compacted, not the stored history.
-  5. A second compaction merges into the existing summary rather than starting over or duplicating summaries.
-  6. Streaming requests show a distinct "compacting" status frame only when compaction is actually triggered.
-  7. Stateless generate requests are never subject to conversation context-budget compaction.
-  8. A summarization failure degrades gracefully  -  the chat/generate request still succeeds.
-  9. An invalid budget configuration (summary target >= max context) is rejected at startup.
-verification_method: T
-version: '0.1'
+  1. A document is ingested into the target collection through a single API call, without using the web interface.
+  2. The API response accurately reflects ingestion success or failure.
+  3. The ingested document is queryable through the chat interface with the same behavior as a document ingested through the UI.
+verification_method: Test (T)
+version: 0.1

@@ -1,0 +1,41 @@
+active: true
+dependence:
+- SRS-004
+- SRS-005
+derived: false
+difficulty: 3
+header: ''
+importance: 5
+level: 2.4
+links:
+- MRS-064: rCFCC6J8LGy6ktRNbyXkl2R84TXvaAKG0Mku23XwDF8=
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: _Gfo9XVqrxM9viGXHIn11oLSY-dN2UjYh3vw1t0hsp4=
+risk: 4
+status: implemented
+text: |
+  # Access and Modification Audit Logging
+
+  As a system administrator,
+  I want every access to and modification of documents, collections, and system configuration to be recorded in a structured, queryable audit log,
+  so that user activity can be reviewed after the fact for accountability and incident investigation.
+
+  1. A user authenticates, accesses or is denied access to a collection, ingests or deletes a document, or an administrator changes a user, role, classification, tenant grant, workflow configuration, or log level.
+  2. The system records an audit entry capturing the acting user, the action performed, the affected resource, a timestamp, and the correlation ID of the originating request.
+  3. An administrator retrieves or exports the audit log, filtered by log type, level, time range, or a free-text search over the entry.
+
+  ### Rationale
+  Enterprise and governance deployments require accountability for who accessed or changed sensitive content, and for that trail to be searchable rather than merely present. Tagging entries with a request correlation ID ties an audit event back to the full set of system log lines produced by the same request, supporting incident investigation. A defined retention period ensures the trail survives long enough to be useful without growing unbounded.
+
+  ### Acceptance criteria
+  - Authentication events, collection access decisions (including denials), document ingestion and deletion, and administrative changes (user/organization CRUD, role and classification changes, tenant/collection access grants, workflow configuration changes, log-level changes) each produce a structured audit log entry.
+  - Each audit entry records the acting user's identity, the action type, the affected resource, a timestamp, and the correlation ID of the originating request.
+  - Audit log entries are retained for a defined minimum period, independently of the lifecycle of the resource they reference (e.g., they persist after the referenced document or user is deleted).
+  - An administrator can query the audit log via an API, filtered by log type, level, and time range, and can export the filtered results in a structured format (e.g., newline-delimited JSON or CSV).
+  - Access to the audit log query and export functionality is restricted to administrators, and use of that functionality is itself recorded as an audit entry.
+type: S
+urgency: 4
+version: '0.1'

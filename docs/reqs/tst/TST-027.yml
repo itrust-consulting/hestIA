@@ -1,45 +1,58 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Authenticated users can view their own profile and update password, username, and email; current-password verification is enforced; must-change-password flag is cleared after a successful change.
+expected_outcome: ''
 header: |
-  Verify self-service account operations — view profile, change password, change username and email
-level: 27.0
+  Collection management - Batch ingestion
+level: 1.27
 links:
-- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
-- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-006: E5QID7Q8QdkxDAJ5oUmyftSIoEpdFBFbZd8C2JjxGsg=
+- SRS-008: t5iEkbl9zzQydNgIthJQB63TyB8_hHMIAVZDArrJBxE=
+- SRS-009: igjnfVtWJESKiB0D1mOfJhe0aOXZqmDpNrLOkh4Q0lY=
+- SRS-010: u6bmmZEgZaZhaWdxw2FsLl_xxzd9LQJjrwmJ_hvvEac=
+- SRS-011: GXtsJ3OGd2xFQ7F4BGw3XLWCjErtKPUs1FiUrxxTNq4=
+- SRS-012: rbTRAL7QiFAI6QbO7ieYG9WEiRLhNRilskSpouCyphg=
+- SRS-025: zY3zWH23WHtpJk7ThxSKeDOMp9GjczF8Ttwc38JiRdg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/reqs/tst/assets
+- path: docs/specs/tst/assets/formats/operational-notes.txt
   type: file
-release: beta
-reviewed: ELCAPGMRTiHngULoX9LwIuBgPeO3G32rUWLN_xs_sBo=
-test_data: |
-  An authenticated user account with a known password that has the must-change-password flag set.
+- path: docs/specs/tst/assets/formats/vpn-setup-guide.md
+  type: file
+- path: docs/specs/tst/assets/formats/employee-directory.csv
+  type: file
+- path: docs/specs/tst/assets/corrupt/corrupt.docx
+  type: file
+release: alpha
+reviewed: Waa0gsMz6ZlP3IimRiaDSlb99mfq0mp_Y9wRjJcbLnE=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and the test user is authenticated
-  - The test user's account has the must-change-password flag set (achievable via admin password reset from TST-025)
+  - TST-025
+  - Among the files to be batch-uploaded, one is a corrupt/unparseable file (e.g., a truncated or non-conforming document).
 
   ## Test steps
-  1. Call GET /account as the authenticated user. Confirm the response returns the correct username, email, and organisation membership.
-  2. Call PATCH /account/password with the current password and a new password. Confirm 200 OK and that the must-change-password flag is now cleared.
-  3. Log out and log back in using the new password. Confirm login succeeds without a forced-change prompt.
-  4. Call PATCH /account with a new username. Confirm 200 OK and that subsequent calls to GET /account return the updated username.
-  5. Call PATCH /account with a new email address. Confirm 200 OK and that GET /account returns the updated email.
-  6. Call PATCH /account/password with a wrong current password. Confirm 401 or 403 is returned and the password is not changed.
+  1. Select the 'Add document' icon.
+  2. Select multiple files of any supported format, including the one corrupt/unparseable file.
+  3. Select the 'Auto-upload' option.
+  4. Verify that each valid document was uploaded and that the metadata was correctly extracted, in a single batch operation without individual uploads.
+  5. Verify that the corrupt file did not block the rest of the batch, and that its failure is reported individually (not silently dropped or a whole-batch failure).
+  6. Delete all uploaded files.
+  7. Repeat step 1 & 2 (excluding the corrupt file).
+  8. Select the 'Review each file' option.
+  9. Set the metadata for each file and upload.
+  10. Verify that each document was uploaded and the metadata correctly set.
+  11. Inspect the logs (admin dashboard > Logging) to check that each successfully ingested document, and the failed corrupt-file ingestion, each produced an audit entry.
 
   ## Expected outcome
-  1. Profile endpoint returns correct user data.
-  2. Password change succeeds and clears the must-change-password flag.
-  3. New password is valid for login and no forced-change prompt appears.
-  4. Username is updated.
-  5. Email address is updated.
-  6. Incorrect current password is rejected.
-verification_method: T
+  1. All valid documents in a folder/selection are uploaded in a single batch operation, without requiring individual uploads, and metadata is set.
+  2. A document that fails to process does not block the rest of the batch; its failure is reported per-document.
+  3. Default classification and language are set to 'Internal' and 'English' respectively,
+  when metadata could not be automatically extracted.
+  4. The audit log contains a correctly-populated entry for each successful ingestion and for the failed corrupt-file ingestion.
+verification_method: Test (T)
 version: 0.1

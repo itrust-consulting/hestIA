@@ -1,8 +1,0 @@
-id: ${id}
-type: EncodeDense
-inputs:
-  data: ${data}
-  model: ${embedding_model}
-  model_kwargs: ${embedding_model_kwargs}
-outputs:
-  vector: ${vector}

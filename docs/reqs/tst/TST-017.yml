@@ -1,45 +1,29 @@
 active: true
 authors: ACR
-complexity: 4
+complexity: 1-5
 derived: false
-execution_type: Manual
-expected_outcome: |
-  Successful RAG query confirms pipeline stages ran in order; Qdrant failure returns an error not a hallucination; new YAML template loads without code changes.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify multi-step pipeline execution, upstream failure handling, and extensibility via YAML templates
-level: 17.0
+  Unauthorized admin access
+level: 1.17
 links:
-- SRS-017: XnxZn6IbCnPK8eU5U2MZyq6SKUNrEcezemLvjMyDzmg=
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: kCv4pc5Ic79QN02nQcwRItqJDWdP9T-bKUathSWBIVw=
-test_data: |
-  Collection with ingested documents; a valid custom YAML workflow template file; Docker access to stop/start Qdrant; analyst credentials
+reviewed: CperifAj6X5K_TUnKoj1YMC4kiRaA_gg0Ow1ANyfL7I=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with all pipeline services active
-  - A test collection with ingested documents exists
-  - Access to the Docker host is available to stop and restart the Qdrant service
-  - A valid custom YAML workflow template is prepared and validated against the template schema
-  - An analyst user is authenticated
+  - User is logged in as user or moderator
 
   ## Test steps
-  1. Submit a RAG query against the test collection. Confirm the response includes citations, verifying that the retrieval stage executed.
-  2. Stop the Qdrant container (e.g. via `docker stop`). Submit another RAG query immediately.
-  3. Confirm the response is an informative error message, not an empty or fabricated answer.
-  4. Restart Qdrant and confirm the system resumes normal operation on the next query.
-  5. Copy the custom YAML workflow template to hestia/templates/workflows/ and restart only the backend service.
-  6. Invoke the new pipeline and confirm it executes without requiring code modifications.
+  1. Try to access any admin accessible pages.
 
   ## Expected outcome
-  1. A successful RAG query confirms all pipeline stages (encode, retrieve, augment, generate) ran in sequence.
-  2. With Qdrant unavailable, the system returns an error — not a hallucinated or empty response.
-  3. After Qdrant restarts, queries succeed again.
-  4. The new YAML workflow template takes effect after backend restart without any source code change.
-verification_method: T
+  1. User is shown a 403
+verification_method: Test (T)
 version: 0.1

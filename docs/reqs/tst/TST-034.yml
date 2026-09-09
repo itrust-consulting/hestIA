@@ -1,45 +1,37 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Plain generate returns a direct LLM response with no retrieval; RAG generate performs retrieval and augments the prompt with corpus context; both modes respect the system prompt and generation parameters.
+expected_outcome: ''
 header: |
-  Verify plain generate and RAG generate modes via POST /generate
-level: 34.0
+  Large corpus capacity review
+level: 1.34
 links:
-- SRS-014: e0wtYttuzfq0GRAVYiKPCFgCitcxfC3f5oQ63KnFsn0=
-- SRS-015: 4IpkFPYvBst8yhqVV1OvKsmZCYIuWYEClss4kyubFbY=
-- SRS-016: A-b-0n5buxq3IBDM2Bb1nN4kw1VAcKOpHcr6cm2rCIs=
+- SRS-019: k-RF5cmuBFZ8y1ybQVvW5hCU_Iqa7yQV-OUaD3Iz0pE=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: mpyeB0yipKMxtnYSGyfrk8vAI2hv560mabtQawC4HD8=
-test_data: |
-  Authenticated user account; a collection with at least one ingested document containing content that answers the test question; a question whose answer is in the corpus; a custom system prompt; generation parameters (temperature, max_tokens).
+references: []
+release: alpha
+reviewed: I5KxxXrwF0zs8of7rA-H_R_VQBJSCc3QhSKQAQVqU0Q=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with the LLM and Qdrant services active
-  - The user is authenticated
-  - A test collection with a known document is available
+  - Access to the deployed vector store (Qdrant) and embedding-storage configuration, and to Qdrant's published documentation/benchmarks for collection size and performance at scale.
+  - hestIA's actual per-document/per-chunk storage footprint (vector dimensionality, payload size) is known or can be estimated from a smaller ingested sample.
 
   ## Test steps
-  1. Call POST /generate with exec_type=generate, a prompt, a custom system_prompt, and no collection. Confirm the response is a direct LLM completion that follows the system_prompt without citing any documents.
-  2. Call POST /generate with exec_type=rag_generate, the same prompt, the test collection, and the same system_prompt. Confirm the response includes citations referencing the test document.
-  3. Confirm that the RAG generate response is more specific or accurate regarding corpus content than the plain generate response from step 1.
-  4. Call POST /generate with exec_type=rag_generate and a question with no relevant content in the corpus. Confirm the response acknowledges the absence of relevant content rather than fabricating an answer.
-  5. Call POST /generate with exec_type=generate and generation parameters (e.g. temperature=0.0, max_tokens=50). Confirm the response length is constrained to the specified max_tokens.
+  1. Review Qdrant's documentation and published benchmarks for supported collection sizes, storage engine behavior (e.g., on-disk vs. in-memory indexes, quantization), and query latency at scale, and confirm they cover corpora at least as large as 100 GB of vector + payload data.
+  2. Using hestIA's measured or estimated per-document storage footprint, extrapolate the vector count and on-disk size corresponding to a 100 GB source corpus, and compare against the reviewed Qdrant capacity guidance.
+  3. Review hestIA's Qdrant deployment configuration (indexing mode, memory/disk settings, sharding if any) against Qdrant's recommendations for the extrapolated scale, and identify any configuration that would need to change to sustain it.
+  4. Ingest a smaller representative sample corpus (e.g., a few GB) and confirm ingestion completes without errors and queries return relevant results within acceptable response times, to validate the extrapolation is grounded in observed behavior rather than documentation alone.
+  5. Record findings, including any configuration change or resource provisioning identified as necessary to reach 100 GB, and any risk or unknown that a full-scale test would be needed to resolve.
 
   ## Expected outcome
-  1. Plain generate returns a direct LLM response with no citations.
-  2. RAG generate returns a response with at least one citation from the test collection.
-  3. RAG response demonstrates corpus grounding compared to plain generate.
-  4. RAG generate returns an honest response when no relevant context is available.
-  5. Generation parameters are respected in the output.
-verification_method: T
+  1. Qdrant's documented capabilities support collections at least as large as the extrapolated 100 GB scenario.
+  2. The extrapolated storage and query-performance characteristics at 100 GB are consistent with Qdrant's documented behavior and with the smaller-scale sample run.
+  3. hestIA's current Qdrant deployment configuration is either already suitable for this scale, or the required configuration changes are identified and documented.
+  4. Any residual risk that can only be resolved by an actual full-scale (100 GB) run is explicitly recorded as an open item rather than left implicit.
+verification_method: Review of design (R)
 version: 0.1

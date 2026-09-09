@@ -1,0 +1,28 @@
+{
+  "service": "hestIA",
+  "environment": "test-fixture",
+  "components": [
+    {
+      "name": "backend",
+      "image": "hestia-backend:test",
+      "replicas": 1
+    },
+    {
+      "name": "frontend",
+      "image": "hestia-frontend:test",
+      "replicas": 1
+    },
+    {
+      "name": "vector-store",
+      "image": "qdrant:test",
+      "replicas": 1
+    }
+  ],
+  "network_policy": {
+    "outbound_allowlist": [
+      "internal-db",
+      "internal-vector-store"
+    ],
+    "external_egress": false
+  }
+}

@@ -51,10 +51,12 @@ nodes:
       prompt: ${last_user_message}
       hits:   ?points
       attachments: ${attached_documents}
-      # Admin-editable RAG system prompt -- must keep the three required
-      # placeholders ({retrieved_data}, {source_map}, {user_prompt}); this
-      # is what the LLM actually sees, wrapping the retrieved context and
-      # citation-key instructions around the user's message.
+      # Admin-editable RAG system prompt -- this is what the LLM actually
+      # sees, wrapping the retrieved context and citation-key instructions
+      # around the user's message. Only {user_prompt} is required (omitting
+      # it silently drops the user's question); {retrieved_data} and
+      # {source_map} are just how this template happens to surface retrieved
+      # context/citations and can be reworked or dropped.
       # {attached_documents} is optional -- resolves to "" when the user
       # attached no files -- but keep it if you want attachments (which the
       # user provided directly, not via the knowledge base) to actually

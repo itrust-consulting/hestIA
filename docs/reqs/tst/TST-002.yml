@@ -1,45 +1,38 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Both containers start cleanly; health and readiness checks pass; login page loads.
+expected_outcome: ''
 header: |
-  Verify that hestIA deploys successfully from Docker Compose with no manual dependency setup
-level: 2.0
+  Container-based deployment
+level: 1.2
 links:
 - SRS-002: DpIokQMeejhD0kVZzAcvQWzEQtNMnbV3iMar8BmLDBg=
 normative: true
-platform: GNU/Linux (Docker Engine + Docker Compose)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: ''
+- path: docs/specs/tst/assets/formats/operational-notes.txt
   type: file
 release: alpha
-reviewed: VKNYNZLPFd0xEXQ1FqIya13urnnkHOJIYrOVw1mQSis=
-test_data: |
-  Valid .env configuration file with all required environment variables (LLM_URL, DB_URL, AUTH_SECRET_KEY, services_to_start)
+reviewed: c_z7SeDPCn7_fOZH_0k_G-L6K9IvLtMyursVhLb9Li4=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - Docker Engine and Docker Compose are installed on the target host
-  - The repository is cloned locally
-  - The .env file is populated with valid values for all required variables
-  - The LLM inference server and Qdrant instance are reachable at the configured URLs
-  - No hestIA containers are currently running
+  - A clean host with Docker (and Docker Compose) installed, no prior hestIA containers or volumes present.
 
   ## Test steps
-  1. From the repository root, run `docker compose up`.
-  2. Wait for both the backend (port 5555) and frontend (port 7860) containers to become healthy.
-  3. Call GET /health on the backend and confirm a successful response.
-  4. Call GET /ready on the backend and confirm all configured services appear as active.
-  5. Open a browser, navigate to port 7860, and confirm the login page loads.
+  1. Build and start hestIA using the repository's docker-compose.yml.
+  2. Confirm both the backend and frontend containers reach a healthy/running state with no error output.
+  3. Log in through the web interface.
+  4. Ingest a document into a collection.
+  5. Submit a chat query (both a plain and a RAG/"Ask My Doc" query) against that collection.
+  6. Tear down and re-create the stack from the same compose file on the same host, without editing any configuration.
 
   ## Expected outcome
-  1. Both containers start without errors or restart loops.
-  2. GET /health returns a successful response.
-  3. GET /ready confirms all activated services are operational.
-  4. The frontend login page is reachable at port 7860 with no additional configuration.
-  5. All dependent requirements pass their respective tests within the same network-blocked environment.
-verification_method: T
+  1. hestIA deploys successfully via Docker Compose with no manual dependency installation beyond Docker itself.
+  2. Login, document ingestion, and both query types complete with no errors.
+  3. Tearing down and re-creating the stack from the same compose file reproduces the same working state.
+verification_method: Test (T)
 version: 0.1

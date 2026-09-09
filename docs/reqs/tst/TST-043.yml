@@ -2,30 +2,38 @@ active: true
 authors: ACR
 complexity: 1-5
 derived: false
-execution_type: Automated/Manual
+execution_type: Manual
 expected_outcome: ''
 header: |
-  OIDC authentication
-level: 35.8
-links: []
+  Network isolation during ingestion and query
+level: 1.43
+links:
+- SRS-001: x0cDkdpTp2prbOGy76qy6trgLLUX2Qxr5YLx15evKpM=
+- SRS-013: qd00gjVuUOE8l0Lz608MfPnW5GVn8bPpE_uQA_mVtKs=
 normative: true
 platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/specs/tst/assets
+- path: docs/specs/tst/assets/formats/operational-notes.txt
   type: file
 release: alpha
-reviewed: null
+reviewed: IjlLsg4jvTdECdY2u6WfEBMH7sEoqFAne9OMwlIw3zQ=
 test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - System initialized
+  - hestIA deployed with locally hosted embedding and generation models (no external LLM/embedding API configured).
+  - Network monitoring available on the host (e.g., packet capture, DNS query log, or firewall deny-log) covering all outbound traffic from the hestIA containers.
+  - Optionally, a network policy or firewall rule blocking all outbound internet routes from the hestIA containers except to explicitly allowlisted internal services (database, vector store).
 
   ## Test steps
-  1. Log in using available credentials.
-  2. Test configurations?
+  1. Start network monitoring (or apply the outbound-blocking policy) before any hestIA activity.
+  2. Ingest a document into a collection.
+  3. Submit a natural-language query against that collection.
+  4. Stop monitoring and review the captured traffic (or blocked-connection log) for the full ingestion + query cycle.
 
   ## Expected outcome
-  1.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+  1. Document ingestion and query processing complete successfully even with all outbound internet routes blocked.
+  2. No requests to external hosts are observed during embedding generation or text generation.
+  3. All observed network activity is limited to internal services (database, vector store) and, where applicable, the locally hosted model runtime.
+verification_method: Test (T)
 version: 0.1

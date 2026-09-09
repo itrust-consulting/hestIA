@@ -1,46 +1,39 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
-execution_type: Manual/Automated
-expected_outcome: |
-  Message history pages backward correctly via cursor: each page returns the requested number of messages with no duplicates or gaps, `has_more`/`next_cursor` accurately reflect whether older messages remain, the final page reports `has_more=false` and `next_cursor=null`, out-of-range `limit` values are rejected, and the client's scroll-triggered older-page loading and memory eviction behave correctly.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify paginated retrieval of conversation message history via cursor-based scrolling
-level: 35.0
+  Help content management
+level: 1.35
 links:
-- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
+- SRS-022: oXkJA7K3EHuLow2s9PzRi8NiH67ADcSGWbsXQYbCBbk=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: beta
-reviewed: hkfq98ZCfVBV-00QDZFlD3ynbKBBkwMt0qDWEfR23tc=
-test_data: |
-  A conversation belonging to the test user containing at least 7 messages (obtainable by submitting multiple POST /chat requests with save_chat=true and the same conversation_id, or equivalent seed data), so that a small page size (e.g. limit=3) forces at least three pages.
+reviewed: QlnngyQwIhQGRcXUXQeVAl_uZsEzqkEyJbcsP8r8GBs=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and the user is authenticated
-  - The user has a conversation (`cid`) containing at least 7 messages
+  - System initialized and logged in as admin.
+  - A non-administrator user account is available.
 
   ## Test steps
-  1. Call `GET /conversations/{cid}?limit=3` with no cursor. Confirm the response is `{messages, has_more, next_cursor}`, `messages` contains exactly the 3 most recent messages in chronological order, `has_more` is `true`, and `next_cursor` is a `{created_at, rowid}` object.
-  2. Call `GET /conversations/{cid}?limit=3` again, this time passing `before_created_at`/`before_rowid` from step 1's `next_cursor`. Confirm the response contains the next 3 older messages, none of which overlap with step 1's page, and that `has_more`/`next_cursor` are set appropriately for the remaining history.
-  3. Repeat step 2, following each returned `next_cursor`, until a page reports `has_more=false`. Confirm that page's `next_cursor` is `null`.
-  4. Concatenate all pages collected in steps 1-3 in chronological order. Confirm the result exactly matches the conversation's full message history (no duplicate messages, no gaps, no reordering) as returned by a single unpaginated call with a large `limit`.
-  5. Call `GET /conversations/{cid}` with no query parameters. Confirm the default page size is applied and `has_more` correctly reflects whether the conversation exceeds it.
-  6. Call `GET /conversations/{cid}?limit=0` and `GET /conversations/{cid}?limit=500`. Confirm both are rejected with `422 Unprocessable Entity` rather than being silently clamped or returning a server error.
-  7. In the web UI, open the conversation and scroll to the top of the currently loaded history. Confirm older messages are fetched and prepended without the viewport jumping or losing scroll position. Continue scrolling down and away from the top for longer than the eviction grace period, then confirm the previously-loaded older messages have been released from memory (not re-fetched needlessly) and are transparently re-fetched without data loss if the user scrolls back up to them.
+  1. Create a new help section with Markdown content.
+  2. Upload an image and reference it in the section's Markdown.
+  3. Rename the image and verify all Markdown references to it across all help sections are updated automatically.
+  4. Update the help section's content and save changes.
+  5. Log in as the non-administrator user and read the help section and image.
+  6. As the non-administrator user, attempt to create, modify, or delete a help section or image.
+  7. As admin, delete the help section and image.
 
   ## Expected outcome
-  1. First page returns the 3 newest messages with `has_more=true` and a valid `next_cursor`.
-  2. Second page returns the next 3 older messages with no overlap with page 1.
-  3. Paging continues until `has_more=false` is reached, at which point `next_cursor` is `null`.
-  4. The full set of paged messages reconstructs the conversation's complete, correctly-ordered history with no duplicates or gaps.
-  5. The default (unpaginated) call applies the configured default page size and reports `has_more` correctly.
-  6. Out-of-range `limit` values are rejected with a validation error, not a server error or silent clamping.
-  7. Scrolling up loads older history transparently and preserves scroll position; long-idle history is evicted from client memory and correctly reloaded on demand.
-verification_method: T
-version: '0.1'
+  1. Help sections and images can be created, updated, and deleted by an administrator.
+  2. Renaming an image atomically rewrites all Markdown references to it across all help sections.
+  3. The non-administrator user can read sections and images but cannot create, modify, or delete them.
+  4. Help sections are listed in a consistent order determined by their frontmatter metadata.
+verification_method: Test (T)
+version: 0.1

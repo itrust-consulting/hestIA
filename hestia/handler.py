@@ -100,13 +100,16 @@ def _format_citations(hits: list) -> tuple[dict, list]:
 
 
 def _build_prompt(prompt: str, hits: list, template: str, attachments: str = "") -> tuple[str, list]:
-    if not hits:
-        # No retrieved context to wrap the template around -- still surface
-        # any attachments (the template's <attached-documents> section is
-        # skipped along with the rest of it here), just plainly ahead of
-        # the user's own message rather than silently dropping them.
-        return (f"{attachments}\n\n{prompt}" if attachments else prompt), []
-    formatted, cite_list = _format_citations(hits)
+    # Always render the template, even with no hits -- an Augment node isn't
+    # necessarily RAG-flavored (see graph.py's _REQUIRED_AUGMENT_PLACEHOLDERS:
+    # only {user_prompt} is required), so a template that doesn't reference
+    # {retrieved_data}/{source_map} at all must still run. When hits is
+    # genuinely empty (0 retrieval results, or no retrieval wired up at all),
+    # those two placeholders just resolve to "".
+    if hits:
+        formatted, cite_list = _format_citations(hits)
+    else:
+        formatted, cite_list = {"retrieved_data": "", "source_map": ""}, []
     return template.format(
         retrieved_data=formatted["retrieved_data"],
         source_map=formatted["source_map"],

@@ -2,38 +2,43 @@ active: true
 authors: ACR
 complexity: 1-5
 derived: false
-execution_type: Manual
+execution_type: Automated
 expected_outcome: ''
 header: |
-  Local setup
-level: 35.2
-links: []
+  Access and modification audit logging
+level: 1.37
+links:
+- SRS-027: YWBQg4-UUS7inYWlM0wgi5uz0xfcJhoidS_4nGPt9AE=
 normative: true
-platform: Linux/Windows/dockerized environment
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/specs/tst/assets
+- path: docs/specs/tst/assets/formats/operational-notes.txt
   type: file
-release: alpha
-reviewed: null
+release: beta
+reviewed: hLmnIEV7k058Xuks1LrKWIeBM2PjoxFT7xzV3ZMOJT0=
 test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  -
+  - System initialized and logged in as admin.
+  - A standard user and a moderator account are available.
 
   ## Test steps
-  1. Prepare environment
-  2. boot
-  3. verify health checks
-  4. navigate to localhost:5173 and login
-  5. First requests (non-RAG and RAG)
-  6. Logout
+  1. Log in and out as the standard user.
+  2. As the standard user, attempt to access a collection outside their granted tenant and observe the access denial.
+  3. As the moderator, ingest a document and then delete it.
+  4. As admin, change a user's role/classification, modify a tenant's collection access grant, edit a workflow configuration, and change the system log level.
+  5. As admin, query the audit log via the API, filtering by time range and log type, and confirm the events from steps 1-4 are present with actor, action, resource, timestamp, and correlation ID — including the ingestion and deletion entries for the document deleted in step 3, referencing a resource that no longer exists.
+  6. Export the filtered audit log (both ndjson and csv) and verify the exported content matches the queried entries.
+  7. As the standard user, attempt to access the audit log query/export endpoint and verify access is denied.
+  8. Confirm that the log query and export actions performed in steps 5-6 themselves produced audit entries.
 
   ## Expected outcome
-  1. Required artefacts created upon first booting -> system initialization
-  2. Health checks ok
-  3. Successful login with provisioned default admin creds.
-  4. Received valid responses.
-  5. Successful logout.
+  1. Authentication, access-denial, document ingestion/deletion, and administrative change events each produce a structured audit entry.
+  2. Each audit entry records the acting user, action, affected resource, timestamp, and correlation ID.
+  3. Audit log entries persist independently of the lifecycle of the resource they reference.
+  4. An administrator can query and export the audit log, filtered by log type, level, and time range.
+  5. A non-administrator user is denied access to the audit log query/export endpoint.
+  6. Audit log query and export actions are themselves recorded as audit entries.
 verification_method: Test (T)
 version: 0.1

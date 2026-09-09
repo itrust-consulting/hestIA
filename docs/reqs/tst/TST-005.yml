@@ -1,46 +1,34 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
-execution_type: Manual
-expected_outcome: |
-  Role and classification restrictions are enforced; admin has full access; moderators are scoped to their organization.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify role enforcement and classification-level filtering across user roles
-level: 5.0
+  LDAP authentication
+level: 1.5
 links:
-- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: RPx55sPKPWCTIAnKj5TsqpLBnKexOjrg0t-tKrCXlZU=
-test_data: |
-  Admin account; standard user account (classification level 1 = INTERNAL);
-  test collection containing documents at classification levels 1 (INTERNAL) and 3 (CONFIDENTIAL);
-  organization moderator account; a second separate organization
+reviewed: 77Oi4wKRZ9sLXstLU24eBE2CViDB8LJoQWLyEjzkSyE=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running
-  - An admin account is available
-  - A standard user account exists, assigned to an organization with classification level 1 (INTERNAL)
-  - A test collection exists containing documents at classification levels 1 and 3, owned by the standard user's organization
-  - A moderator account exists for one organization; a second separate organization also exists
-  - All accounts have known credentials
+  - System configured with AUTH_MODE=ldap, LDAP_HOST/LDAP_PORT/LDAP_SEARCH_BASE/LDAP_APP_DN/LDAP_APP_PASSWORD/LDAP_USER_DN_TEMPLATE set to a reachable directory.
+  - A test user account exists in that LDAP directory.
 
   ## Test steps
-  1. Log in as the standard user. Attempt to access an admin-only function (e.g. user creation). Confirm access is denied.
-  2. As the standard user, submit a query against the test collection. Inspect the citations and confirm only INTERNAL-classified content appears; CONFIDENTIAL content must not be present.
-  3. Log in as admin. Submit the same query. Confirm content at all classification levels is returned.
-  4. Log in as the moderator of organization A. Attempt to add a member to organization B. Confirm this is denied.
+  1. Log in using the LDAP test user's directory credentials.
+  2. Log out, then attempt to log in with an incorrect password for the same LDAP user.
+  3. Attempt to log in with a username that does not exist in the directory.
 
   ## Expected outcome
-  1. Standard users cannot access administrative functions.
-  2. A user with classification level 1 receives only content classified at level ≤ 1; higher-classified content is filtered out.
-  3. Admin users have unrestricted access to all collections and classification levels.
-  4. Moderators cannot manage organizations outside their own scope.
-verification_method: T
+  1. A valid LDAP user is authenticated and granted access to the system.
+  2. An incorrect password for a valid LDAP user is rejected with a clear error.
+  3. A non-existent LDAP username is rejected with a clear error.
+verification_method: Test (T)
 version: 0.1

@@ -2,29 +2,35 @@ active: true
 authors: ACR
 complexity: 1-5
 derived: false
-execution_type: Automated/Manual
+execution_type: Manual
 expected_outcome: ''
 header: |
-  Local containerized setup
-level: 35.3
-links: []
+  GPU-accelerated inference
+level: 1.38
+links:
+- SRS-028: rAssul-uJdLabI7IxlWCuEmuP5p0SGojBFkTOkM23Qc=
 normative: true
 platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/specs/tst/assets
+- path: docs/specs/tst/assets/formats/operational-notes.txt
   type: file
-release: alpha
-reviewed: null
+release: beta
+reviewed: jquJHf4jxYZ5iC7L0RJRfq92Z4W5XPnd3uLSQG_cG54=
 test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  -
+  - System deployed on a host with a supported GPU and the required drivers/runtime available to the container.
 
   ## Test steps
-  1. follow steps in SRS.
+  1. Configure the embedding and generation services to use the GPU device.
+  2. Start GPU utilization monitoring on the host (e.g., nvidia-smi).
+  3. Ingest a document and observe GPU utilization during embedding generation.
+  4. Submit a chat query and observe GPU utilization during text generation.
+  5. Redeploy without GPU access (or disable the GPU configuration) and repeat document ingestion and a chat query.
 
   ## Expected outcome
-  1.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+  1. GPU utilization is observed during embedding generation and text generation when a GPU is configured and available.
+  2. Ingestion and query processing complete successfully on CPU, without crashing, when no GPU is available.
+verification_method: Test (T)
 version: 0.1

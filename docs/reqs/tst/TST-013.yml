@@ -1,45 +1,35 @@
 active: true
 authors: ACR
-complexity: 4
+complexity: 1-5
 derived: false
-execution_type: Manual
-expected_outcome: |
-  No external inference calls observed; backends switch via configuration only; embedding model configurable via environment.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify all inference is served by locally hosted models and that backends are switchable without code changes
-level: 13.0
+  Session expiration
+level: 1.13
 links:
-- SRS-013: qd00gjVuUOE8l0Lz608MfPnW5GVn8bPpE_uQA_mVtKs=
+- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: HUTubSTPRx4gWkB3iKVdUnt2dS9LKRG4gKQy2OTWMNA=
-test_data: |
-  Network monitoring tool; .env configuration variants for two LLM backends (e.g. vLLM and Ollama); one test document; a collection to ingest into
+references: []
+release: alpha
+reviewed: OYcVMkNSYTy-W_nZrSFDoJYwX8Nb0PwkF2WuNUuvBlA=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with a locally hosted LLM inference server and embedding server (e.g. vLLM on port 8000)
-  - Network monitoring is active and logging all outbound connections
-  - All outbound internet routes are blocked at the network level
-  - A test collection exists
-  - A second LLM backend configuration (e.g. Ollama) is prepared in a separate .env variant
-  - A moderator account is available for ingestion
+  - System configured with a short AUTH_TOKEN_LIFETIME (e.g., 1 minute) for testing.
+  - Logged in and holding a valid access token.
 
   ## Test steps
-  1. With outbound internet blocked, ingest the test document. Confirm ingestion completes successfully and the chunk count matches expectations.
-  2. Submit a natural-language query against the ingested document. Confirm a response is returned.
-  3. Inspect network monitoring logs. Confirm all embedding and generation requests were routed to the local inference server and no external hosts were contacted.
-  4. Stop hestIA, switch to the second backend configuration (updating only .env), and restart. Confirm the system starts without errors.
-  5. Repeat steps 1–2 with the second backend. Confirm equivalent functionality.
+  1. Wait past the configured AUTH_TOKEN_LIFETIME without further activity, then access a protected feature.
+  2. Log in again and, without waiting for expiry, log out.
+  3. Attempt to reuse the token that was active before logout to access a protected feature.
+  4. Restore AUTH_TOKEN_LIFETIME to a longer value and confirm normal session length.
 
   ## Expected outcome
-  1. Ingestion and query succeed with all outbound internet blocked.
-  2. Network logs confirm zero requests to external inference APIs.
-  3. The LLM backend switches between supported providers via configuration without source code changes.
-  4. Embedding model selection via configuration takes effect after restart.
-verification_method: T
+  1. Once the token has expired, the protected feature is inaccessible and the user is prompted to re-authenticate.
+  2. A token invalidated by logout is rejected immediately, even though it has not yet naturally expired.
+  3. The session lifetime is configurable and takes effect without code changes.
+verification_method: Test (T)
 version: 0.1

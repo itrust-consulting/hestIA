@@ -1,42 +1,34 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
-execution_type: Manual
-expected_outcome: |
-  Unauthenticated and invalid access is denied; valid credentials grant access; sessions expire and require re-authentication.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify that authentication gates access and sessions expire as configured
-level: 4.0
+  Local authentication
+level: 1.4
 links:
 - SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: G0aTWuA48DyVDnDomX7UXE1FozKc2WuuvrhKbyvkAvQ=
-test_data: |
-  Valid local user credentials; a set of intentionally wrong credentials (wrong password); AUTH_TOKEN_LIFETIME set to a known value
+reviewed: pmhwv-xlIH_19nCLo8gK7pYoKKbnFfZePHiummLausk=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running
-  - At least one local user account exists with known valid credentials
-  - Invalid credentials (wrong password for an existing user) are prepared
-  - AUTH_TOKEN_LIFETIME is set to a known value for expiry testing
+  - System initialized with AUTH_MODE=local.
 
   ## Test steps
-  1. Attempt to access a protected resource (e.g. the chat interface) without logging in. Confirm access is denied.
-  2. Navigate to the login screen and enter the invalid credentials. Confirm a clear error is displayed and no session is established.
-  3. Enter the valid credentials and confirm a session is established and protected features are accessible.
-  4. Allow the session to expire (or manually invalidate the token) and attempt to use a protected feature. Confirm re-authentication is required.
+  1. Without authenticating, attempt to access a protected feature (e.g., the chat interface) and observe the result.
+  2. Log in using valid local credentials.
+  3. Access the same protected feature.
+  4. Log out, then attempt to log in again using an incorrect password for the same account.
 
   ## Expected outcome
-  1. Unauthenticated access to any protected feature is denied with no data exposed.
-  2. Invalid credentials are rejected with a clear, non-revealing error message.
-  3. Valid credentials successfully establish a session and grant access to the system.
-  4. After session expiry the user is prompted to re-authenticate before accessing protected features.
-verification_method: T
+  1. The protected feature is inaccessible before authentication.
+  2. Valid credentials grant access to the system.
+  3. Invalid credentials are rejected with a clear error message, and no access is granted.
+verification_method: Test (T)
 version: 0.1

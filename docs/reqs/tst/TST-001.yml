@@ -1,41 +1,45 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  No outbound connections observed; all operations complete successfully with internet blocked.
+expected_outcome: ''
 header: |
-  Verify that hestIA operates fully without outbound internet connectivity
-level: 1.0
+  Local setup
+level: 1.1
 links:
 - SRS-001: x0cDkdpTp2prbOGy76qy6trgLLUX2Qxr5YLx15evKpM=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: ''
+- path: docs/specs/tst/assets/formats/operational-notes.txt
   type: file
 release: alpha
-reviewed: noGdgHEaAvdtZcAF3GpqhdBS0PHANH7s6Fy7ASF4FlY=
-test_data: |
-  One ingestion-ready DOCX or PDF test document; network monitoring tool (e.g. Wireshark, tcpdump, or ss/netstat)
+reviewed: 5FrudofjmkQEPGYxXcWngVtyuDp0atDnzP4iY2WiGDY=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and all services are running (confirmed by GET /ready)
-  - All outbound routes to external internet addresses are blocked at the OS or firewall level (e.g. via iptables drop rule or network namespace restriction)
-  - An admin account exists with known credentials
-  - A network monitoring tool is active and logging all connection attempts
+  - A fresh host with no prior hestIA containers, volumes, or data directories present.
+  - .env configured with DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_EMAIL, AUTH_MODE=local, AUTH_SECRET_KEY, and the database/vector-store connection settings required for a first boot.
 
   ## Test steps
-  1. Confirm hestIA responds to requests from within the internal network (e.g. health check).
-  2. Upload the test document via the ingestion interface.
-  3. Submit a natural-language query against the ingested document via the chat interface.
-  4. Inspect network monitoring logs for any outbound connection attempts made during steps 2–3.
+  1. Prepare the environment: verify the .env file contains all variables required for a first boot, and that no user database, vector store, or data directory from a previous run exists.
+  2. Boot hestIA for the first time.
+  3. Call GET /health and GET /ready and inspect the response.
+  4. Confirm the first-boot artefacts were created: the bootstrap admin user exists in the user database (derived from DEFAULT_ADMIN_USERNAME/PASSWORD/EMAIL), and the default workflow/template configuration has been seeded into the data directory.
+  5. Navigate to http://localhost:5173 and log in using the DEFAULT_ADMIN_* credentials.
+  6. Submit a plain chat request with no collection selected (non-RAG).
+  7. Create a collection, ingest a document into it, and submit a query against that collection with 'Ask My Docs' active (RAG).
+  8. Log out, then attempt to access a protected page.
+  9. Inspect the logs (admin dashboard > Logging) to check that the login, the document ingestion, and the logout each produced a correctly-populated audit entry (actor, action, resource, timestamp, correlation ID).
 
   ## Expected outcome
-  1. hestIA responds correctly to all requests with no dependency on external connectivity.
-  2. Network logs show zero outbound TCP/UDP connections to external internet addresses during ingestion or query processing.
-  3. All dependent requirements pass their respective tests within the same network-blocked environment.
-verification_method: R
+  1. GET /health and GET /ready both report a healthy/ready status, with the expected services and providers listed.
+  2. The bootstrap admin user and default workflow templates are present after first boot; re-running boot does not recreate or duplicate them.
+  3. Login succeeds with the provisioned default admin credentials.
+  4. Both the non-RAG and the RAG request return valid responses; the RAG response includes a citation to the ingested document.
+  5. Logout terminates the session; the protected page is no longer accessible and the user is redirected to login.
+  6. The audit log contains a correctly-populated entry for the login, the ingestion, and the logout.
+verification_method: Test (T)
 version: 0.1

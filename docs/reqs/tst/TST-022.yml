@@ -1,39 +1,39 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Repeated failed login attempts from the same source are throttled; a 429 Too Many Requests response is returned once the rate limit is exceeded.
+expected_outcome: ''
 header: |
-  Verify login rate limiting rejects rapid successive authentication attempts
-level: 22.0
+  User management
+level: 1.22
 links:
-- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
-- SRS-020: VXgLxT_Apdm4JHtgqfnNR1ce9EXVhs_L8_v1kMUHcLs=
+- SRS-005: -qYDaE4KUMXhB0t-IOXPcWXJqJbRU0JUVqfk1YXTkxU=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: P7Hzsos2bNvaRZae_cM4NWtD-KUOF3d9bFPr6pzhTLw=
-test_data: |
-  A non-existent or invalid username/password pair; a tool capable of submitting rapid HTTP requests (e.g. curl in a loop, Locust, or Postman runner).
+references: []
+release: alpha
+reviewed: Hflac2EWTt5XJhXFkktvhRp7t0scJqKjoj3WYpJqBkQ=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and the login rate limiter is active
-  - The rate limit threshold and window are known (from configuration)
+  - System initialized and logged in as admin
 
   ## Test steps
-  1. Submit POST /login with invalid credentials. Confirm a 401 Unauthorized is returned.
-  2. Repeat the POST /login request in rapid succession (exceeding the configured threshold within the rate-limit window). Confirm that once the threshold is exceeded the response changes to 429 Too Many Requests.
-  3. Wait for the rate-limit window to expire. Submit a POST /login with valid credentials. Confirm authentication succeeds and a 200 OK with a session token is returned.
+  1. Navigate to the admin dashboard > Users
+  2. Create a test user.
+  3. Inspect test user and verify that information is correctly displayed.
+  4. Modify user information and save changes.
+  5. Verify that changes were successfully adopted.
+  6. Delete test user.
+  7. Verify that test user is no longer listed in the user overview.
+  8. Inspect the logs (admin dashboard > Logging) to check that the user's creation, modification, and deletion each produced an audit entry recording the acting admin, the action, and the affected user.
 
   ## Expected outcome
-  1. Individual failed logins return 401.
-  2. Rapid successive failed logins return 429 after the threshold is exceeded.
-  3. After the window expires, successful login is possible again.
-verification_method: T
+  1. All users are listed in the overview.
+  2. User information is correctly displayed (Profile information, activity, tenants)
+  3. All CRUD operations sucessful.
+  4. The audit log contains a correctly-populated entry for the user's creation, modification, and deletion.
+verification_method: Test (T)
 version: 0.1

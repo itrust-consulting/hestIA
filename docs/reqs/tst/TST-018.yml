@@ -1,43 +1,46 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Responses are in the language of the query; retrieval succeeds across all three languages despite the corpus being in English.
+expected_outcome: ''
 header: |
-  Verify that queries in English, French, and German each produce responses in the same language
-level: 18.0
+  Access to knowledge base
+level: 1.18
 links:
-- SRS-018: WIf8o5Iyo0nI6QnqIum5o5dBE_osM-YTXYtyf1GzoB8=
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/reqs/tst/assets
+- path: docs/specs/tst/assets/formats/network-security-policy.docx
   type: file
 release: alpha
-reviewed: qx-bnrVO9xOhD2WH5ScXGEfKePXuYFAhGfVbJ2OVI74=
-test_data: |
-  A collection containing English-language documents;
-  three equivalent test questions — one in English, one in French, one in German — each with a known answer present in the corpus;
-  analyst credentials
+reviewed: 42ewoR7KWYSC9hAnRLzMnRGOg-IE2x53h7GCyyTq97g=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with a multilingual-capable LLM and embedding model
-  - A test collection contains English-language documents with known content
-  - An analyst user is authenticated
-  - The three language-variant test questions and their expected topics are documented
+  - 'PublicUser', 'InternalUser', 'ConfidentialUser', 'RestrictedUser', and 'SecretUser' created, each assigned the classification clearance matching their name (Public, Internal, Confidential, Restricted, Secret respectively).
+  - All users are members of tenant 'TestTenant'.
+  - TestTenant owns at least one non-empty knowledge base, ingested with network-security-policy.docx (or an equivalent document) split across sections tagged at each of the five classification levels.
+  - TestTenant has access to at least one shared non-empty knowledge base.
+  - At least one knowledge base exists that TestTenant, and thus, its members, have no access to.
 
   ## Test steps
-  1. Submit the French-language test question against the collection. Record the response language and check whether a citation is present.
-  2. Submit the German-language test question. Record the response language and check for a citation.
-  3. Submit the English-language test question. Record the response language and check for a citation.
+  1. Log in as 'PublicUser' and activate 'Ask My Docs'.
+  2. Verify the collection selector lists only the owned and shared knowledge bases; the knowledge base TestTenant has no access to is not listed.
+  3. Select the owned knowledge base and submit a query whose answer draws on content spanning multiple classification levels (e.g., a question covered by network-security-policy.docx).
+  4. Inspect the response and its citations; confirm only content at or below the user's clearance (Public) is surfaced.
+  5. Attempt to query the knowledge base TestTenant has no access to directly (e.g., by its known collection identifier) and confirm the request is denied or returns no content.
+  6. Log out, then repeat steps 1-4 logged in as 'InternalUser', 'ConfidentialUser', and 'RestrictedUser' in turn, each time confirming the retrieved/cited content is limited to that user's clearance level or below.
+  7. Log out, then repeat steps 1-4 logged in as 'SecretUser', confirming content up to and including the Secret level (the highest classification present) is now included when relevant.
+  8. As admin, inspect the logs (admin dashboard > Logging) to check that each user's query against the owned knowledge base and the denied attempt against the inaccessible knowledge base were both recorded as collection access decisions.
 
   ## Expected outcome
-  1. The French query produces a French-language response with at least one citation.
-  2. The German query produces a German-language response with at least one citation.
-  3. The English query produces an English-language response with at least one citation.
-  4. Retrieval quality (presence of relevant citations) is comparable across all three languages despite the corpus being in English.
-verification_method: T
+  1. Only knowledge bases the tenant owns or has been granted access to are ever listed or queryable, regardless of which user is logged in.
+  2. For every user, retrieved answers and citations are strictly limited to document content at or below that user's assigned classification clearance level.
+  3. Content above a user's clearance is never surfaced, even when it is the most relevant passage for the query; the response instead relies on the highest-relevance content the user is cleared for, or acknowledges that sufficient information is unavailable.
+  4. 'SecretUser' is the only user among the five for whom Secret-level content is retrievable.
+  5. The audit log contains a correctly-populated entry for each user's collection access, including the denied attempt against the inaccessible knowledge base.
+verification_method: Test (T)
 version: 0.1

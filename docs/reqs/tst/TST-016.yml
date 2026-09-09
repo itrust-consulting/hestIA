@@ -1,41 +1,29 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
-execution_type: Manual/Automated
-expected_outcome: |
-  Parameters demonstrably affect output; minimum temperature produces consistent results; models are discoverable.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify that generation parameters affect response behaviour and that available models are discoverable
-level: 16.0
+  Unauthorized moderator access
+level: 1.16
 links:
-- SRS-016: A-b-0n5buxq3IBDM2Bb1nN4kw1VAcKOpHcr6cm2rCIs=
+- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: SbP1JDfpcU7X_5ytYeICncg5G7mjwfMGJZaegS5Eb8s=
-test_data: |
-  Analyst credentials; a fixed test prompt with a deterministic expected answer; two max_tokens values (e.g. 50 and 500)
+reviewed: iDFDUjNaar7VX8BMAWdXl0SUkBFMCrGSYs9QT-WVacM=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running with the LLM service active
-  - An analyst user is authenticated
-  - A collection with ingested content is available
-  - The test prompt and expected response characteristics are documented
+  - Logged in as user
 
   ## Test steps
-  1. Query the system to retrieve the list of available models. Confirm models are listed without requiring external documentation.
-  2. Submit the test prompt twice with temperature set to its minimum value (0.0 or equivalent). Compare the two responses.
-  3. Submit the test prompt with max_tokens set to 50. Record the approximate response length.
-  4. Submit the same prompt with max_tokens set to 500. Compare the response length to step 3.
+  1. Try to access any moderator accessible pages.
 
   ## Expected outcome
-  1. Available models are returned by the system without consulting external sources.
-  2. Two identical prompts at minimum temperature produce consistent (identical or near-identical) responses.
-  3. A max_tokens value of 50 produces a measurably shorter response than 500 tokens.
-verification_method: T
+  1. User is shown a 403
+verification_method: Test (T)
 version: 0.1

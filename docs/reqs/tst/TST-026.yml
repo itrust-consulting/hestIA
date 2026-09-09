@@ -1,55 +1,80 @@
 active: true
 authors: ACR
-complexity: 4
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  Organisations can be created, updated, and deleted; members can be enrolled and removed; tenant-collection grants control retrieval scope; the one-moderator-per-org constraint is enforced.
+expected_outcome: ''
 header: |
-  Verify organisation lifecycle and tenant-collection management
-level: 26.0
+  Collection management - Document ingestion
+level: 1.26
 links:
-- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-006: E5QID7Q8QdkxDAJ5oUmyftSIoEpdFBFbZd8C2JjxGsg=
+- SRS-008: t5iEkbl9zzQydNgIthJQB63TyB8_hHMIAVZDArrJBxE=
+- SRS-010: u6bmmZEgZaZhaWdxw2FsLl_xxzd9LQJjrwmJ_hvvEac=
+- SRS-011: GXtsJ3OGd2xFQ7F4BGw3XLWCjErtKPUs1FiUrxxTNq4=
+- SRS-012: rbTRAL7QiFAI6QbO7ieYG9WEiRLhNRilskSpouCyphg=
+- SRS-013: qd00gjVuUOE8l0Lz608MfPnW5GVn8bPpE_uQA_mVtKs=
+- SRS-025: zY3zWH23WHtpJk7ThxSKeDOMp9GjczF8Ttwc38JiRdg=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
 references:
-- path: docs/reqs/tst/assets
+- path: docs/specs/tst/assets/formats/network-security-policy.docx
   type: file
-release: beta
-reviewed: X2qeNgZ-afXVVBFz8EuY6bR1iCJbDvSdTyS1FbD_D9k=
-test_data: |
-  An admin account; two test user accounts (user A and user B); an existing collection.
+- path: docs/specs/tst/assets/formats/incident-response-procedure.pdf
+  type: file
+- path: docs/specs/tst/assets/formats/asset-inventory.xlsx
+  type: file
+- path: docs/specs/tst/assets/formats/operational-notes.txt
+  type: file
+- path: docs/specs/tst/assets/formats/vpn-setup-guide.md
+  type: file
+- path: docs/specs/tst/assets/formats/employee-directory.csv
+  type: file
+- path: docs/specs/tst/assets/formats/deployment-manifest.json
+  type: file
+- path: docs/specs/tst/assets/formats/security-awareness-training.pptx
+  type: file
+release: alpha
+reviewed: M9eT_eZnxjGYqZe4txMx7XxaLasTpmsf2D9Ze83Ii8Y=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with the admin account active
-  - The test users exist but are not yet members of any organisation
-  - At least one collection exists
+  - TST-025 executed.
+  - No document has yet been ingested into the target collection, so its default (out-of-box) chunking strategy is still in effect.
+  - At least one .docx file to be ingested contains a table.
 
   ## Test steps
-  1. As admin, call POST /organizations/create with a name and abbreviation. Confirm 201 Created and a valid org_id is returned.
-  2. Call GET /organizations. Confirm the new organisation appears in the list.
-  3. Call PUT /organizations/{org_id} to update the organisation name. Confirm 200 OK and the updated name.
-  4. Call POST /organizations/{org_id}/members/{user_id} to add user A. Confirm 200 OK. Call GET /organizations/{org_id}/members and confirm user A is listed.
-  5. Assign user A as moderator via PATCH /organizations/{org_id}/members/{user_id}/role. Confirm 200 OK.
-  6. Attempt to assign user B as a second moderator of the same organisation. Confirm the request is rejected (the one-moderator constraint).
-  7. Call PUT /organizations/{org_id}/collections/{collection_id} to grant the organisation owner access to the collection. Confirm 200 OK.
-  8. Call GET /organizations/{org_id}/collections. Confirm the collection appears with owner-level access.
-  9. Call DELETE /organizations/{org_id}/collections/{collection_id}. Confirm 200 or 204. Call GET /organizations/{org_id}/collections and confirm the collection is no longer listed.
-  10. Call DELETE /organizations/{org_id}/members/{user_id} to remove user A. Confirm 200 or 204. Call GET /organizations/{org_id}/members and confirm user A is absent.
-  11. Call DELETE /organizations/{org_id}. Confirm 200 or 204. Call GET /organizations and confirm the organisation is no longer listed.
+  1. Select the 'Add document' icon.
+  2. Import a .docx file (containing a table) without changing the chunking strategy.
+  3. Set the metadata, including a Restricted classification level.
+  4. (Optional) Set custom metadata fields.
+  5. Upload the document.
+  6. Inspect uploaded document.
+  7. Verify that all set metadata are correctly displayed, the generated chunks collectively reproduce the document, the chunks are split section-by-section (the default strategy, one chunk per section, with no prior configuration change), the table is present as structured queryable content, and each chunk's citation surfaces its section heading.
+  8. Submit a chat query whose answer lies in this document; verify the document's content is returned with a citation, and that the citation allows navigating to an adjacent chunk to see surrounding context.
+  9. As a user without Restricted clearance, submit the same query and verify this document's content is not returned.
+  10. Modify metadata (e.g., correct the title, or lower the classification level to one the lower-clearance user holds) and save changes.
+  11. Verify that metadata has been adopted, and re-submit the lower-clearance user's query from step 9 to confirm retrieval now reflects the edited metadata.
+  12. Import a .pdf file and repeat steps 3-7 (skipping the table/default-strategy checks, which are format-independent).
+  13. Import an .xlsx file and repeat steps 3-7 (skipping the table/default-strategy checks).
+  14. Import one file each of the remaining supported formats (.txt, .md, .csv, .json, .pptx) and verify each is ingested without error, with metadata extracted and chunks generated.
+  15. Replace the .docx file and select the 'Sections only' chunking strategy via the UI chunking-strategy selector, without editing any source code or configuration file.
+  16. Verify that the entire document was replaced (no duplicate chunks) and the chunks are split by sections.
+  17. Replace the .docx file and select the 'Paragraphs & tables' chunking strategy via the same UI selector, again without editing any source code or configuration file.
+  18. Verify that the entire document was replaced (no duplicate chunks) and the chunks are split by paragraphs and tables.
+  19. As a standard (non-moderator) user, attempt to delete one of the ingested documents.
+  20. As the moderator, delete all added documents.
+  21. Submit the query from step 8 again and confirm it no longer returns the deleted document's content.
+  22. Inspect the logs (admin dashboard > Logging) to check that each document ingestion, the metadata edit, the denied non-moderator deletion attempt, and the actual deletions each produced an audit entry.
 
   ## Expected outcome
-  1. Organisation is created with a valid org_id.
-  2. Organisation appears in the listing.
-  3. Name update is reflected immediately.
-  4. User A is enrolled and appears in the member list.
-  5. User A is assigned moderator role.
-  6. Second moderator assignment is rejected.
-  7. Collection grant succeeds.
-  8. Collection appears in the org's collection list with correct access level.
-  9. Collection grant is removed.
-  10. User A is removed from the member list.
-  11. Organisation is deleted and absent from subsequent listings.
-verification_method: T
+  1. Documents in all supported formats (.docx, .pdf, .xlsx, .txt, .md, .csv, .json, .pptx) are correctly parsed and chunked according to the selected chunking strategy, defaulting to section-level splitting out of the box.
+  2. Metadata is correctly extracted and assigned to each chunk, and edits to metadata are reflected in subsequent retrieval.
+  3. Tables are extractable as structured, queryable content; citations surface each chunk's structural position (section heading); adjacent chunks can be linked to reconstruct surrounding context.
+  4. Ingested content is queryable through the chat interface, and access is correctly gated by classification level.
+  5. Only a moderator can delete a document; a standard user's attempt is denied.
+  6. After deletion, no chunks remain in the Qdrant database and a live query no longer returns the deleted document's content.
+  7. The audit log contains a correctly-populated entry for each ingestion, the metadata edit, the denied deletion attempt, and the actual deletions.
+verification_method: Test (T)
 version: 0.1

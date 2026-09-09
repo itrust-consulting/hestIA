@@ -1,41 +1,46 @@
 active: true
 authors: ACR
-complexity: 2
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  A single message can be deleted from a conversation without affecting other messages; ownership is enforced so users cannot delete messages from other users' conversations.
+expected_outcome: ''
 header: |
-  Verify individual message deletion within a conversation
-level: 24.0
+  Moderator tenant management.
+level: 1.24
 links:
-- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
-- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
+- SRS-005: -qYDaE4KUMXhB0t-IOXPcWXJqJbRU0JUVqfk1YXTkxU=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: llYKs_MFnxMWX5-KxWuZwMqxFa1hvfTy4GZawTGpyKU=
-test_data: |
-  Two authenticated user accounts (user A and user B); a conversation belonging to user A with at least three messages.
+references: []
+release: alpha
+reviewed: 54xeiolRYxg39Q47PHV_TVRD3dYbkre0gKqoul6uYwk=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and both user accounts are authenticated
-  - User A has a conversation with at least three messages (obtainable by submitting multiple POST /chat requests with the same conversation_id)
+  - TST-023, steps 1-7 (tenant 'TEST' created, with 'User' and 'Moderator' added and assigned their roles; moderator not yet removed and tenant not yet deleted).
+  - A third test user account, 'Invitee', exists but is not yet a member of any tenant, and its stored email is known.
+  - Logged in as 'Moderator'.
 
   ## Test steps
-  1. As user A, call GET /conversations/{cid} and note the message IDs from the response's `messages` array (the endpoint returns an object `{messages, has_more, next_cursor}`, not a bare array).
-  2. Call DELETE /conversations/{cid}/messages/{mid} for the middle message. Confirm a 200 or 204 response.
-  3. Call GET /conversations/{cid} again. Confirm only the targeted message is absent; all other messages remain intact and in order.
-  4. As user B, attempt DELETE /conversations/{cid}/messages/{mid} on a message from user A's conversation. Confirm a 403 Forbidden or 404 Not Found response is returned.
+  1. Navigate to admin dashboard > Tenants.
+  2. Verify that only assigned tenant ('TEST') is listed in the overview.
+  3. Inspect tenant 'TEST'.
+  4. Modify tenant information and save changes.
+  5. Verify that changes have been adopted.
+  6. Invite 'Invitee' to the tenant, using their stored email.
+  7. Verify that an invitation has been sent to 'Invitee' and is pending.
+  8. Remove 'User' from tenant.
+  9. Create collection 'Test-collection' via the tenant profile.
+  10. Verify that collection was created and return to the tenant profile.
+  11. Verify that the created collection is now listed under the tenants collections.
+  12. Delete collection 'Test-collection' via the tenant profile.
+  13. As admin, inspect the logs (admin dashboard > Logging) to check that the tenant modification, the invitation, the member removal, and the collection creation/deletion each produced an audit entry.
 
   ## Expected outcome
-  1. Message IDs are visible in the conversation history.
-  2. Deletion returns a success response.
-  3. Only the deleted message is absent; the remaining messages are unchanged.
-  4. Cross-user deletion is rejected with 403 or 404.
-verification_method: T
+  1. Only assigned tenant are visible to the moderator.
+  2. All CRUD operations execute successfully.
+  3. Collection 'Test-collection' removed from Qdrant database.
+  4. The audit log contains a correctly-populated entry for the tenant and collection actions performed above.
+verification_method: Test (T)
 version: 0.1

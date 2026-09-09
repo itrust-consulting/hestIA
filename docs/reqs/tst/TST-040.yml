@@ -2,29 +2,38 @@ active: true
 authors: ACR
 complexity: 1-5
 derived: false
-execution_type: Automated/Manual
+execution_type: Manual
 expected_outcome: ''
 header: |
-  Server setup
-level: 35.5
-links: []
+  API endpoint review
+level: '1.40'
+links:
+- SRS-005: -qYDaE4KUMXhB0t-IOXPcWXJqJbRU0JUVqfk1YXTkxU=
+- SRS-007: HKbdS7odJV_kzLZIHn2V8equd3eHtjGEHVI0cxKq1hU=
 normative: true
 platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/specs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: null
+reviewed: 9ROjihiRaGdhDZyP8WVW0Ry5gyPH46AqvQRuiC32_io=
 test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  -
+  - Source code access to all API routers, and access to the generated API documentation (e.g., OpenAPI schema).
 
   ## Test steps
-  1. follow steps in SRS.
+  1. Enumerate every endpoint exposed by the API, grouped by router.
+  2. Cross-reference the enumerated endpoints against the published API documentation and confirm each endpoint is described with its expected inputs and outputs.
+  3. For each core capability that must be reachable via the API, confirm a corresponding endpoint exists.
+  4. For each endpoint, confirm it requires authentication and enforces the authorization level (standard user, moderator, or administrator) appropriate to its function.
+  5. Confirm response and error structures are consistent across endpoints (common envelope/error format).
+  6. Record all findings, including any endpoint missing from the documentation, any capability not reachable via the API, and any endpoint with missing or inconsistent authorization enforcement.
 
   ## Expected outcome
-  1.
-verification_method: Test (T)/Review of design (R)/Inspection (I)/Analysis (A)
+  1. Every implemented endpoint is described in the API documentation with accurate inputs and outputs.
+  2. Every core capability required to be API-accessible has a corresponding endpoint.
+  3. Every endpoint enforces authentication and the correct authorization level for its function.
+  4. Response and error structures are consistent across endpoints.
+  5. Any gap found is documented with the affected endpoint(s) for remediation.
+verification_method: Review of design (R)
 version: 0.1

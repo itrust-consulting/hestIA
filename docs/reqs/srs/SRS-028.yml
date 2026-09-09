@@ -1,0 +1,38 @@
+active: true
+dependence:
+- SRS-002
+derived: false
+difficulty: 2
+header: ''
+importance: 4
+level: 1.3
+links:
+- MRS-072: fN96CgdAHTAIXZLxBcejjwRZHLGJa7VkBm-_OzMV8sk=
+normative: true
+outlay: ''
+ref: ''
+release: beta
+reviewed: zWXfZw9QT8sT1swQOweGXmE-s51MRt-EaI3uLQzehgs=
+risk: 2
+status: implemented
+text: |
+  # GPU-Accelerated Inference
+
+  As a system administrator,
+  I want hestIA's embedding and generation workloads to run on available GPU hardware,
+  so that inference throughput and response latency meet operational requirements for concurrent users.
+
+  1. Deploy hestIA on a host with a supported GPU and the required drivers/runtime available to the container.
+  2. Configure the embedding and generation services to use the GPU device.
+  3. Run document ingestion and chat queries and confirm the GPU is utilized during inference.
+
+  ### Rationale
+  CPU-only inference is too slow for interactive query response times and concurrent multi-user load. GPU acceleration is required to meet the performance and concurrency expectations of the deployment.
+
+  ### Acceptance criteria
+  - When a supported GPU is available, embedding generation and text generation are executed on the GPU rather than the CPU.
+  - GPU utilization is observable (e.g., via driver tooling) during ingestion and query processing.
+  - The system falls back to CPU execution without crashing when no GPU is available.
+type: O
+urgency: 3
+version: '0.1'

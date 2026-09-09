@@ -1,0 +1,5 @@
+Offboarding Checklist
+======================
+1. Revoke all system access on last working day.
+2. Retrieve corporate hardware.
+3. Archive user's documents per retention policy.

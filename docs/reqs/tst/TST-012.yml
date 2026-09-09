@@ -1,41 +1,35 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
-execution_type: Manual
-expected_outcome: |
-  Default strategy chunks by section; strategy change produces a measurably different distribution; no code modification required.
+execution_type: Automated
+expected_outcome: ''
 header: |
-  Verify that the chunking strategy is configurable and affects chunk distribution without code changes
-level: 12.0
+  Rate limiting
+level: 1.12
 links:
-- SRS-012: rbTRAL7QiFAI6QbO7ieYG9WEiRLhNRilskSpouCyphg=
+- SRS-020: VXgLxT_Apdm4JHtgqfnNR1ce9EXVhs_L8_v1kMUHcLs=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
+references: []
 release: alpha
-reviewed: Q27pnnKMkb64v1R0pwPGayWFx6s2J8shOESMk4JiOEQ=
-test_data: |
-  A DOCX test document with exactly 10 distinct headed sections; system administrator access to the chunking configuration
+reviewed: UaphJu3859GBYe1LwOUv8YEw038QsgUwBDT21XQaWe0=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed and running with the ingestion service active
-  - A test collection exists
-  - A moderator account and system administrator access to the chunking configuration are available
-  - The default section-level chunking strategy is confirmed active in the configuration
+  - System running with default AUTH_MAX_ATTEMPTS (5) and AUTH_LOCKOUT_DURATION.
+  - A valid test account whose correct password is known.
 
   ## Test steps
-  1. Ingest the 10-section test document using the default section-level strategy. Record the number of chunks reported.
-  2. Update the chunking strategy in the system configuration to a second available strategy without modifying application source code.
-  3. Re-ingest the same document.
-  4. Record the new chunk count and compare it against the result from step 1.
+  1. Submit 5 failed login attempts for the test account in quick succession.
+  2. Submit a 6th login attempt, using the correct password.
+  3. Wait for the configured lockout duration to elapse, then log in again using the correct password.
+  4. Change AUTH_MAX_ATTEMPTS and AUTH_LOCKOUT_DURATION to different values, restart, and repeat steps 1-3 to confirm the new values are honored.
 
   ## Expected outcome
-  1. The default section-level strategy produces approximately 10 chunks (one per section).
-  2. Changing the strategy to a different option and re-ingesting produces a measurably different chunk count or distribution.
-  3. The configuration change takes effect without any modification to application source code.
-verification_method: A
+  1. The 6th attempt (beyond the configured threshold) returns HTTP 429 Too Many Requests, even with the correct password.
+  2. After the lockout window elapses, a correct-password login succeeds again.
+  3. The threshold and window are configurable via deployment settings and take effect without code changes.
+verification_method: Test (T)
 version: 0.1

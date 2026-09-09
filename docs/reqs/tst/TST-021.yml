@@ -1,45 +1,52 @@
 active: true
 authors: ACR
-complexity: 3
+complexity: 1-5
 derived: false
 execution_type: Manual
-expected_outcome: |
-  LDAP-authenticated user is admitted, org membership is derived from AD group membership, and a hestIA account is auto-provisioned on first login.
+expected_outcome: ''
 header: |
-  Verify LDAP/Active Directory authentication and auto-provisioning
-level: 21.0
+  Conversation compaction
+level: 1.21
 links:
-- SRS-004: aQWshP7mWFQqLLji44vKuF69N7HKzQcpm15JhJyQ6Fg=
-- SRS-005: jLeClSaYou7VmbUX8DfN4_dYIQYYZ2jXhqS0I-8_6vU=
+- SRS-021: tPbBvs8-mcFsk-I1V1zActVf-aPBbMnoJHzpFMlgiww=
 normative: true
-platform: GNU/Linux (Dockerized deployment environment)
+platform: GNU/Linux (Dockerized C5-DEC deployment environment)
 ref: ''
-references:
-- path: docs/reqs/tst/assets
-  type: file
-release: beta
-reviewed: 7-pt2R5pqXsdF6mgUgCQ-f6me3-MuTT018EynBoQmVA=
-test_data: |
-  An LDAP/AD server (or a containerised OpenLDAP test instance) with at least one test user belonging to a group mapped to a hestIA organisation; hestIA configured with the LDAP host, bind credentials, and group-to-org mapping; the test user's LDAP credentials.
+references: []
+release: alpha
+reviewed: Bxm-ZntsT4tXS_iHMU4XyyZuxACVAP2oUYfy_ILgGog=
+test_data: see referenced files
 text: |
   ## Preconditions and setup actions
-  - hestIA is deployed with LDAP authentication enabled
-  - The LDAP server is reachable and the bind credentials are configured
-  - A test user exists in LDAP and belongs to a group mapped to a hestIA organisation
-  - No hestIA account yet exists for the test user
+  - System initialized and user is logged in.
+  - 'Ask My Doc' deactivated
+  - TST-020 executed.
+  - 'Enable auto-compaction' turned on, with a small context window and summary length configured (e.g. a few thousand tokens)
 
   ## Test steps
-  1. Submit a POST /login request with the test user's LDAP username and password. Confirm authentication succeeds and a session token is returned.
-  2. Confirm that a hestIA user account has been auto-provisioned for the LDAP user with the correct organisation membership derived from LDAP group membership.
-  3. Use the session token to call GET /account. Confirm the profile reflects the LDAP-sourced organisation and role.
-  4. Log in again with the same LDAP credentials. Confirm no duplicate account is created and the same hestIA account is returned.
-  5. Submit a POST /login request with the same username but a wrong password. Confirm the response is a 401 Unauthorized.
+  1. Populate conversation to reach the context usage limit (see context usage ring in the input box).
+  2. Remember a specific fact stated in earlier messages.
+  3. Trigger auto-compacting by exceeding the context usage.
+  4. Ask a follow up question that requires recalling the fact noted in step 2.
+  5. While at low context usage (<50%) trigger the manual compaction.
+  6. Verify that compaction is not triggered since usage is within budget.
+  7. Continue populating the conversation to reach a usage of >85%.
+  8. Trigger the manual compaction.
+  9. Verify that the compaction was triggered.
+  10. Ask a follow up question that requires recalling a previous fact.
 
   ## Expected outcome
-  1. Valid LDAP credentials return a session token.
-  2. A hestIA user account is auto-provisioned with org membership matching the LDAP group.
-  3. The user's profile is accessible and reflects LDAP-derived attributes.
-  4. Re-login returns the existing account — no duplicate is created.
-  5. Invalid LDAP credentials are rejected with 401.
-verification_method: T
+  1. The context usage ring reflects token usage as a proportion of the configured context window.
+  2. Auto-compaction starts only with the submission of a new request once the context window is exceeded.
+  3. Compaction process is visualised by a "Compacting..." label.
+  4. Once compaction is finished the freed up space is displayed and the assistant response is generated.
+  5. The full conversation history remains intact, unaltered, and scrollable after compaction --
+  only the context sent to the LLM is affected, not the persisted/displayed messages.
+  5. The assistant can still answer using information from turns that were folded away, based on the retained summary,
+  even if it no longer quotes them verbatim.
+  6. Clicking the context usage ring manually triggers compaction immediately: if usage is already within budget it reports that nothing needed compacting,
+  otherwise it compacts and reports the freed tokens, consistent with auto-compaction.
+  7. With auto-compaction disabled, usage keeps growing past the configured budget without any automatic fold,
+  and the ring reflects the uncapped usage; manual compaction via the ring remains available regardless of the setting.
+verification_method: Test (T)
 version: 0.1

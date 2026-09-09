@@ -1,0 +1,39 @@
+active: true
+dependence:
+- SRS-007
+- SRS-008
+derived: false
+difficulty: 2
+header: ''
+importance: 4
+level: 3.1
+links:
+- MRS-010: s17FSQ5NyNEOIrUd0QZ-n2HeB3sMk_8bzX66YPq0T9o=
+normative: true
+outlay: ''
+ref: ''
+release: alpha
+reviewed: 4YjerdImS4vxDAJJrSIBadOwqRDQevEkC8r4Wdi6S14=
+risk: 2
+status: implemented
+text: |
+  # API-Based Document Ingestion
+
+  As a system integrator,
+  I want to ingest a single document into a named knowledge base collection through a REST API call,
+  so that ingestion can be automated and integrated into external systems without using the web interface.
+
+  1. Submit a single document, target collection, and classification level to the ingestion API endpoint.
+  2. Receive a response indicating whether the document was accepted and its ingestion status.
+  3. Verify the document is queryable through the chat interface once ingestion completes.
+
+  ### Rationale
+  Automated pipelines and external systems need to populate the knowledge base without manual interaction with the web interface. Exposing single-document ingestion through the API, independent of the UI upload flow, is required to support integration workflows.
+
+  ### Acceptance criteria
+  - A document can be ingested into a named collection through a single API call, without going through the web interface.
+  - The API response confirms whether ingestion succeeded and reports a clear error when the document is rejected.
+  - A document ingested via the API is queryable through the chat interface after processing completes, with the same behavior as a document ingested through the UI.
+type: F
+urgency: 4
+version: '0.1'

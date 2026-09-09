@@ -1,0 +1,6 @@
+Operational Notes - Weekly Maintenance Window
+==============================================
+
+Maintenance windows occur every Sunday between 02:00 and 04:00 UTC. During this window, non-critical services may be restarted for patching. Critical services (authentication, document ingestion queue) are patched in a rolling fashion to avoid downtime.
+
+Escalation contact: on-call rotation via the incident management system. Do not page the security team for routine maintenance.

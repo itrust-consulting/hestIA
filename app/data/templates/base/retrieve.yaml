@@ -1,8 +1,0 @@
-id: ${id}
-type: Retrieve
-inputs:
-  dense: ${dense}
-  collection: ${collection}
-  options: ${query_kwargs}
-outputs:
-  hits: ${output_hits}

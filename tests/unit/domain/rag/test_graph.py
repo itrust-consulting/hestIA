@@ -174,16 +174,24 @@ class TestAugmentTemplateValidation:
         node = self._augment_node(self._VALID_TEMPLATE + " {attached_documents}")
         validate_workflow_graph({"nodes": [node], "entrypoint": "a1"})
 
-    @pytest.mark.parametrize("missing", ["{retrieved_data}", "{source_map}", "{user_prompt}"])
-    def test_missing_required_placeholder_raises(self, missing):
+    @pytest.mark.parametrize("missing", ["{retrieved_data}", "{source_map}"])
+    def test_missing_optional_placeholder_passes(self, missing):
+        # {retrieved_data}/{source_map} are just how this template happens to
+        # surface retrieved context/citations -- an admin is free to omit or
+        # restructure those, so only {user_prompt} is a hard requirement.
         template = self._VALID_TEMPLATE.replace(missing, "")
+        node = self._augment_node(template)
+        validate_workflow_graph({"nodes": [node], "entrypoint": "a1"})
+
+    def test_missing_required_placeholder_raises(self):
+        template = self._VALID_TEMPLATE.replace("{user_prompt}", "")
         node = self._augment_node(template)
         with pytest.raises(ValidationError, match="missing required placeholder"):
             validate_workflow_graph({"nodes": [node], "entrypoint": "a1"})
 
     def test_invalid_format_syntax_raises(self):
-        # An unmatched brace breaks str.format() even though all three
-        # required placeholders are textually present.
+        # An unmatched brace breaks str.format() even though the required
+        # placeholder is textually present.
         template = self._VALID_TEMPLATE + " {unbalanced"
         node = self._augment_node(template)
         with pytest.raises(ValidationError, match="invalid formatting syntax"):

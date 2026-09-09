@@ -1,6 +1,14 @@
-acceptancecriteria: Logs present.
+acceptancecriteria: |
+  Access to and modifications of documents, collections, and system configuration
+  are logged with the acting user, action, affected resource, and timestamp.
+  Log entries are structured, retained independently of the referenced resource's
+  lifecycle, and queryable and exportable by an authorised administrator, filtered
+  at minimum by time range.
 active: true
-comments: null
+comments: |
+  System logging additionally tags each log entry with a correlation ID shared
+  across all log lines produced by the same request, and audit entries are
+  retained for a defined minimum period.
 coverage: 90
 derived: false
 header: ''
@@ -8,10 +16,13 @@ importance: 5
 level: 1.0
 links: []
 normative: true
-rationale: Audit.
+rationale: Audit and accountability.
 ref: ''
 releasephase: beta
-requirement: The system shall log access and modifications.
+requirement: |
+  The system shall log access to and modifications of documents, collections, and
+  system configuration, and shall provide an authorised administrator with the
+  ability to query and export these logs.
 reviewed: rCFCC6J8LGy6ktRNbyXkl2R84TXvaAKG0Mku23XwDF8=
 text: ''
 type: S

@@ -112,10 +112,12 @@ _SLOT_REF = re.compile(r"^\?([A-Za-z0-9_]+)$")
 
 # hestia/handler.py's _build_prompt() does template.format(retrieved_data=,
 # source_map=, user_prompt=) -- .format() silently ignores an omitted named
-# placeholder rather than raising, so a template missing e.g. {user_prompt}
+# placeholder rather than raising, so a template missing {user_prompt}
 # wouldn't crash, it would just silently drop the user's question from
-# every RAG request. Checked explicitly for Augment nodes below.
-_REQUIRED_AUGMENT_PLACEHOLDERS = ("{retrieved_data}", "{source_map}", "{user_prompt}")
+# every RAG request. {retrieved_data}/{source_map} are just how this
+# template happens to surface retrieved context/citations -- an admin is
+# free to omit or restructure those -- so only {user_prompt} is enforced.
+_REQUIRED_AUGMENT_PLACEHOLDERS = ("{user_prompt}",)
 
 
 def _iter_ref_values(value: Any):

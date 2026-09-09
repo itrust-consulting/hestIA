@@ -46,10 +46,12 @@ nodes:
     inputs:
       prompt: ${prompt}
       hits:   ?points
-      # Admin-editable RAG system prompt -- must keep all three placeholders
-      # ({retrieved_data}, {source_map}, {user_prompt}); this is what the
-      # LLM actually sees, wrapping the retrieved context and citation-key
-      # instructions around the user's message.
+      # Admin-editable RAG system prompt -- this is what the LLM actually
+      # sees, wrapping the retrieved context and citation-key instructions
+      # around the user's message. Only {user_prompt} is required (omitting
+      # it silently drops the user's question); {retrieved_data} and
+      # {source_map} are just how this template happens to surface retrieved
+      # context/citations and can be reworked or dropped.
       template: |
         You are an assistant with access to an organizations ISMS knowledge base of Markdown documents.
         Below are the most relevant excerpts retrieved from that database.
