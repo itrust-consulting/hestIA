@@ -1,0 +1,108 @@
+active: true
+defect-category: 2 = minor defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.39'
+links:
+- SRS-027
+normative: true
+not-executed-steps: '0'
+passed-steps: '6'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-039 (Logging coverage review)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: source-code review of all audit and system logging call sites,
+    request handlers and routers.
+
+  ## Test execution results
+
+  **Test case step 1 (enumerate all audit/system logging call sites)**:
+  - Audit facade: hestia/infrastructure/logging/audit.py (auth_attempt,
+    policy_decision, ai_request, ai_response, admin_action, logout). System
+    logging via _log across handlers/services. ?c5-defect-0
+
+  **Test case step 2 (enumerate critical paths per SRS-027)**:
+  - Paths identified: authentication, collection access decisions (incl.
+    denials), document ingestion/deletion, admin changes (user/org CRUD, role
+    and classification changes, tenant/collection grants, workflow changes,
+    log-level changes). ?c5-defect-0
+
+  **Test case step 3 (confirm a log call on success AND failure branches)**:
+  - Several critical paths log on success only, not on failure. See defects
+    below. ?c5-defect-2
+
+  **Test case step 4 (verify captured fields: actor, action, resource, ts, correlation id)**:
+  - Where logging exists, entries carry actor_id/action/target/detail; timestamp
+    and per-request correlation id are added by the logging config
+    (_JsonFormatter + CorrelationMiddleware). ?c5-defect-0
+
+  **Test case step 5 (identify unlogged paths or default-disabled gated logging)**:
+  - Multiple gaps identified. See defects below. ?c5-defect-2
+
+  **Test case step 6 (record findings with file/line references)**:
+  - Findings recorded below. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-2 (minor defect).
+  Several SRS-027 critical paths are not logged, are logged on success only, or
+  are gated behind a default-disabled flag:
+
+  - Authentication logging is off by default: hestia/domain/auth/service.py,
+    _audit_auth_attempt is gated by AuthSettings.audit_logs (default false /
+    AUTH_AUDIT_LOGS). On a default install no login attempts are recorded, so
+    the "failed logins" admin counter always reads 0.
+  - OIDC login failures are not audited, while local login failures are
+    (hestia/domain/auth/service.py, authenticate_oidc).
+  - Permission denials are not logged: the assert_* checks in
+    hestia/api/security.py raise 403 with no log; admin actions in
+    hestia/api/routers/admin.py are logged on success only.
+  - Document ingestion, deletion and metadata edits are not audited at all:
+    hestia/api/routers/ingestion.py (upload_document, delete_document,
+    delete_collection, update_document_metadata). Confirmed in testing
+    (TST-024, TST-026): deleting a collection/document produces no audit entry.
+  - LLM connection actions are not audited (create/update/delete/activate):
+    hestia/api/routers/llm_settings.py.
+  - Reading the audit logs is not logged (only export is):
+    hestia/api/routers/logs.py.
+  - Rejected admin actions are not logged, e.g. the rejected second-moderator
+    assignment (confirmed in TST-025): set_member_tenant_role logs only after a
+    successful call.
+
+  Correctly logged paths include: collection access decisions incl. denials
+  (hestia/domain/policies/guard.py, policy_decision on DENY and FILTER), LLM
+  requests/responses (hestia/handler.py, ai_request/ai_response), auth/workflow/
+  notification settings changes, and user/org CRUD on success.
+
+  ### Test execution evidence
+
+  Source-code review plus runtime confirmation from TST-018 (policy_decision
+  logs), TST-024 (collection deletion not logged), TST-025 (rejected
+  second-moderator not logged), TST-026 (ingestion/deletion not logged).
+
+  ### Comments
+
+  Logging infrastructure itself is sound (separate audit.log/system.log, audit
+  level pinned so lowering the system log level cannot silence it, 90-day
+  retention, structured JSON with correlation id). The gaps are in coverage:
+  failures and denials are frequently not logged, ingestion actions are not
+  logged at all, and authentication logging is disabled by default.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Review of design (R)
+verification-method: R

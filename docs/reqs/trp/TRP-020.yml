@@ -1,0 +1,80 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.20'
+links:
+- SRS-021
+normative: true
+not-executed-steps: '0'
+passed-steps: '8'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-020 (Conversation pagination)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: System initialized with logged-in user. Precondition TST-019 executed.
+    Tested both with 'Ask My Docs' deactivated and activated using available
+    corpus context.
+
+  ## Test execution results
+
+  **Test case step 1 (populate conversation with >30 message pairs)**:
+  - Conversation populated with over 30 message pairs successfully. ?c5-defect-0
+
+  **Test case step 2 (refresh/reopen page and observe rendered messages)**:
+  - Initial load renders only the most recent messages; full history not loaded
+    at once. ?c5-defect-0
+
+  **Test case step 3 (scroll up towards top of message list)**:
+  - Older messages load progressively by scroll and are prepended
+    above visible content. ?c5-defect-0
+
+  **Test case step 4 (scroll up until reaching the very first message pair)**:
+  - Scrolling reaches the initial message pair without gaps or duplicates;
+    loading stops at the top. ?c5-defect-0
+
+  **Test case step 5 (scroll down and partway back up)**:
+  - Scroll position and message display remain stable and in correct
+    chronological order. ?c5-defect-0
+
+  **Test case step 6 (wait 20 seconds, scroll back up to top)**:
+  - History remains intact with no data loss, corruption, or re-fetching issues.
+    ?c5-defect-0
+
+  **Test case step 7 (activate 'Ask My Docs' and select corpus)**:
+  - Feature activated and corpus selected without issue. ?c5-defect-0
+
+  **Test case step 8 (repeat steps 1-6 with Ask My Docs and document citations)**:
+  - Pagination behaves identically; retrieved document context and citations are
+    preserved upon reloading. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0
+
+  ### Test execution evidence
+
+
+  ### Comments
+
+  All pagination mechanisms (infinite scroll, lazy loading of older messages,
+  preservation of RAG citations upon re-scroll) performed as expected under
+  normal usage conditions.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

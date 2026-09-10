@@ -1,0 +1,90 @@
+active: true
+defect-category: 3 = major defect
+derived: false
+failed-steps: '1'
+header: ''
+level: 1.18
+links:
+- SRS-005
+normative: true
+not-executed-steps: '0'
+passed-steps: '7'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026-10-09
+tester: dmahfouf
+text: |
+  # TCER: TST-1.18 (Access to knowledge base)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: tenant 'TestTenant' with 5 users (PublicUser, InternalUser,
+    ConfidentialUser, RestrictedUser, SecretUser), each assigned the matching
+    clearance. Owned collection 'test-collection' with 5 test documents, one
+    tagged at each classification level. A second collection owned by another
+    tenant ('test_collection_2') that TestTenant has no access to.
+
+  ## Test execution results
+
+  **Test case step 1 (log in as PublicUser, activate Ask My Docs)**:
+  - ?c5-defect-0
+
+  **Test case step 2 (collection selector lists only owned/shared bases)**:
+  - Collections owned by other tenants are not listed. ?c5-defect-0
+
+  **Test case step 3-4 (PublicUser query, content limited to clearance)**:
+  - Only Public-level content surfaced; nothing above. ?c5-defect-0
+
+  **Test case step 5 (direct access to an inaccessible collection is denied)**:
+  - Direct call to test_collection_2 as a TestTenant user returned 403 Forbidden.
+    No content leaked. ?c5-defect-0
+
+  **Test case step 6 (repeat for InternalUser, ConfidentialUser, RestrictedUser)**:
+  - InternalUser: content limited to Internal or below. ?c5-defect-0
+  - ConfidentialUser: retrieved and cited a Restricted-tagged document, i.e.
+    content above the user's clearance. Violates expected outcomes 2 and 3. ?c5-defect-3
+  - RestrictedUser: Secret-level content correctly not surfaced. ?c5-defect-0
+
+  **Test case step 7 (SecretUser sees all levels)**:
+  - Content up to Secret retrievable for SecretUser. ?c5-defect-0
+
+  **Test case step 8 (collection access decisions are logged)**:
+  - policy_decision entries present for both granted (decision: filter) and
+    denied (decision: deny) access. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-3 (major defect).
+  A ConfidentialUser (clearance 2) retrieved content from a Restricted-tagged
+  document (level 3), above their clearance.
+
+  ### Test execution evidence
+
+  Test case stem 5: Direct access to an inaccessible collection is denied
+  
+  {
+  "user_id": "3dc0cc0f-5674-46db-9167-6802aa6412b1",
+  "exec_type": "rag_chat",
+  "collection": "test_collection_2",
+  "decision": "deny",
+  "reason": "Collection access denied."
+  }
+
+  ### Comments
+
+  Cross-tenant access control (step 5) and audit logging (step 8) behaved
+  correctly. The single failure is in step 6: a Confidential user accessing
+  Restricted content. Symptom reproducible; root cause still being confirmed.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

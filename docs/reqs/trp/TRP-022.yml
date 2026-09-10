@@ -1,0 +1,101 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.22
+links:
+- SRS-005
+normative: true
+not-executed-steps: '0'
+passed-steps: '8'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-022 (User management)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: System initialized and logged in with administrator privileges.
+
+  ## Test execution results
+
+  **Test case step 1 (navigate to admin dashboard > Users)**:
+  - Navigation successful; user overview table displayed correctly. ?c5-defect-0
+
+  **Test case step 2 (create a test user)**:
+  - Test user account created without error. ?c5-defect-0
+
+  **Test case step 3 (inspect test user information)**:
+  - Profile details, activity status, and assigned organizations accurately displayed. ?c5-defect-0
+
+  **Test case step 4-5 (modify user information and verify changes)**:
+  - User details updated and changes successfully persisted/reflected in the UI. ?c5-defect-0
+
+  **Test case step 6-7 (delete test user and verify overview)**:
+  - Test user deleted and confirmed no longer present in the user list. ?c5-defect-0
+
+  **Test case step 8 (inspect audit logs for creation, modification, and deletion)**:
+  - Audit logs correctly record entries for create, update, and delete actions with acting admin, action type, and target user ID. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0
+
+  ### Test execution evidence
+
+  -Audit log entries for user creation actions:
+  {
+  "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+  "action": "user_create",
+  "target": "b9ab1388-3ba7-4b6f-8236-4246c2005534",
+  "detail": {
+    "username": "test",
+    "roles": [
+      2
+    ],
+    "organization": "TEST"
+  }
+
+
+  -Audit log entries for user management actions:
+  {
+  "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+  "action": "user_update",
+  "target": "b9ab1388-3ba7-4b6f-8236-4246c2005534",
+  "detail": {
+    "username": "test",
+    "email": "tst@tst.lu",
+    "role_ids": [
+      2
+    ],
+    "expires_at": null,
+    "password_reset": false
+  }
+
+  - Audit log entries for user deletion actions:
+  {
+  "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+  "action": "user_delete",
+  "target": "b9ab1388-3ba7-4b6f-8236-4246c2005534",
+  "detail": null
+  }
+
+  ### Comments
+
+  Full CRUD lifecycle for user management and corresponding administrative audit logging operated as expected.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

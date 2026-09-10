@@ -1,0 +1,91 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.30'
+links:
+- SRS-014
+- SRS-015
+- SRS-017
+normative: true
+not-executed-steps: '0'
+passed-steps: '11'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-030 (RAG pipeline)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: System initialized and logged in as tenant member user. Non-empty collection active.
+
+  ## Test execution results
+
+  **Test case step 1-4 (Ask My Doc activation, collection selection & grounded RAG query)**:
+  - Natural language query answered with truth-grounded content and source citations. ?c5-defect-0
+
+  **Test case step 5-6 (Out-of-domain query handling)**:
+  - Foreign domain query submitted; assistant correctly declared insufficient information available. ?c5-defect-0
+
+  **Test case step 7 (RAG pipeline log inspection)**:
+  - Execution of full RAG pipeline confirmed in system logs. ?c5-defect-0
+
+  **Test case step 8-9 (Plain query without Ask My Doc)**:
+  - Plain completion executed with Ask My Doc deactivated; response returned without citations. ?c5-defect-0
+
+  **Test case step 10-11 (Unreachable/deleted collection query handling)**:
+  - Query pointed at collection deleted mid-session returned explicit HTTP 403 error as expected. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0
+
+  ### Test execution evidence
+
+  Unreachable collection prompt:
+  which color is the mascot
+
+  Unreachable collection system error response:
+  ⚠️ Error: HTTP 403
+
+  Classification 0 request log:
+  Fields
+  {
+    "user_id": "3dc0cc0f-5674-46db-9167-6802aa6412b1",
+    "exec_type": "rag_chat",
+    "collection": "test-coll-2",
+    "decision": "filter",
+    "reason": "Max classification: 0"
+  }
+
+  AI request log:
+  ai_request
+  Fields
+  {
+    "user_id": "3dc0cc0f-5674-46db-9167-6802aa6412b1",
+    "exec_type": "rag_chat",
+    "model": "ministral-3:14b",
+    "collection": "test-coll-2",
+    "prompt_len": 71,
+    "stream": true
+  }
+
+  ### Comments
+
+  Full RAG pipeline, out-of-domain safeguards, classification filtering (level 0 constraint), ungrounded mode, and error handling for unreachable/deleted collections (HTTP 403) operated strictly as expected.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

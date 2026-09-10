@@ -1,0 +1,103 @@
+active: true
+defect-category: 2 = minor defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.40'
+links:
+- SRS-005
+- SRS-007
+normative: true
+not-executed-steps: '0'
+passed-steps: '6'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-040 (API endpoint review)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: source-code review of all API routers (hestia/api/routers/) and the
+    router registry (hestia/api/routers/registry.py).
+
+  ## Test execution results
+
+  **Test case step 1 (enumerate every endpoint, grouped by router)**:
+  - 16 routers enumerated via registry.py: account, auth, auth_settings, admin,
+    chat, conversations, encode, generate, health, ingestion, llm_settings,
+    logs, notification_settings, notifications, search, workflow_settings.
+    (registry.py assembles the routers and exposes no endpoint of its own;
+    __init__.py and the API-layer helpers dependencies.py, error_handlers.py,
+    limiter.py, security.py, streaming.py are not routers.) ?c5-defect-0
+
+  **Test case step 2 (cross-reference endpoints against API documentation)**:
+  - Endpoints reviewed against the OpenAPI schema exposed by the app. ?c5-defect-0
+
+  **Test case step 3 (confirm each core capability has an endpoint)**:
+  - Auth, account, conversations, chat/generate, search, ingestion, admin
+    (users/orgs/collections/roles), settings and logs are all reachable via the
+    API. ?c5-defect-0
+
+  **Test case step 4 (confirm authentication and correct authorization level)**:
+  - Most endpoints require authentication (get_current_user) and enforce the
+    appropriate level (assert_admin, assert_*_moderator, can_read_collection).
+    Two exceptions found on health.py. See defects below. ?c5-defect-2
+
+  **Test case step 5 (consistent response/error structures)**:
+  - Errors are raised as HTTPException and handled centrally
+    (api/error_handlers.py); provider errors are normalised to ProviderError.
+    Structures are consistent across endpoints. ?c5-defect-0
+
+  **Test case step 6 (record findings with affected endpoints)**:
+  - Findings recorded below. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-2 (minor defect).
+  Authentication and authorization are enforced consistently across the API,
+  with the following exceptions on hestia/api/routers/health.py:
+
+  - GET /ready has no authentication and returns the list of all active
+    services and providers.
+  - GET /models has no authentication and returns the list of available LLM
+    models.
+
+  Both expose internal system information to any unauthenticated caller
+  (information disclosure). Impact depends on whether a reverse proxy/firewall
+  restricts these routes externally, which should be confirmed. GET /health is
+  correctly public (liveness check).
+
+  Additionally (design note, not an auth gap): the auth_settings and llm_settings
+  "test before save" step is enforced by the frontend only, not the server, so a
+  direct call can save an untested configuration (admin-only).
+
+  ### Test execution evidence
+
+  Source-code review of hestia/api/routers/*.py and registry.py.
+  - Auth enforcement present via get_current_user on account, conversations,
+    chat, generate, encode, search, notifications, ingestion.
+  - Admin-level enforcement via assert_admin on admin, logs, *_settings routers.
+  - Moderator/collection scoping via assert_*_moderator and can_read_collection.
+  - health.py: /ready and /models declared without get_current_user.
+
+  ### Comments
+
+  16 routers expose endpoints; registry.py only assembles them and is not itself
+  an endpoint provider. The registry refuses to boot if two routers register the
+  same method+path, preventing an accidental route collision that could bypass a
+  stricter auth dependency. Overall authorization is coherent; the only auth gap
+  is the two unauthenticated health endpoints exposing internal information.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Review of design (R)
+verification-method: R
