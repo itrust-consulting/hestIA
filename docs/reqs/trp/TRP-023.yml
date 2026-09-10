@@ -3,9 +3,9 @@ defect-category: 0 = no defect
 derived: false
 failed-steps: '0'
 header: ''
-level: '1.23'
+level: 1.23
 links:
-- SRS-005
+- TST-023: Tu7x3Kwc6iilxJ8zE5TMLxBi-av53NF1899n7Onj7Tg=
 normative: true
 not-executed-steps: '0'
 passed-steps: '11'
@@ -14,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: YDLcrM03pnKqW56gvWRmQdcsVUQ_hVD7jdAfD889v90=
 test-date: 2026/09/10
 tester: dmahfouf
 text: |
@@ -87,5 +87,4 @@ text: |
 
   - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
   - Verification method (VM): Test (T)
-
 verification-method: T

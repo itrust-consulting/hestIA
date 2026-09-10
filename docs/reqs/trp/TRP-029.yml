@@ -4,7 +4,8 @@ derived: false
 failed-steps: '0'
 header: ''
 level: 1.44
-links: [TST-029]
+links:
+- TST-029: GcjLryq426P4eizPKEwI7JQqrV0Rvv4K5de2trldWyg=
 normative: true
 not-executed-steps: '0'
 passed-steps: '13'
@@ -13,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: uQHHm-CxyyFSRxmUMRtDykkq4quFLE6Uin-igQRNVeM=
 test-date: 2026/09/10
 tester: HFR
 text: |

@@ -5,7 +5,7 @@ failed-steps: '0'
 header: ''
 level: '1.20'
 links:
-- SRS-021
+- TST-020: jOI9fGbd_XTBJ5OjRAnBGhK3X5sKuuhVlnx50t-gvnU=
 normative: true
 not-executed-steps: '0'
 passed-steps: '8'
@@ -14,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: hnDEzY49j9oqL9AMBnbI1cLxPsEGNCfVIkzd0Kikf4A=
 test-date: 2026/09/09
 tester: dmahfouf
 text: |

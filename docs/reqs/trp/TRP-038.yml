@@ -3,9 +3,9 @@ defect-category: 0 = no defect
 derived: false
 failed-steps: '0'
 header: ''
-level: '1.38'
+level: 1.38
 links:
-- SRS-028
+- TST-038: -iB_vqjP0bJnpse_NOWxkgZV57smVUBkDK2tr4PSf_w=
 normative: true
 not-executed-steps: '0'
 passed-steps: '5'
@@ -14,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: 3I_ERDQGvTh4JyLiSiaqPaurSC1ZA4ygpF6YQuws2W8=
 test-date: 2026/09/09
 tester: dmahfouf
 text: |
@@ -48,7 +48,7 @@ text: |
   ### Defect summary description
 
   Defect-free test execution, defect category: ?c5-defect-0.
-  
+
   ### Test execution evidence
 
   N/A

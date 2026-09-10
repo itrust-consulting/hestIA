@@ -1,0 +1,84 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.46
+links:
+- TST-002: 2LrOfLqUmq5wAxUyYTNJOt7MwDxTCi5v_XIgRlGIgms=
+normative: true
+not-executed-steps: '0'
+passed-steps: '6'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: kwDdDZgDnMf6rXGvdSPOmeu0O5HlRN_jl2XZapJupSo=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-002 (Container-based deployment)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: a clean host with Docker and Docker Compose installed, no prior
+    hestIA containers or volumes present.
+
+  ## Test execution results
+
+  **Test case step 1 (build and start hestIA via docker-compose.yml)**:
+  - Stack built and started from the repository's docker-compose.yml with no
+    manual dependency installation beyond Docker itself. ?c5-defect-0
+
+  **Test case step 2 (confirm both containers reach healthy/running state,
+  no error output)**:
+  - Both backend and frontend containers reached a healthy/running state
+    with no error output. ?c5-defect-0
+
+  **Test case step 3 (log in through the web interface)**:
+  - Login succeeded. ?c5-defect-0
+
+  **Test case step 4 (ingest a document into a collection)**:
+  - Document ingestion completed successfully. ?c5-defect-0
+
+  **Test case step 5 (submit a plain and a RAG chat query against that
+  collection)**:
+  - Both query types completed with no errors. ?c5-defect-0
+
+  **Test case step 6 (tear down and re-create the stack from the same
+  compose file, same host, no configuration changes)**:
+  - Re-created stack reproduced the same working state. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0.
+  hestIA deployed successfully via Docker Compose on a clean host; login,
+  document ingestion, and both query types completed with no errors; tearing
+  down and re-creating the stack from the same compose file reproduced the
+  same working state.
+
+  ### Test execution evidence
+
+  See linked files (if any), e.g., screenshots, logs.
+
+  ### Comments
+
+  Run alongside TST-001/TST-003 on the same fresh-environment session. Note
+  for the record: the Docker Compose path was not actually exposed to the
+  first-boot database-initialization defect fixed ahead of TST-001 (see
+  TRP-001) -- the shipped docker-compose.yml's `LOG_DIR=data/logs` setting
+  incidentally created the app/data directory as a side effect of the
+  logging setup's own mkdir, before the SQLite connection was ever opened.
+  That masking was undocumented and coincidental, so the fix (ensuring
+  app/data exists directly in create_sqlite_connection) is still in place as
+  the actual guarantee going forward, independent of this deployment path
+  happening to already work.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

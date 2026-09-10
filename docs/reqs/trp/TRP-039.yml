@@ -3,9 +3,9 @@ defect-category: 2 = minor defect
 derived: false
 failed-steps: '0'
 header: ''
-level: '1.39'
+level: 1.39
 links:
-- SRS-027
+- TST-039: fs5Y-UILKRJPcAG-Uc1Qqslc_9IzfdN9TS1G1G82Xmo=
 normative: true
 not-executed-steps: '0'
 passed-steps: '6'
@@ -14,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: GNH-rugkK0Z6PZtND-rSXpYqxJZJYaRSMJPvaxjwi_Q=
 test-date: 2026/09/09
 tester: dmahfouf
 text: |

@@ -3,6 +3,7 @@ import sqlite3
 import threading
 import time
 import uuid
+from pathlib import Path
 
 BUSY_TIMEOUT_MS = 5000
 
@@ -24,6 +25,16 @@ class ModeratorConflictError(Exception):
 
 
 def create_sqlite_connection(db_path: str) -> tuple[callable, callable, threading.Lock]:
+    # sqlite3.connect() never creates its own parent directory -- on a fresh
+    # environment (no prior app/data) this raised "unable to open database
+    # file" before a single request could be served. Ensured here, not just
+    # in container.py, so every caller (including a future one) gets it for
+    # free -- mirrors SparseEncoder's own eager mkdir for corpus_stats
+    # (hestia/domain/rag/services.py). ":memory:"/"" resolve to Path("."),
+    # which always exists, so this is a no-op for the in-memory DBs the test
+    # suite uses.
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+
     _local = threading.local()
     _lock = threading.Lock()
 
