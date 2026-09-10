@@ -1,0 +1,115 @@
+active: true
+defect-category: 1 = minor defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.24'
+links:
+- SRS-005
+normative: true
+not-executed-steps: '0'
+passed-steps: '12'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-024 (Moderator tenant management)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: Executed steps 1-7 of TST-023 (tenant 'TEST' configured with 'User'
+    as member and 'Moderator' as moderator). Unassigned user 'Invitee' available
+    with a known email. Logged in as 'Moderator'.
+
+  ## Test execution results
+
+  **Test case step 1-2 (navigate to Tenants and check visibility)**:
+  - Moderator dashboard lists strictly the assigned tenant 'TEST'; unassigned
+    tenants are hidden. ?c5-defect-0
+
+  **Test case step 3 (inspect tenant 'TEST')**:
+  - Tenant info, current members, and assigned collections rendered correctly.
+    ?c5-defect-0
+
+  **Test case step 4-5 (modify tenant information and save changes)**:
+  - Tenant information successfully updated and saved changes confirmed. ?c5-defect-0
+
+  **Test case step 6-7 (invite 'Invitee' by email and verify pending state)**:
+  - Invitation sent to 'Invitee' email; pending status correctly listed in the
+    UI. ?c5-defect-0
+
+  **Test case step 8 (remove 'User' from tenant)**:
+  - 'User' removed from tenant without issue. ?c5-defect-0
+
+  **Test case step 9-11 (create collection 'test-collection_2' and verify listing)**:
+  - Collection created and listed under the tenant's collections. ?c5-defect-0
+
+  **Test case step 12 (delete collection via tenant profile)**:
+  - Collection deleted from tenant. ?c5-defect-0
+
+  **Test case step 13 (inspect admin audit logs for moderator actions)**:
+  - Audit log entries present for tenant modification, user invitation, member
+    removal, and collection creation. No audit log entry was produced for the
+    collection deletion. ?c5-defect-1
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-1 (negligible defect).
+  All moderator actions were correctly audited except collection deletion, which
+  produced no audit log entry. Collection creation is logged (collection_create)
+  but the corresponding deletion is not, leaving no trace of the removal.
+
+  ### Test execution evidence
+
+  Tenant modification:
+  {
+    "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+    "action": "org_update",
+    "target": "12",
+    "detail": {"name": "TEST", "abbreviation": "TS"}
+  }
+
+  Invitation sent to 'Invitee':
+  {
+    "actor_id": "2c8e077f-184a-4b9e-bf6f-2ae7d80c6f6e",
+    "action": "tenant_invitation_send",
+    "target": "e1695034-f305-4edf-8e59-97af12ab9bf2",
+    "detail": {"org_id": 12, "identifier": "inv@itee.com"}
+  }
+
+  Member removal:
+  {
+    "actor_id": "2c8e077f-184a-4b9e-bf6f-2ae7d80c6f6e",
+    "action": "org_member_remove",
+    "target": "12:9baff624-488e-433b-b878-0dc0d845a2c3",
+    "detail": null
+  }
+
+  Collection creation:
+  {
+    "actor_id": "2c8e077f-184a-4b9e-bf6f-2ae7d80c6f6e",
+    "action": "collection_create",
+    "target": "test-collection_2",
+    "detail": {"owner_org_id": 12}
+  }
+
+  Collection deletion: no audit log entry found.
+
+  ### Comments
+
+  All moderator tenant-management actions functioned correctly. The only defect
+  is the absence of an audit log entry for collection deletion, while creation
+  is logged — an asymmetry in audit coverage.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

@@ -1,0 +1,75 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.31
+links:
+- SRS-017
+normative: true
+not-executed-steps: '0'
+passed-steps: '6'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-031 (Multi-step pipeline)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: System initialized and logged in as admin. Admin dashboard accessible.
+
+  ## Test execution results
+
+  **Test case step 1-4 (workflow selection, modification & adoption verification)**:
+  - Chat workflow modified with custom Augment node, saved, and adopted successfully. ?c5-defect-0
+
+  **Test case step 5 (restore default workflow)**:
+  - Default Chat workflow restored successfully. ?c5-defect-0
+
+  **Test case step 6 (audit log verification)**:
+  - Audit logs verified for workflow update and reset actions. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0
+
+  ### Test execution evidence
+
+  Admin workflow update audit log:
+  admin_action
+  Fields
+  {
+    "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+    "action": "workflow_update",
+    "target": "chat",
+    "detail": null
+  }
+
+  Admin workflow reset audit log:
+  admin_action
+  Fields
+  {
+    "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+    "action": "workflow_reset",
+    "target": "chat",
+    "detail": null
+  }
+
+  ### Comments
+
+  Multi-step workflow customization, execution, default restoration, and audit logging performed without issues.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

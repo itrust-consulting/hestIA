@@ -1,0 +1,83 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.21'
+links:
+- SRS-021
+normative: true
+not-executed-steps: '0'
+passed-steps: '10'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-021 (Conversation compaction)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: System initialized with logged-in user. Precondition TST-020 executed.
+
+  ## Test execution results
+
+  **Test case step 1 (populate conversation to reach context usage limit)**:
+  - Context usage ring in the input box accurately reflects token usage growth
+    relative to the configured window. ?c5-defect-0
+
+  **Test case step 2 (remember a specific fact stated in earlier messages)**:
+  - Target key fact established in early turns. ?c5-defect-0
+
+  **Test case step 3 (trigger auto-compaction by exceeding context usage)**:
+  - Exceeding the context budget triggers auto-compaction on submission;
+    "Compacting..." label displayed, freed space reflected, and assistant
+    response generated properly. ?c5-defect-0
+
+  **Test case step 4 (ask follow-up question requiring the recalled fact)**:
+  - Assistant successfully recalled the target fact from compacted turns using
+    the retained summary. Full chat history remained visible and scrollable.
+    ?c5-defect-0
+
+  **Test case step 5-6 (trigger manual compaction at low context usage <50% and verify)**:
+  - Manual compaction via the context ring attempted at <50% usage; the system
+    correctly reported usage within budget and did not compact. ?c5-defect-0
+
+  **Test case step 7 (populate conversation to reach usage >85%)**:
+  - Context usage expanded past 85% as shown on the usage ring. ?c5-defect-0
+
+  **Test case step 8-9 (trigger manual compaction and verify execution)**:
+  - Clicking the usage ring at >85% triggered manual compaction immediately,
+    displaying freed tokens and updating the UI ring. ?c5-defect-0
+
+  **Test case step 10 (ask follow-up question requiring previous fact recall)**:
+  - Assistant correctly retrieved the second key fact after manual compaction. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0
+
+  ### Test execution evidence
+
+  See linked files (if any), e.g., screenshots of the context ring percentage,
+  the "Compacting..." indicator, and the chat showing fact recall after
+  compaction.
+
+  ### Comments
+
+  Both automatic and manual compaction flows functioned strictly as specified.
+  The context ring indicator provided accurate visual feedback, freed token
+  counts were displayed correctly, and model retention across folded turns
+  remained intact.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

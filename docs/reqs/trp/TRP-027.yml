@@ -1,0 +1,88 @@
+active: true
+defect-category: 1 = minor defect
+derived: false
+failed-steps: '1'
+header: ''
+level: 1.27
+links:
+- SRS-006
+- SRS-008
+- SRS-009
+- SRS-010
+- SRS-011
+- SRS-012
+- SRS-025
+normative: true
+not-executed-steps: '0'
+passed-steps: '10'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-027 (Collection management - Batch ingestion)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: Precondition TST-025 executed. Target collection active. Test batch includes valid files and one corrupt file.
+
+  ## Test execution results
+
+  **Test case step 1-4 (batch auto-upload with valid documents)**:
+  - Valid documents imported in a single batch operation without individual prompts. ?c5-defect-0
+
+  **Test case step 5 (corrupt file handling and error reporting)**:
+  - Corrupt file did not block batch execution, but no error or audit log was emitted for the unparsed file. ?c5-defect-1
+
+  **Test case step 6 (delete uploaded files)**:
+  - Batch documents deleted successfully. ?c5-defect-0
+
+  **Test case step 7-10 (batch upload with 'Review each file' option)**:
+  - Valid files batch imported with manual metadata review and saved successfully. ?c5-defect-0
+
+  **Test case step 11 (inspect audit logs)**:
+  - Audit logs verified for successful ingestions, but no log entry was generated for the failed corrupt file. ?c5-defect-1
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-1 (minor defect).
+  The corrupt/unparseable file was correctly excluded from ingestion without blocking the batch, but system audit logs did not produce a failure entry for the corrupt file.
+
+  ### Test execution evidence
+
+  Batch document ingestion log 1:
+  ingestion_done
+  Fields
+  {
+    "collection": "test-coll-2",
+    "source": "hestia_issues",
+    "n_chunks": 3,
+    "elapsed_ms": 42.1
+  }
+
+  Batch document ingestion log 2:
+  ingestion_done
+  Fields
+  {
+    "collection": "test-coll-2",
+    "source": "report, hestia tests (analysis)",
+    "n_chunks": 1,
+    "elapsed_ms": 30
+  }
+
+  ### Comments
+
+  Batch ingestion executed correctly for valid documents in both auto and review modes. However, the failure to record an error log for the skipped corrupt file constitutes a minor defect against step 5 and step 11 audit requirements.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

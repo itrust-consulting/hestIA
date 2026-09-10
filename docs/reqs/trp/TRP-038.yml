@@ -1,0 +1,63 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.38'
+links:
+- SRS-028
+normative: true
+not-executed-steps: '0'
+passed-steps: '5'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-038 (GPU-accelerated inference)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: system deployed on a host with a supported GPU and the required
+    drivers/runtime available to the container.
+
+  ## Test execution results
+
+  **Test case step 1 (configure embedding and generation services to use the GPU)**:
+  - Embedding and generation services configured to use the GPU device. ?c5-defect-0
+
+  **Test case step 2 (start GPU utilization monitoring, e.g. nvidia-smi)**:
+  - GPU utilization monitoring started on the host. ?c5-defect-0
+
+  **Test case step 3 (ingest a document, observe GPU utilization during embedding)**:
+  - GPU utilization observed during embedding generation. ?c5-defect-0
+
+  **Test case step 4 (submit a chat query, observe GPU utilization during generation)**:
+  - GPU utilization observed during text generation. ?c5-defect-0
+
+  **Test case step 5 (redeploy without GPU, repeat ingestion and query)**:
+  - Ingestion and query completed successfully on CPU, without crashing, when no
+    GPU was available. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, defect category: ?c5-defect-0.
+  
+  ### Test execution evidence
+
+  N/A
+
+  ### Comments
+
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

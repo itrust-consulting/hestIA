@@ -1,0 +1,108 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.19'
+links:
+- SRS-021
+normative: true
+not-executed-steps: '0'
+passed-steps: '15'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/09
+tester: dmahfouf
+text: |
+  # TCER: TST-019 (Basic conversation operations)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: system initialized, first user logged in, 'Ask My Docs' initially
+    deactivated, a second user account available (PublicUser as first user,
+    InternalUser as second user).
+
+  ## Test execution results
+
+  **Test case step 1 (start a conversation, New Chat)**:
+  - ?c5-defect-0
+
+  **Test case step 2 (ask any question)**:
+  - Response returned. ?c5-defect-0
+
+  **Test case step 3 (rename conversation and refresh)**:
+  - Rename via double-click; new title persisted after refresh. ?c5-defect-0
+
+  **Test case step 4 (ask another question)**:
+  - ?c5-defect-0
+
+  **Test case step 5 (retry last reply)**:
+  - ?c5-defect-0
+
+  **Test case step 6 (copy last reply)**:
+  - ?c5-defect-0
+
+  **Test case step 7 (delete last reply and user message)**:
+  - ?c5-defect-0
+
+  **Test case step 8 (start new conversation)**:
+  - ?c5-defect-0
+
+  **Test case step 9 (activate 'Ask My Docs', select a corpus)**:
+  - test-collection selected. ?c5-defect-0
+
+  **Test case step 10 (repeat steps 2-7 with RAG)**:
+  - All operations behaved as in the non-RAG conversation. ?c5-defect-0
+
+  **Test case step 11 (refresh page again)**:
+  - ?c5-defect-0
+
+  **Test case step 12 (verify operations persisted in both conversations)**:
+  - Renames, deletions and message ordering persisted after refresh. ?c5-defect-0
+
+  **Test case step 13 (delete a conversation and refresh)**:
+  - Conversation stayed deleted after refresh. ?c5-defect-0
+
+  **Test case step 14 (create more than the configured maximum, retrieve list)**:
+  - Created 21 conversations; the list returned at most 20, most recent first;
+    the oldest dropped out of the list. ?c5-defect-0
+
+  **Test case step 15 (second user attempts to retrieve/rename/delete the first
+  user's conversation by its known identifier)**:
+  - GET on the first user's conversation returned 404. ?c5-defect-0
+  - PATCH (rename) on the first user's conversation returned 404; the target
+    conversation was unchanged. ?c5-defect-0
+  - DELETE on the first user's conversation returned 404; the target
+    conversation still existed. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0.
+  All conversation operations persisted correctly with proper message ordering.
+  The conversation list is capped at 20, ordered by most recent activity. A
+  second user cannot retrieve, rename, or delete another user's conversation
+  (all three attempts returned 404, ownership enforced server-side).
+
+  ### Test execution evidence
+
+  Screenshots of the conversation operations and persistence after refresh;
+  conversation list showing the 20-item cap after creating 21; devtools Network
+  showing 404 responses for the cross-user GET, PATCH and DELETE attempts.
+
+  ### Comments
+
+  No deviations from expected outcomes. Cross-user access control (step 15)
+  behaved correctly, consistent with the ownership check in the service layer
+  (assert_conversation_owner).
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

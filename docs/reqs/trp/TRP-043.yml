@@ -1,0 +1,80 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.43'
+links:
+- SRS-001
+- SRS-013
+normative: true
+not-executed-steps: '0'
+passed-steps: '4'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-043 (Network isolation during ingestion and query)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: hestIA deployed with locally hosted embedding and generation models (no external LLM/embedding API configured). Outbound traffic observed from the browser via devtools Network.
+
+  ## Test execution results
+
+  **Test case step 1 (start network monitoring before activity)**:
+  - devtools Network capture started before ingestion/query. ?c5-defect-0
+
+  **Test case step 2 (ingest a document)**:
+  - Document ingestion completed successfully; upload request targeted internal host hestia-dev.itrust.lu. ?c5-defect-0
+
+  **Test case step 3 (submit a natural-language query)**:
+  - Query completed successfully; POST /api/chat targeted hestia-dev.itrust.lu (same-origin), HTTP 200. ?c5-defect-0
+
+  **Test case step 4 (review captured traffic for the full cycle)**:
+  - All observed client requests were directed to the internal application host (hestia-dev.itrust.lu). No requests to external/public hosts were observed during ingestion or query. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution (client-side), i.e., defect category: ?c5-defect-0.
+  Ingestion and query completed successfully and all browser-observed traffic stayed on the internal application host, with no external requests.
+
+  ### Test execution evidence
+
+  Query devtools capture message:
+
+  Content-Length: 851
+  POST https://hestia-dev.itrust.lu/api/chat
+  Status: 200 OK
+  Host: hestia-dev.itrust.lu
+  Origin: https://hestia-dev.itrust.lu
+  Referer: https://hestia-dev.itrust.lu/chat?cid=a582971b-bd23-4946-8e10-bf26474047f7
+  Sec-Fetch-Site: same-origin
+
+  Query devtools capture attachments:
+
+  Content-Length: 3494
+  POST https://hestia-dev.itrust.lu/api/chat
+  Status: 200 OK
+  Host: hestia-dev.itrust.lu
+  Origin: https://hestia-dev.itrust.lu
+  Referer: https://hestia-dev.itrust.lu/chat?cid=a582971b-bd23-4946-8e10-bf26474047f7
+  Sec-Fetch-Site: same-origin
+
+  ### Comments
+
+  Verification was performed from the browser (devtools), confirming that client requests remain strictly within the internal host (hestia-dev.itrust.lu / same-origin) with no external egress during ingestion and query execution.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0
+  - Verification method (VM): Test (T)
+
+verification-method: T

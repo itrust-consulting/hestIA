@@ -1,0 +1,154 @@
+active: true
+defect-category: 1 = minor defect
+derived: false
+failed-steps: '1'
+header: ''
+level: 1.26
+links:
+- SRS-006
+- SRS-008
+- SRS-010
+- SRS-011
+- SRS-012
+- SRS-013
+- SRS-025
+normative: true
+not-executed-steps: '0'
+passed-steps: '21'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-026 (Collection management - Document ingestion)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: Precondition TST-025 executed. Target collection initialized.
+
+  ## Test execution results
+
+  **Test case step 1-7 (docx import, metadata & chunking)**:
+  - docx imported successfully, metadata and section chunking verified. ?c5-defect-0
+
+  **Test case step 8 (RAG query & context navigation)**:
+  - Query answered with citation and adjacent chunk navigation verified. ?c5-defect-0
+
+  **Test case step 9 (gated access check)**:
+  - Restricted content correctly hidden from uncleared user. ?c5-defect-0
+
+  **Test case step 10-11 (metadata edit & re-query)**:
+  - Metadata updated and retrieval updated accordingly. ?c5-defect-0
+
+  **Test case step 12 (pdf import)**:
+  - pdf imported successfully. ?c5-defect-0
+
+  **Test case step 13 (xlsx import)**:
+  - xlsx imported successfully. ?c5-defect-0
+
+  **Test case step 14 (other formats import)**:
+  - txt, md, csv, json, and pptx imported successfully. ?c5-defect-0
+
+  **Test case step 15-16 (section chunking strategy)**:
+  - Section chunking strategy applied without duplicate chunks. ?c5-defect-0
+
+  **Test case step 17-18 (paragraph chunking strategy)**:
+  - Paragraph & table chunking strategy applied successfully. ?c5-defect-0
+
+  **Test case step 19 (non-moderator deletion attempt)**:
+  - No delete option available in UI for standard users to attempt deletion. ?c5-defect-1
+
+  **Test case step 20-21 (moderator deletion & Qdrant check)**:
+  - All documents deleted by moderator and purged from vector storage. ?c5-defect-0
+
+  **Test case step 22 (inspect audit logs)**:
+  - Audit logs verified for ingestion, edit, and deletion actions. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-1 (minor defect).
+  Standard users have no UI option/button to attempt document deletion, preventing the execution of step 19 and the generation of a denied deletion audit log.
+
+  ### Test execution evidence
+
+  docx format file loaded log:
+  docx_loaded
+  Fields
+  {
+    "file": "/tmp/tmp17n9bcqv.docx",
+    "n_rels": 22,
+    "n_footnotes": 3
+  }
+
+  pdf format file loaded log:
+  pdf_loaded
+  Fields
+  {
+    "file": "/tmp/tmpndi9kxum.pdf",
+    "n_pages": 1
+  }
+
+  xlsx format file loaded log:
+  xlsx_loaded
+  Fields
+  {
+    "file": "/tmp/tmp3n_nr7vc.xlsx",
+    "n_sheets": 1
+  }
+
+  md format file loaded log:
+  md_loaded
+  Fields
+  {
+    "file": "/tmp/tmpuflc5qg1.md",
+    "has_frontmatter": false
+  }
+
+  csv format file loaded log:
+  csv_loaded
+  Fields
+  {
+    "file": "/tmp/tmp90ufo5_d.csv",
+    "rows": 176,
+    "cols": 1
+  }
+
+  json format file loaded log:
+  json_loaded
+  Fields
+  {
+    "file": "/tmp/tmpy5jqm0_y.json"
+  }
+
+  pptx format file loaded log:
+  pptx_loaded
+  Fields
+  {
+    "file": "/tmp/tmpbtida1ud.pptx",
+    "n_slides": 69
+  }
+
+  Qdrant document deletion log:
+  qdrant_delete_document
+  Fields
+  {
+    "collection": "test_collection_2",
+    "source_uri": "public.csv"
+  }
+
+  ### Comments
+
+  Step 19 failed due to missing deletion UI control for standard users. All other document ingestion, chunking, retrieval gating, and moderator deletion steps passed as expected.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

@@ -1,0 +1,91 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.23'
+links:
+- SRS-005
+normative: true
+not-executed-steps: '0'
+passed-steps: '11'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-023 (Admin tenant management)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: System initialized and logged in as admin. Pre-existing users 'User' and 'Moderator' available.
+
+  ## Test execution results
+
+  **Test case step 1 (navigate to Admin Dashboard > Tenants)**:
+  - Navigation successful; tenant management panel displayed properly. ?c5-defect-0
+
+  **Test case step 2 (create a new tenant 'TEST')**:
+  - Tenant 'TEST' created successfully. ?c5-defect-0
+
+  **Test case step 3 (inspect new tenant information)**:
+  - Tenant metadata and empty member list correctly displayed. ?c5-defect-0
+
+  **Test case step 4-5 (modify tenant information and verify changes)**:
+  - Tenant configuration updated and saved changes verified in the UI. ?c5-defect-0
+
+  **Test case step 6-7 (add users and assign 'member' and 'moderator' roles)**:
+  - 'User' assigned member role and 'Moderator' assigned moderator role within tenant 'TEST'. ?c5-defect-0
+
+  **Test case step 8 (resume execution after dependent tests TST-024 to TST-028)**:
+  - Resumed execution after completing dependent tests TST-024 through TST-028 on tenant 'TEST'. ?c5-defect-0
+
+  **Test case step 9 (remove moderator from tenant)**:
+  - 'Moderator' role removed from tenant 'TEST' successfully. ?c5-defect-0
+
+  **Test case step 10 (delete the tenant)**:
+  - Tenant 'TEST' deleted successfully. ?c5-defect-0
+
+  **Test case step 11 (inspect audit logs for tenant lifecycle and role actions)**:
+  - Audit log entries verified for tenant creation, modification, role assignments, moderator removal, and tenant deletion. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0
+
+  ### Test execution evidence
+
+  Tenant creation log:
+  org_create
+  Fields
+  {
+    "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+    "action": "org_create",
+    "target": "TEST"
+  }
+
+  Tenant deletion log:
+  org_delete
+  Fields
+  {
+    "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+    "action": "org_delete",
+    "target": "TEST"
+  }
+
+  ### Comments
+
+  Full tenant lifecycle (creation, update, role assignments, dependent collection/document tests, moderator revocation, tenant deletion, and audit logging) completed without defect.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

@@ -1,0 +1,94 @@
+active: true
+defect-category: 1 = minor defect
+derived: false
+failed-steps: '2'
+header: ''
+level: 1.28
+links:
+- SRS-006
+- SRS-009
+- SRS-010
+- SRS-011
+- SRS-012
+- SRS-025
+normative: true
+not-executed-steps: '0'
+passed-steps: '16'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-028 (Collection management - Synchronise Folder)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: Precondition TST-025 executed. Target collection active with multi-tenant access grants.
+
+  ## Test execution results
+
+  **Test case step 1-3 (Folder sync selection & document listing)**:
+  - Folder sync feature functions properly on Firefox, but fails to select/list folder documents when using Chrome or Edge. ?c5-defect-1
+
+  **Test case step 4-8 (Metadata modification & initial upload verification)**:
+  - Document metadata modified and all files uploaded successfully. ?c5-defect-0
+
+  **Test case step 9-14 (Synchronization of additions, modifications, and deletions)**:
+  - External folder changes detected correctly; added document uploaded, modified document re-uploaded, and deleted document removed from corpus. ?c5-defect-0
+
+  **Test case step 15 (Non-admin collection deletion attempt)**:
+  - Standard users do not have UI options or buttons to delete collections. ?c5-defect-1
+
+  **Test case step 16-17 (Admin collection deletion)**:
+  - Collection deleted by admin and purged from tenant access listings. ?c5-defect-0
+
+  **Test case step 18 (Inspect audit logs)**:
+  - Audit log entries confirmed for sync-driven document updates, removals, and admin collection deletion. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-1 (minor defect).
+  1. Browser compatibility: 'Sync Folder' feature only operates correctly in Mozilla Firefox (fails on Chrome and Edge).
+  2. UI controls: Standard users are not presented with any UI button to delete a collection, preventing the execution of step 15 and the generation of a denied deletion audit log.
+
+  ### Test execution evidence
+
+  Document deletion log:
+  qdrant_delete_document
+  Fields
+  {
+    "collection": "test-coll-2",
+    "source_uri": "test_collection_2/1_POL_ACMt-PolSécuInfo_v1.1.1-dma.docx"
+  }
+
+  Corpus document removal log:
+  corpus_document_removed
+  Fields
+  {
+    "corpus": "test-coll-2",
+    "source_uri": "test_collection_2/1_POL_ACMt-PolSécuInfo_v1.1.1-dma.docx"
+  }
+
+  Collection deletion log:
+  qdrant_delete_collection
+  Fields
+  {
+    "collection": "test-coll-2"
+  }
+
+  ### Comments
+
+  Folder synchronization operates as specified under Firefox, including change detection and Qdrant purging. Steps 1-3 failed on Chrome/Edge due to browser incompatibility, and step 15 failed due to missing deletion UI options for non-admin users.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+
+verification-method: T

@@ -1,0 +1,143 @@
+active: true
+defect-category: 1 = negligible defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.25'
+links:
+- SRS-005
+normative: true
+not-executed-steps: '0'
+passed-steps: '15'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ''
+test-date: 2026/09/10
+tester: dmahfouf
+text: |
+  # TCER: TST-025 (Collection management - Access)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: System initialized, logged in as admin. TST-023 steps 1-7 executed
+    (tenant 'TEST' with 'User' and 'Moderator' assigned). More than two tenants
+    available.
+
+  ## Test execution results
+
+  **Test case step 1 (navigate to Admin Dashboard > Collections)**:
+  - Navigation successful. ?c5-defect-0
+
+  **Test case step 2 (create collection, assign ownership and access to TEST)**:
+  - Collection created with the correct owner and access permissions. ?c5-defect-0
+
+  **Test case step 3 (verify owner and access permissions)**:
+  - Owner and access for TEST correctly set. ?c5-defect-0
+
+  **Test case step 4 (verify listing under owner and accessible collections)**:
+  - Collection listed under the owner's profile and under TEST's accessible
+    collections. ?c5-defect-0
+
+  **Test case step 5 (Manage Access, revoke access for TEST)**:
+  - Access for TEST revoked. ?c5-defect-0
+
+  **Test case step 6 (verify collection no longer accessible to TEST)**:
+  - Collection no longer listed under TEST's accessible collections. ?c5-defect-0
+
+  **Test case step 7 (reassign ownership to TEST)**:
+  - Ownership reassigned to TEST. ?c5-defect-0
+
+  **Test case step 8 (verify ownership and access in tenant profiles)**:
+  - Ownership and access correctly displayed. ?c5-defect-0
+
+  **Test case step 9-10 (log in as Moderator, verify only TEST collections listed)**:
+  - Moderator sees only the assigned tenant's collections. ?c5-defect-0
+
+  **Test case step 11 (Moderator creates a collection, assigns owner and access)**:
+  - Collection created with correct owner and access. ?c5-defect-0
+
+  **Test case step 12 (verify owner and access permissions)**:
+  - Owner and access correctly set. ?c5-defect-0
+
+  **Test case step 13 (Manage Access, revoke access)**:
+  - Access revoked. ?c5-defect-0
+
+  **Test case step 14 (admin opens/queries a Restricted collection of a tenant
+  it was never added to, without an explicit grant)**:
+  - Admin can view and query the collection at Restricted level without any
+    explicit access grant, as expected. ?c5-defect-0
+
+  **Test case step 15 (attempt to assign a second moderator to TEST)**:
+  - Assignment rejected (err 400); a tenant cannot have more than one moderator,
+    as expected. ?c5-defect-0
+
+  **Test case step 16 (inspect logs for collection, access and role actions)**:
+  - Audit entries present for collection creation (collection_create), access
+    grant (tenant_collection_grant, role access), access revocation
+    (tenant_collection_revoke), and ownership reassignment
+    (tenant_collection_grant, role owner). No audit entry was produced for the
+    rejected second-moderator assignment. ?c5-defect-1
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-1 (negligible defect).
+  All collection and access actions were correctly audited. The rejected
+  second-moderator assignment (step 15) was correctly refused (HTTP 400) but
+  produced no audit log entry, so the expected outcome that every action
+  including the rejected one is logged is not fully met.
+
+  ### Test execution evidence
+
+  Collection creation:
+  {
+    "actor_id": "2c8e077f-184a-4b9e-bf6f-2ae7d80c6f6e",
+    "action": "collection_create",
+    "target": "tst_coll-3",
+    "detail": {"owner_org_id": 12}
+  }
+
+  Access grant (role access):
+  {
+    "actor_id": "2c8e077f-184a-4b9e-bf6f-2ae7d80c6f6e",
+    "action": "tenant_collection_grant",
+    "target": "13:tst_coll-3",
+    "detail": {"role": "access", "max_classification": 0}
+  }
+
+  Access revocation:
+  {
+    "actor_id": "2c8e077f-184a-4b9e-bf6f-2ae7d80c6f6e",
+    "action": "tenant_collection_revoke",
+    "target": "13:tst_coll-3",
+    "detail": null
+  }
+
+  Ownership reassignment (role owner):
+  {
+    "actor_id": "d599388c-1090-475f-803c-85a6fc9997b9",
+    "action": "tenant_collection_grant",
+    "target": "13:test_collection_2",
+    "detail": {"role": "owner", "max_classification": null}
+  }
+
+  Rejected second-moderator assignment (step 15): request refused with HTTP 400,
+  no audit log entry produced.
+
+  ### Comments
+
+  Access control behaved correctly throughout: moderator scoping (step 10),
+  admin override on any collection/level (step 14), and single-moderator-per-
+  tenant enforcement (step 15) all worked as specified. The only defect is the
+  missing audit entry for the rejected second-moderator assignment: the action
+  is logged only on success, not on rejection.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T
