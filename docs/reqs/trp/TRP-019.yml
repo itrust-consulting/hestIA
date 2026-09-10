@@ -3,9 +3,9 @@ defect-category: 0 = no defect
 derived: false
 failed-steps: '0'
 header: ''
-level: '1.19'
+level: 1.19
 links:
-- SRS-021
+- TST-019: yWAKNsHg1eRzc9JywtQKtFyUgXr__TlYwXkppf24GcI=
 normative: true
 not-executed-steps: '0'
 passed-steps: '15'
@@ -14,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: eKu73OxSThCiRmdzS4Pq6H5YCC_MsbZqPT8VvW1X2dU=
 test-date: 2026/09/09
 tester: dmahfouf
 text: |

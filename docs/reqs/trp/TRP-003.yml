@@ -1,0 +1,74 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.47
+links:
+- TST-003: 3c_xTguNOyBGOzGrraYREWBMuxixSAzLGGux2yqmx70=
+normative: true
+not-executed-steps: '0'
+passed-steps: '4'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: Y2iq7ESuXDo8OeOUczzRU2kZCnSSS69uWVMMlQPbSiI=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-003 (VPN-gated remote access)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: hestIA deployed and reachable only from the internal network (no
+    public exposure); a host connected to the organizational VPN, and a
+    separate host with no VPN connection.
+
+  ## Test execution results
+
+  **Test case step 1 (from the VPN-connected host, connect to the VPN and
+  navigate to the hestIA frontend URL)**:
+  - hestIA frontend reachable and fully usable from the VPN-connected host.
+    ?c5-defect-0
+
+  **Test case step 2 (authenticate and use the chat and document interfaces
+  normally)**:
+  - Authentication and normal use of the chat/document interfaces succeeded.
+    ?c5-defect-0
+
+  **Test case step 3 (confirm no hestIA application configuration was
+  changed to enable this access)**:
+  - Access is purely VPN/infrastructure-routing-level; no hestIA
+    application-level configuration change was required. ?c5-defect-0
+
+  **Test case step 4 (from the non-VPN host, without connecting to the VPN,
+  attempt to reach the same hestIA URL)**:
+  - The non-VPN host could not reach hestIA directly. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0.
+  hestIA is fully usable from the VPN-connected host with no
+  application-level configuration required to enable that access, and is
+  unreachable from a host outside the VPN.
+
+  ### Test execution evidence
+
+  See linked files (if any), e.g., screenshots, logs.
+
+  ### Comments
+
+  Run alongside TST-001/TST-002 on the same fresh-environment session.
+  Unrelated to the first-boot database-initialization defect fixed ahead of
+  TST-001 (see TRP-001) -- this test exercises network/infrastructure-level
+  access control, not application startup.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

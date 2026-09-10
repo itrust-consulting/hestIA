@@ -1,0 +1,106 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.45
+links:
+- TST-001: UoK6JHWjOR0YvUJjdDx8ha7tmM62zlyseAtgwkgc_HU=
+normative: true
+not-executed-steps: '0'
+passed-steps: '9'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: ikWyPT3ysyDU0yiGi96mrPkPBtWG2q6lCUinnmnyRAA=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-001 (Local setup)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: fresh host, no prior hestIA containers, volumes, or data
+    directories present; .env populated with DEFAULT_ADMIN_USERNAME,
+    DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_EMAIL, AUTH_MODE=local,
+    AUTH_SECRET_KEY, and the database/vector-store connection settings
+    required for a first boot.
+
+  ## Test execution results
+
+  **Test case step 1 (prepare the environment: .env complete, no pre-existing
+  database/vector store/data directory)**:
+  - Confirmed no app/data directory, user database, or vector store present
+    from a previous run. ?c5-defect-0
+
+  **Test case step 2 (boot hestIA for the first time)**:
+  - Startup completed without crashing. Previously, a fresh environment with
+    no pre-existing app/data directory crashed here
+    (sqlite3.OperationalError: unable to open database file, from
+    hestia/infrastructure/db/user_repository.py's create_sqlite_connection --
+    see fix below). ?c5-defect-0
+
+  **Test case step 3 (call GET /health and GET /ready, inspect response)**:
+  - Both endpoints reported healthy/ready, with the expected services and
+    providers listed. ?c5-defect-0
+
+  **Test case step 4 (confirm first-boot artefacts: bootstrap admin user in
+  the user database, default workflow/template configuration seeded)**:
+  - Bootstrap admin user present in app/data/users.db; default workflow
+    templates seeded into app/data/templates. ?c5-defect-0
+
+  **Test case step 5 (log in at http://localhost:5173 with DEFAULT_ADMIN_*
+  credentials)**:
+  - Login succeeded with the provisioned default admin credentials.
+    ?c5-defect-0
+
+  **Test case step 6 (submit a plain chat request, no collection selected)**:
+  - Non-RAG chat request returned a valid response. ?c5-defect-0
+
+  **Test case step 7 (create a collection, ingest a document, query it with
+  'Ask My Docs' active)**:
+  - RAG request returned a valid response with a citation to the ingested
+    document. ?c5-defect-0
+
+  **Test case step 8 (log out, then attempt to access a protected page)**:
+  - Logout terminated the session; the protected page was no longer
+    accessible and the user was redirected to login. ?c5-defect-0
+
+  **Test case step 9 (inspect logs for login, ingestion, and logout audit
+  entries)**:
+  - Correctly-populated audit entries (actor, action, resource, timestamp,
+    correlation ID) present for all three events. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0.
+  First boot on a fresh host completed successfully: /health and /ready
+  reported healthy/ready, the bootstrap admin user and default workflow
+  templates were created, login/non-RAG chat/RAG chat with citation/logout
+  all behaved correctly, and audit entries were correctly populated for
+  login, ingestion, and logout.
+
+  ### Test execution evidence
+
+  See linked files (if any), e.g., screenshots, logs.
+
+  ### Comments
+
+  This TCER follows the fix for a defect found ahead of this formal run:
+  first boot on a genuinely fresh environment (no pre-existing app/data)
+  crashed during initialization because nothing created the app/data
+  directory before the shared SQLite connection was opened, and this was
+  only masked in the shipped docker-compose.yml by an unrelated LOG_DIR side
+  effect. Root-caused and fixed prior to this TCER (see the corresponding
+  GitLab issue for defect history). This execution reflects the corrected
+  behaviour only.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

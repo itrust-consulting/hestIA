@@ -61,6 +61,21 @@ class TestCreateSqliteConnection:
         assert isinstance(conn, sqlite3.Connection)
         close()
 
+    def test_creates_missing_parent_directory(self, tmp_path):
+        # Regression test: on a fresh environment with no pre-existing
+        # app/data, sqlite3.connect() used to raise "unable to open database
+        # file" here because nothing created the parent directory first --
+        # crashing startup before a single request could be served.
+        db_path = tmp_path / "does" / "not" / "exist" / "users.db"
+        assert not db_path.parent.exists()
+
+        get_conn, close, lock = create_sqlite_connection(str(db_path))
+        conn = get_conn()
+
+        assert db_path.parent.is_dir()
+        assert isinstance(conn, sqlite3.Connection)
+        close()
+
     def test_same_thread_reuses_connection(self):
         get_conn, close, lock = create_sqlite_connection(":memory:")
         c1 = get_conn()

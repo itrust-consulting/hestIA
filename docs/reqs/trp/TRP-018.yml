@@ -5,7 +5,7 @@ failed-steps: '1'
 header: ''
 level: 1.18
 links:
-- TST-018
+- TST-018: TIi8x1iPrAD6c7VepIC-UeAHSiXkJpGbyLTWtWqRvo8=
 normative: true
 not-executed-steps: '0'
 passed-steps: '7'
@@ -14,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: UOL1GPcKTFnJucI7Stjd7tGjlNCIHyUhuBbI8TFERsc=
 test-date: 2026-10-09
 tester: dmahfouf
 text: |
@@ -67,7 +67,7 @@ text: |
   ### Test execution evidence
 
   Test case stem 5: Direct access to an inaccessible collection is denied
-  
+
   {
   "user_id": "3dc0cc0f-5674-46db-9167-6802aa6412b1",
   "exec_type": "rag_chat",
@@ -86,5 +86,4 @@ text: |
 
   - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
   - Verification method (VM): Test (T)
-
 verification-method: T

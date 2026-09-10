@@ -5,9 +5,7 @@ failed-steps: '0'
 header: ''
 level: '1.30'
 links:
-- SRS-014
-- SRS-015
-- SRS-017
+- TST-030: jZGLIOMAVhP7useQnuHsxRAKrh5Jn9swptWp_giXoyY=
 normative: true
 not-executed-steps: '0'
 passed-steps: '11'
@@ -16,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: NAff2sprCFTQH3U0UZ63oYdexX_vh9q7wbEKDIS0qDE=
 test-date: 2026/09/10
 tester: dmahfouf
 text: |
@@ -87,5 +85,4 @@ text: |
 
   - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
   - Verification method (VM): Test (T)
-
 verification-method: T

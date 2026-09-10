@@ -5,8 +5,7 @@ failed-steps: '0'
 header: ''
 level: '1.40'
 links:
-- SRS-005
-- SRS-007
+- TST-040: OmX6uVQSCBPYaeP5Zc_vfMdTeOCcQh3WtYOIjOZZGUc=
 normative: true
 not-executed-steps: '0'
 passed-steps: '6'
@@ -15,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: KluENsyg4Lgr8AcARdldxrf7Nh1-pA4mprplFvYXXiI=
 test-date: 2026/09/09
 tester: dmahfouf
 text: |

@@ -3,9 +3,9 @@ defect-category: 1 = negligible defect
 derived: false
 failed-steps: '0'
 header: ''
-level: '1.25'
+level: 1.25
 links:
-- SRS-005
+- TST-025: q6XFGZhfA7oQpqxi7VCUez40zwfU_UAA5QqIdMnprEw=
 normative: true
 not-executed-steps: '0'
 passed-steps: '15'
@@ -14,7 +14,7 @@ references:
 - path: ''
   type: file
 release-version: ''
-reviewed: ''
+reviewed: 51NRbkaZTuGKj9Kgn2ctZUqHjbhvm57TKsZH02vSiSM=
 test-date: 2026/09/10
 tester: dmahfouf
 text: |
