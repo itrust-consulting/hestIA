@@ -12,6 +12,7 @@ from hestia.container import Container
 from hestia.domain.auth.models import User
 from hestia.domain.auth.users import now_epoch
 from hestia.domain.exceptions import ConfigurationError
+from hestia.infrastructure.logging.audit import audit
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
@@ -21,36 +22,44 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 _ALLOWED_JWT_ALGORITHMS = {"HS256", "HS384", "HS512"}
 
 
+def _deny(user: User, action: str, reason: str, target: str | None = None) -> None:
+    """Single choke point for 403 denials -- records an access_denied audit
+    event before raising, so every assert_* below shares one place to log
+    from instead of duplicating the call at each raise site."""
+    audit.access_denied(actor_id=str(user.id), action=action, target=target, reason=reason)
+    raise HTTPException(403, reason)
+
+
 # @MRS-003
 def assert_admin(user: User) -> None:
     if not user.permissions.is_admin:
-        raise HTTPException(403, "Admin access required.")
+        _deny(user, "assert_admin", "Admin access required.")
 
 
 def assert_admin_or_moderator(user: User) -> None:
     if not user.permissions.is_admin and not user.permissions.moderated_tenants:
-        raise HTTPException(403, "Admin or moderator access required.")
+        _deny(user, "assert_admin_or_moderator", "Admin or moderator access required.")
 
 
 def assert_org_member(user: User, org_id: int) -> None:
     if user.permissions.is_admin:
         return
     if org_id not in {o["id"] for o in user.orgs}:
-        raise HTTPException(403, "You must be a member of this tenant.")
+        _deny(user, "assert_org_member", "You must be a member of this tenant.", target=str(org_id))
 
 
 def assert_tenant_moderator(user: User, org_id: int) -> None:
     if user.permissions.is_admin:
         return
     if org_id not in user.permissions.moderated_tenants:
-        raise HTTPException(403, "Tenant moderator access required.")
+        _deny(user, "assert_tenant_moderator", "Tenant moderator access required.", target=str(org_id))
 
 
 def assert_tenant_role_assigner(user: User, org_id: int) -> None:
     if user.permissions.is_admin:
         return
     if org_id not in user.permissions.role_assignable_tenants:
-        raise HTTPException(403, "Only the tenant moderator can assign roles.")
+        _deny(user, "assert_tenant_role_assigner", "Only the tenant moderator can assign roles.", target=str(org_id))
 
 
 def assert_collection_moderator(user: User, collection_id: str, h) -> None:
@@ -63,7 +72,8 @@ def assert_collection_moderator(user: User, collection_id: str, h) -> None:
     grants = svc.get_collection_grants(collection_id)
     owner = grants.get("owner")
     if not owner or owner["id"] not in user.permissions.moderated_tenants:
-        raise HTTPException(403, "Only the collection owner's moderator may perform this action.")
+        _deny(user, "assert_collection_moderator",
+              "Only the collection owner's moderator may perform this action.", target=collection_id)
 
 
 
@@ -116,18 +126,23 @@ def get_current_user(
         )
         user_id_hex = payload.get("sub")
         if not user_id_hex:
+            audit.access_denied(actor_id="unknown", action="get_current_user", reason="missing_subject")
             raise HTTPException(401, "Invalid authentication payload")
         user_id = uuid.UUID(user_id_hex)
     except jwt.ExpiredSignatureError:
+        audit.access_denied(actor_id="unknown", action="get_current_user", reason="token_expired")
         raise HTTPException(401, "Token expired")
     except jwt.DecodeError:
+        audit.access_denied(actor_id="unknown", action="get_current_user", reason="token_invalid")
         raise HTTPException(401, "Invalid token")
 
     jti = payload.get("jti")
     if jti and auth_svc.local.repo.is_token_revoked(jti):
+        audit.access_denied(actor_id=str(user_id), action="get_current_user", reason="token_revoked")
         raise HTTPException(401, "Token has been revoked")
 
     user = user_svc.load_user_profile(user_id)
     if not user:
+        audit.access_denied(actor_id=str(user_id), action="get_current_user", reason="user_not_found")
         raise HTTPException(401, "User not found")
     return user

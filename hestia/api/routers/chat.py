@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response, StreamingResponse
 
@@ -65,4 +67,4 @@ async def chat(
     if req.stream:
         gen = abort_on_disconnect(request, await h.resolve(exec_req, stream=True))
         return StreamingResponse(gen, media_type="application/json")
-    return Response(await h.resolve(exec_req), media_type="application/json")
+    return Response(json.dumps({"content": await h.resolve(exec_req)}), media_type="application/json")

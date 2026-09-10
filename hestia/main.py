@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from hestia.api.error_handlers import register_error_handlers
-from hestia.api.limiter import limiter, login_rate_limit
+from hestia.api.limiter import limiter, login_ip_rate_limit, login_rate_limit
 from hestia.api.routers.registry import include_routers
 from hestia.config.settings import Settings
 from hestia.container import build_container
@@ -30,6 +30,8 @@ def create_api() -> FastAPI:
 
         _log.info("startup", extra={"version": settings.version, "port": settings.port,
                                     "services": settings.services_to_start})
+        for setting_name, url in settings.insecure_llm_urls():
+            _log.warning("insecure_llm_url", extra={"setting": setting_name, "url": url})
 
         try:
             container = build_container(settings)
@@ -37,6 +39,7 @@ def create_api() -> FastAPI:
             if auth_svc and auth_svc.config:
                 cfg = auth_svc.config
                 login_rate_limit.configure(cfg.max_failed_attempts, cfg.lockout_duration_minutes)
+                login_ip_rate_limit.configure(cfg.ip_rate_limit_max_attempts, cfg.ip_rate_limit_window_minutes)
             app.state.container = container
             sync_templates(settings.project_root / "hestia" / "templates", settings.app_data / "templates")
             app.state.handler = RequestHandler(container, policy=ExecutionPolicy())

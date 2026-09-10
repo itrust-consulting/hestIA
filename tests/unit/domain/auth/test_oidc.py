@@ -208,40 +208,60 @@ class TestAuthenticateOIDCErrors:
 
     def test_nack_when_oidc_not_configured(self, mock_user_service):
         svc = AuthenticationService(local=mock_user_service)
-        result = asyncio.run(svc.authenticate_oidc("code", "https://app/callback"))
+        with patch("hestia.domain.auth.service.audit") as mock_audit:
+            result = asyncio.run(svc.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
+        mock_audit.auth_attempt.assert_called_once_with(
+            username="unknown", success=False, source="oidc", reason="oidc_not_configured"
+        )
 
     def test_nack_on_token_exchange_failure(self, auth_service):
         bad_resp = MagicMock()
         bad_resp.raise_for_status.side_effect = req.HTTPError("400")
-        with patch("hestia.domain.auth.oidc.requests.post", return_value=bad_resp):
+        with patch("hestia.domain.auth.oidc.requests.post", return_value=bad_resp), \
+             patch("hestia.domain.auth.service.audit") as mock_audit:
             result = asyncio.run(auth_service.authenticate_oidc("bad-code", "https://app/callback"))
         assert not result.success
         assert "token exchange" in result.message.lower()
+        mock_audit.auth_attempt.assert_called_once_with(
+            username="unknown", success=False, source="oidc", reason="token_exchange_failed"
+        )
 
     def test_nack_when_access_token_missing(self, auth_service):
         resp = MagicMock()
         resp.json.return_value = {}
-        with patch("hestia.domain.auth.oidc.requests.post", return_value=resp):
+        with patch("hestia.domain.auth.oidc.requests.post", return_value=resp), \
+             patch("hestia.domain.auth.service.audit") as mock_audit:
             result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
         assert "access_token" in result.message
+        mock_audit.auth_attempt.assert_called_once_with(
+            username="unknown", success=False, source="oidc", reason="missing_access_token"
+        )
 
     def test_nack_on_userinfo_failure(self, auth_service):
         bad_userinfo = MagicMock()
         bad_userinfo.raise_for_status.side_effect = req.HTTPError("401")
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
-             patch("hestia.domain.auth.oidc.requests.get", return_value=bad_userinfo):
+             patch("hestia.domain.auth.oidc.requests.get", return_value=bad_userinfo), \
+             patch("hestia.domain.auth.service.audit") as mock_audit:
             result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
         assert "user info" in result.message.lower()
+        mock_audit.auth_attempt.assert_called_once_with(
+            username="unknown", success=False, source="oidc", reason="userinfo_failed"
+        )
 
     def test_nack_when_email_missing(self, auth_service):
         with patch("hestia.domain.auth.oidc.requests.post", return_value=_token_response()), \
-             patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response(email=None)):
+             patch("hestia.domain.auth.oidc.requests.get", return_value=_userinfo_response(email=None)), \
+             patch("hestia.domain.auth.service.audit") as mock_audit:
             result = asyncio.run(auth_service.authenticate_oidc("code", "https://app/callback"))
         assert not result.success
         assert "email" in result.message.lower()
+        mock_audit.auth_attempt.assert_called_once()
+        assert mock_audit.auth_attempt.call_args.kwargs["success"] is False
+        assert mock_audit.auth_attempt.call_args.kwargs["reason"] == "missing_email"
 
 
 # ---------------------------------------------------------------------------

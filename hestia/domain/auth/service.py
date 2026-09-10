@@ -105,26 +105,37 @@ class AuthenticationService:
 
     async def authenticate_oidc(self, code: str, redirect_uri: str, code_verifier: str | None = None) -> AuthResult:
         if not self.oidc:
+            self._audit_auth_attempt(username="unknown", success=False, source="oidc",
+                                      reason="oidc_not_configured")
             return AuthResult.nack("OIDC not configured.")
 
         try:
             token_data = await self.oidc.exchange_code(code, redirect_uri, code_verifier=code_verifier)
         except Exception as e:
             _log.warning("oidc_token_exchange_failed", extra={"error": str(e)})
+            self._audit_auth_attempt(username="unknown", success=False, source="oidc",
+                                      reason="token_exchange_failed")
             return AuthResult.nack("OIDC token exchange failed.")
 
         access_token = token_data.get("access_token")
         if not access_token:
+            self._audit_auth_attempt(username="unknown", success=False, source="oidc",
+                                      reason="missing_access_token")
             return AuthResult.nack("OIDC response missing access_token.")
 
         try:
             user_info = await self.oidc.get_user_info(access_token)
         except Exception as e:
             _log.warning("oidc_userinfo_failed", extra={"error": str(e)})
+            self._audit_auth_attempt(username="unknown", success=False, source="oidc",
+                                      reason="userinfo_failed")
             return AuthResult.nack("Failed to fetch OIDC user info.")
 
         email = user_info.get("email")
         if not email:
+            fallback_username = user_info.get("preferred_username") or "unknown"
+            self._audit_auth_attempt(username=fallback_username, success=False, source="oidc",
+                                      reason="missing_email")
             return AuthResult.nack("OIDC user info missing email.")
 
         username = user_info.get("preferred_username") or email

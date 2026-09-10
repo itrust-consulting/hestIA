@@ -7,6 +7,7 @@ from hestia.container import build_db_provider, build_llm_provider
 from hestia.domain.auth.models import User
 from hestia.domain.exceptions import ProviderError
 from hestia.handler import RequestHandler
+from hestia.infrastructure.logging.audit import audit, audited
 
 router = APIRouter()
 
@@ -29,9 +30,17 @@ def create_connection(
     assert_admin(user)
     if not req.base_url.strip():
         raise HTTPException(400, "Base URL is required")
-    connection_id = h.container.services["llm_settings"].create_connection(
-        purpose=req.purpose, backend_type=req.backend_type, base_url=req.base_url.strip(), api_key=req.api_key,
-    )
+    detail = {"purpose": req.purpose, "backend_type": req.backend_type}
+    try:
+        connection_id = h.container.services["llm_settings"].create_connection(
+            purpose=req.purpose, backend_type=req.backend_type, base_url=req.base_url.strip(), api_key=req.api_key,
+        )
+    except Exception as e:
+        audit.connection_action(actor_id=str(user.id), action="connection_create", target=req.purpose,
+                                 detail=detail, success=False, reason=str(e))
+        raise
+    audit.connection_action(actor_id=str(user.id), action="connection_create", target=str(connection_id),
+                             detail=detail, success=True)
     return {"ok": True, "id": connection_id}
 
 
@@ -90,13 +99,14 @@ def update_connection(
     repo = h.container.services["llm_settings"]
     if repo.get_connection(connection_id) is None:
         raise HTTPException(404, "Connection not found")
-    repo.update_connection(
-        connection_id=connection_id, base_url=req.base_url.strip(), api_key=req.api_key,
-        model=req.model.strip(), params=req.params,
-        compaction_enabled=req.compaction_enabled, compaction_model=req.compaction_model,
-        compaction_context_window=req.compaction_context_window,
-        compaction_summary_length=req.compaction_summary_length,
-    )
+    with audited(audit.connection_action, actor_id=str(user.id), action="connection_update", target=str(connection_id)):
+        repo.update_connection(
+            connection_id=connection_id, base_url=req.base_url.strip(), api_key=req.api_key,
+            model=req.model.strip(), params=req.params,
+            compaction_enabled=req.compaction_enabled, compaction_model=req.compaction_model,
+            compaction_context_window=req.compaction_context_window,
+            compaction_summary_length=req.compaction_summary_length,
+        )
     h.container.apply_connection_update(connection_id)
     return {"ok": True}
 
@@ -110,8 +120,11 @@ def delete_connection(
     assert_admin(user)
     repo = h.container.services["llm_settings"]
     row = repo.get_connection(connection_id)
-    repo.delete_connection(connection_id=connection_id)
-    h.container.apply_connection_delete(connection_id, row["purpose"] if row else None)
+    purpose = row["purpose"] if row else None
+    with audited(audit.connection_action, actor_id=str(user.id), action="connection_delete", target=str(connection_id),
+                 detail={"purpose": purpose}):
+        repo.delete_connection(connection_id=connection_id)
+    h.container.apply_connection_delete(connection_id, purpose)
     return {"ok": True}
 
 
@@ -130,7 +143,8 @@ def activate_connection(
     repo = h.container.services["llm_settings"]
     if repo.get_connection(connection_id) is None:
         raise HTTPException(404, "Connection not found")
-    repo.activate_connection(connection_id=connection_id)
+    with audited(audit.connection_action, actor_id=str(user.id), action="connection_activate", target=str(connection_id)):
+        repo.activate_connection(connection_id=connection_id)
     h.container.apply_connection_update(connection_id)
     return {"ok": True}
 

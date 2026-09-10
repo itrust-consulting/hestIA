@@ -15,6 +15,35 @@ from hestia.domain.exceptions import ConfigurationError
 
 
 # ---------------------------------------------------------------------------
+# Settings.insecure_llm_urls
+# ---------------------------------------------------------------------------
+
+class TestInsecureLlmUrls:
+
+    def test_https_urls_are_not_flagged(self):
+        s = Settings(llm_url="https://llm.example.com", emb_url="https://llm.example.com",
+                      rrk_url="https://llm.example.com")
+        assert s.insecure_llm_urls() == []
+
+    def test_localhost_http_is_not_flagged(self):
+        s = Settings(llm_url="http://localhost:8000", emb_url="http://127.0.0.1:8000",
+                      rrk_url="http://localhost:8000")
+        assert s.insecure_llm_urls() == []
+
+    def test_non_local_http_is_flagged(self):
+        s = Settings(llm_url="http://llm.internal:8000", emb_url="https://llm.example.com",
+                      rrk_url="https://llm.example.com")
+        assert s.insecure_llm_urls() == [("llm_url", "http://llm.internal:8000")]
+
+    def test_multiple_insecure_urls_all_reported(self):
+        s = Settings(llm_url="http://a.internal", emb_url="http://b.internal",
+                      rrk_url="https://c.example.com")
+        assert s.insecure_llm_urls() == [
+            ("llm_url", "http://a.internal"), ("emb_url", "http://b.internal"),
+        ]
+
+
+# ---------------------------------------------------------------------------
 # _parse_str_mapping
 # ---------------------------------------------------------------------------
 
@@ -128,6 +157,22 @@ class TestLoadAuthSettings:
         monkeypatch.delenv("AUTH_AUDIT_LOGS", raising=False)
         settings = _load_auth_settings()
         assert settings.audit_logs is False
+
+    def test_ip_rate_limit_defaults(self, monkeypatch):
+        monkeypatch.setenv("AUTH_SECRET_KEY", "x" * 32)
+        monkeypatch.delenv("AUTH_IP_RATE_LIMIT_ATTEMPTS", raising=False)
+        monkeypatch.delenv("AUTH_IP_RATE_LIMIT_WINDOW_MINUTES", raising=False)
+        settings = _load_auth_settings()
+        assert settings.ip_rate_limit_max_attempts == 30
+        assert settings.ip_rate_limit_window_minutes == 1
+
+    def test_ip_rate_limit_reads_env_overrides(self, monkeypatch):
+        monkeypatch.setenv("AUTH_SECRET_KEY", "x" * 32)
+        monkeypatch.setenv("AUTH_IP_RATE_LIMIT_ATTEMPTS", "50")
+        monkeypatch.setenv("AUTH_IP_RATE_LIMIT_WINDOW_MINUTES", "2")
+        settings = _load_auth_settings()
+        assert settings.ip_rate_limit_max_attempts == 50
+        assert settings.ip_rate_limit_window_minutes == 2
 
 
 # ---------------------------------------------------------------------------

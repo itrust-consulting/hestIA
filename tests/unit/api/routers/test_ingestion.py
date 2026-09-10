@@ -12,6 +12,7 @@ from hestia.api.security import get_current_user
 from hestia.api.dependencies import get_handler
 from hestia.domain.auth.models import CollectionPermission
 from hestia.domain.exceptions import ValidationError as DomainValidationError
+from hestia.domain.rag.classification import Classification
 from tests.unit.conftest import _make_user
 
 import pytest
@@ -371,6 +372,42 @@ class TestUploadDocument:
         assert args[2] == "sub/doc.md"
         assert args[3] == "abc123"
 
+    def test_upsert_entry_failure_after_successful_ingest_still_audits_upload_as_success(self):
+        # Regression test: recording the sync-manifest entry is a separate
+        # step from ingesting the document into Qdrant -- a failure there
+        # must not make the audit trail claim the upload itself failed.
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.settings.classification_labels = []
+
+        mock_pipeline = MagicMock()
+        from hestia.application.ingestion import IngestionResult
+        mock_pipeline.ingest.return_value = IngestionResult(
+            collection="test-col", source="doc", n_chunks=1, n_upserted=1, elapsed_ms=1.0
+        )
+        handler.container.services.get.return_value = mock_pipeline
+        sync_manifest = MagicMock()
+        sync_manifest.claim_owner.return_value = "sub/doc.md"
+        sync_manifest.upsert_entry.side_effect = RuntimeError("manifest db down")
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        from io import BytesIO
+        client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.post(
+                "/upload",
+                data={
+                    "collection": "test-col", "tenants": "[]",
+                    "sync_id": "my-repo", "content_hash": "abc123",
+                },
+                files={"file": ("sub/doc.md", BytesIO(b"# Title\n\nBody"), "text/plain")},
+            )
+        assert resp.status_code == 500
+        mock_pipeline.ingest.assert_called_once()
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "document_upload"
+        assert kwargs["success"] is True
+
     def test_skips_ingest_when_content_already_owned_elsewhere(self):
         user = _make_user(is_admin=True)
         handler = MagicMock()
@@ -430,12 +467,43 @@ class TestUploadDocument:
         assert resp.status_code == 200
         db.bump_classification.assert_called_once_with("test-col", "original/report.pdf", 3)
 
+    def test_non_moderator_forbidden(self):
+        # Regression test: assert_collection_moderator gates this route but
+        # had no endpoint-level test proving a non-privileged caller is
+        # actually denied.
+        user = _make_user()  # no admin, no moderated tenants
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.get_collection_grants.return_value = {"owner": {"id": 99}}
+        handler.container.services.get.return_value = users_svc
+
+        from io import BytesIO
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/upload",
+            data={"collection": "secret-col", "tenants": "[]"},
+            files={"file": ("doc.txt", BytesIO(b"body"), "text/plain")},
+        )
+        assert resp.status_code == 403
+
 
 # ---------------------------------------------------------------------------
 # DELETE /collections/{name}/documents
 # ---------------------------------------------------------------------------
 
 class TestDeleteDocument:
+
+    def test_non_moderator_forbidden(self):
+        user = _make_user()
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.get_collection_grants.return_value = {"owner": {"id": 99}}
+        handler.container.services.get.return_value = users_svc
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 403
 
     def _client(self, sync_manifest):
         user = _make_user(is_admin=True)
@@ -500,6 +568,69 @@ class TestDeleteDocument:
         sync_manifest.remove_owner.assert_called_once_with("test-col", "hash123")
         sync_manifest.delete_entry.assert_called_once_with("test-col", "sub/doc.md")
 
+    def test_success_is_audited(self):
+        # Regression test: ingestion actions used to have no audit trail at
+        # all (upload, delete, metadata update, collection delete).
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = None
+        client, handler = self._client(sync_manifest)
+
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 200
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "document_delete"
+        assert kwargs["target"] == "test-col"
+        assert kwargs["detail"] == {"source_uri": "sub/doc.md"}
+        assert kwargs["success"] is True
+
+    def test_failure_is_audited(self):
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = None
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.require_db_provider.return_value = MagicMock()
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+        handler.container.services.get.return_value = None
+        handler.container.require_db_provider.return_value.delete_document.side_effect = RuntimeError("db down")
+        client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 500
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "document_delete"
+        assert kwargs["success"] is False
+        assert kwargs["reason"] == "db down"
+
+    def test_sparse_index_failure_after_successful_delete_still_audits_delete_as_success(self):
+        # Regression test: removing the document from the sparse-search
+        # index is a separate step from deleting it from Qdrant -- a
+        # failure there must not make the audit trail claim the delete
+        # itself failed.
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = None
+        sparse_enc = MagicMock()
+        sparse_enc.remove_document.side_effect = RuntimeError("index down")
+        services = {"sync_manifest": sync_manifest, "encSparse": sparse_enc}
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.require_db_provider.return_value = MagicMock()
+        handler.container.services.__getitem__.side_effect = lambda k: services[k]
+        handler.container.services.get.side_effect = lambda k, default=None: services.get(k, default)
+        client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 500
+        handler.container.require_db_provider.return_value.delete_document.assert_called_once_with("test-col", "sub/doc.md")
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "document_delete"
+        assert kwargs["success"] is True
+
 
 # ---------------------------------------------------------------------------
 # GET /collections/{name}/documents (single document detail)
@@ -537,6 +668,18 @@ class TestGetDocument:
 
         assert resp.status_code == 404
 
+    def test_non_moderator_forbidden(self):
+        user = _make_user()
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.get_collection_grants.return_value = {"owner": {"id": 99}}
+        handler.container.services.get.return_value = users_svc
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.get("/collections/test-col/documents", params={"source_uri": "doc.pdf"})
+
+        assert resp.status_code == 403
+
 
 # ---------------------------------------------------------------------------
 # PATCH /collections/{name}/documents
@@ -563,7 +706,7 @@ class TestUpdateDocumentMetadata:
             "test-col", "doc.pdf", {"title": "New Title", "classification": "confidential"}, 3
         )
 
-    def test_no_classification_field_yields_null_level(self):
+    def test_no_classification_field_defaults_to_internal_level(self):
         user = _make_user(is_admin=True)
         handler = MagicMock()
         db = MagicMock()
@@ -577,7 +720,9 @@ class TestUpdateDocumentMetadata:
         )
 
         assert resp.status_code == 200
-        db.update_document_metadata.assert_called_once_with("test-col", "doc.pdf", {"author": "Someone"}, None)
+        db.update_document_metadata.assert_called_once_with(
+            "test-col", "doc.pdf", {"author": "Someone"}, Classification.INTERNAL.level
+        )
 
     def test_returns_404_when_document_not_found(self):
         user = _make_user(is_admin=True)
@@ -593,6 +738,21 @@ class TestUpdateDocumentMetadata:
         )
 
         assert resp.status_code == 404
+
+    def test_non_moderator_forbidden(self):
+        user = _make_user()
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.get_collection_grants.return_value = {"owner": {"id": 99}}
+        handler.container.services.get.return_value = users_svc
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.patch(
+            "/collections/test-col/documents",
+            json={"source_uri": "doc.pdf", "metadata": {"title": "New Title"}},
+        )
+
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -700,6 +860,21 @@ class TestSyncDiff:
         assert resp.status_code == 200
         assert resp.json()["previous_classifications"] == {}
 
+    def test_non_moderator_forbidden(self):
+        user = _make_user()
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.get_collection_grants.return_value = {"owner": {"id": 99}}
+        handler.container.services.get.return_value = users_svc
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post(
+            "/collections/test-col/sync/diff",
+            json={"sync_id": "my-repo", "manifest": []},
+        )
+
+        assert resp.status_code == 403
+
 
 class TestSyncComplete:
 
@@ -718,6 +893,18 @@ class TestSyncComplete:
         args = sync_manifest.mark_synced.call_args[0]
         assert args[0] == "test-col"
         assert args[1] == "my-repo"
+
+    def test_non_moderator_forbidden(self):
+        user = _make_user()
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.get_collection_grants.return_value = {"owner": {"id": 99}}
+        handler.container.services.get.return_value = users_svc
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.post("/collections/test-col/sync/complete", json={"sync_id": "my-repo"})
+
+        assert resp.status_code == 403
 
 
 class TestDeleteCollection:
@@ -754,3 +941,41 @@ class TestDeleteCollection:
 
         assert resp.status_code == 404
         sync_manifest.delete_collection.assert_not_called()
+
+    def test_non_moderator_forbidden(self):
+        user = _make_user()
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.get_collection_grants.return_value = {"owner": {"id": 99}}
+        handler.container.services.get.return_value = users_svc
+
+        client = TestClient(_app(user=user, handler=handler))
+        resp = client.request("DELETE", "/collections/test-col")
+
+        assert resp.status_code == 403
+
+    def test_grant_cleanup_failure_after_successful_delete_still_audits_delete_as_success(self):
+        # Regression test: removing collection grants/index data is a
+        # separate step from the actual Qdrant delete -- a failure there
+        # must not make the audit trail claim the delete itself failed.
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.delete_collection.return_value = True
+        handler.container.require_db_provider.return_value = db
+        users_svc = MagicMock()
+        users_svc.remove_collection_grants.side_effect = RuntimeError("boom")
+        sync_manifest = MagicMock()
+        services = {"sync_manifest": sync_manifest, "users": users_svc}
+        handler.container.services.__getitem__.side_effect = lambda k: services.get(k, MagicMock())
+        handler.container.services.get.side_effect = lambda k, default=None: services.get(k, default)
+
+        client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.request("DELETE", "/collections/test-col")
+
+        assert resp.status_code == 500
+        db.delete_collection.assert_called_once_with("test-col")
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "collection_delete"
+        assert kwargs["success"] is True

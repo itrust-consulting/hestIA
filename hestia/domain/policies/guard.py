@@ -33,7 +33,7 @@ class PolicyGuard(Protocol):
 class CollectionAccessPolicy:
 
     def check(self, req: ExecutionRequest) -> PolicyResult:
-        if req.exec_type not in {"rag_chat", "rag_generate"}:
+        if req.exec_type not in {"rag_chat", "rag_generate", "search"}:
             return PolicyResult(decision=PolicyDecision.ALLOW)
 
         collection = req.collection

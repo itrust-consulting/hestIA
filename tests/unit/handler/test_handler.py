@@ -1010,6 +1010,24 @@ class TestRequestHandlerResolve:
         h.builder.build.assert_called_once_with(req, RequestHandler.TEMPLATE_MAP["generate"])
         h.runner.run.assert_awaited_once_with("graph", stream=False)
 
+    def test_non_streaming_failure_is_audited_and_reraised(self):
+        # Regression test: a non-streaming model failure used to log
+        # ai_request but never ai_response, leaving the failure invisible in
+        # the audit trail.
+        h = self._handler()
+        h.runner.run = AsyncMock(side_effect=RuntimeError("model unreachable"))
+        req = self._req(exec_type="generate")
+
+        with patch("hestia.handler.audit") as mock_audit:
+            with pytest.raises(RuntimeError):
+                asyncio.run(h.resolve(req, stream=False))
+
+        mock_audit.ai_response.assert_called_once()
+        _, kwargs = mock_audit.ai_response.call_args
+        assert kwargs["success"] is False
+        assert kwargs["error"] == "model unreachable"
+        assert kwargs["response_len"] == 0
+
     def test_sets_query_filters_when_policy_decision_is_filter(self):
         h = self._handler()
         h.policy.check.return_value = PolicyResult(
@@ -1147,7 +1165,7 @@ class TestStreamWithBudgetNotice:
         h.runner.container = container
 
         async def fake_stream():
-            yield b'{"content": "hi"}\n'
+            yield {"content": "hi"}
 
         h.runner.run = AsyncMock(return_value=(fake_stream(), {}))
         return h
@@ -1272,7 +1290,7 @@ class TestStreamWithBudgetNotice:
         h = self._handler(users, generator)
 
         async def broken_stream():
-            yield b'{"content": "partial"}\n'
+            yield {"content": "partial"}
             raise RuntimeError("provider connection dropped mid-chunk")
 
         h.runner.run = AsyncMock(return_value=(broken_stream(), {}))
@@ -1282,3 +1300,21 @@ class TestStreamWithBudgetNotice:
 
         assert chunks[0] == b'{"content": "partial"}\n'
         assert b"Something went wrong" in chunks[1]
+
+    def test_save_chat_false_still_encodes_chunks_and_does_not_persist(self):
+        # Regression test: save_chat=False used to skip PersistChat entirely,
+        # leaving the raw provider generator's dict chunks unencoded and
+        # crashing StreamingResponse with AttributeError: 'dict' object has
+        # no attribute 'encode'. Encoding must always happen; only
+        # persistence is conditional on save_chat.
+        users = MagicMock()
+        generator = MagicMock()
+        h = self._handler(users, generator)
+        req = self._req(save_chat=False)
+        req.exec_type = "generate"  # skip the budget-check machinery entirely
+
+        chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        assert chunks == [b'{"content": "hi"}\n']
+        users.append_conversation_message.assert_not_called()
+        users.create_user_conversation.assert_not_called()

@@ -15,6 +15,7 @@ from hestia.application.ingestion import IngestionPipeline, IngestionRequest
 from hestia.domain.auth.models import User
 from hestia.domain.rag.classification import Classification
 from hestia.handler import RequestHandler
+from hestia.infrastructure.logging.audit import audit, audited
 
 router = APIRouter()
 
@@ -173,26 +174,31 @@ async def upload_document(
     result = None
     deduped = False
     duplicate_of: str | None = None
+    detail = {"filename": file.filename}
+
+    with audited(audit.data_action, actor_id=str(user.id), action="document_upload", target=collection, detail=detail):
+        if sync_id and content_hash:
+            sync_repo = h.container.services["sync_manifest"]
+            owner = sync_repo.claim_owner(collection, content_hash, file.filename)
+            if owner == file.filename:
+                result = await asyncio.to_thread(pipeline.ingest, req)
+            else:
+                # Identical content already owned by a different source_uri in this
+                # collection — skip parsing/embedding entirely and just make sure
+                # the owner's classification is at least as strict as requested.
+                deduped = True
+                duplicate_of = owner
+                classification_override = overrides.get("classification")
+                if isinstance(classification_override, str):
+                    requested = Classification.from_label(classification_override)
+                    if requested is not None:
+                        h.container.require_db_provider().bump_classification(collection, owner, requested.level)
+        else:
+            result = await asyncio.to_thread(pipeline.ingest, req)
+        detail["deduped"] = deduped
 
     if sync_id and content_hash:
-        sync_repo = h.container.services["sync_manifest"]
-        owner = sync_repo.claim_owner(collection, content_hash, file.filename)
-        if owner == file.filename:
-            result = await asyncio.to_thread(pipeline.ingest, req)
-        else:
-            # Identical content already owned by a different source_uri in this
-            # collection — skip parsing/embedding entirely and just make sure
-            # the owner's classification is at least as strict as requested.
-            deduped = True
-            duplicate_of = owner
-            classification_override = overrides.get("classification")
-            if isinstance(classification_override, str):
-                requested = Classification.from_label(classification_override)
-                if requested is not None:
-                    h.container.require_db_provider().bump_classification(collection, owner, requested.level)
         sync_repo.upsert_entry(collection, sync_id, file.filename, content_hash, int(time.time()))
-    else:
-        result = await asyncio.to_thread(pipeline.ingest, req)
 
     Path(tmp_path).unlink(missing_ok=True)
 
@@ -287,30 +293,32 @@ def delete_document(
     db = h.container.require_db_provider()
     sync_repo = h.container.services["sync_manifest"]
 
-    should_delete_content = True
-    content_hash = sync_repo.get_hash_for_source(name, source_uri)
-    if content_hash is not None:
-        owner = sync_repo.get_owner(name, content_hash)
-        if owner is not None and owner != source_uri:
-            # This source_uri never had real Qdrant content of its own — it was
-            # a deduped reference piggybacking on another source's upload.
-            should_delete_content = False
-        elif owner is not None and owner == source_uri:
-            remaining = [u for u in sync_repo.get_references(name, content_hash) if u != source_uri]
-            if remaining:
-                new_owner = remaining[0]
-                sync_repo.reassign_owner(name, content_hash, new_owner)
-                db.rename_source(name, source_uri, new_owner)
+    with audited(audit.data_action, actor_id=str(user.id), action="document_delete", target=name, detail={"source_uri": source_uri}):
+        should_delete_content = True
+        content_hash = sync_repo.get_hash_for_source(name, source_uri)
+        if content_hash is not None:
+            owner = sync_repo.get_owner(name, content_hash)
+            if owner is not None and owner != source_uri:
+                # This source_uri never had real Qdrant content of its own — it was
+                # a deduped reference piggybacking on another source's upload.
                 should_delete_content = False
-            else:
-                sync_repo.remove_owner(name, content_hash)
+            elif owner is not None and owner == source_uri:
+                remaining = [u for u in sync_repo.get_references(name, content_hash) if u != source_uri]
+                if remaining:
+                    new_owner = remaining[0]
+                    sync_repo.reassign_owner(name, content_hash, new_owner)
+                    db.rename_source(name, source_uri, new_owner)
+                    should_delete_content = False
+                else:
+                    sync_repo.remove_owner(name, content_hash)
+
+        if should_delete_content:
+            db.delete_document(name, source_uri)
 
     if should_delete_content:
-        db.delete_document(name, source_uri)
         sparse_enc = h.container.services.get("encSparse")
         if sparse_enc is not None:
             sparse_enc.remove_document(source_uri, name)
-
     sync_repo.delete_entry(name, source_uri)
     return {"ok": True, "deleted": source_uri}
 
@@ -334,12 +342,13 @@ def update_document_metadata(
         for v in body.metadata.values()
         if isinstance(v, str) and (c := Classification.from_label(v)) is not None
     ]
-    level = max(matched_levels) if matched_levels else None
+    level = max(matched_levels) if matched_levels else Classification.INTERNAL.level
 
-    ok = h.container.require_db_provider().update_document_metadata(name, body.source_uri, body.metadata, level)
-    if not ok:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail=f"Document '{body.source_uri}' not found in '{name}'.")
+    with audited(audit.data_action, actor_id=str(user.id), action="document_metadata_update", target=name, detail={"source_uri": body.source_uri}):
+        ok = h.container.require_db_provider().update_document_metadata(name, body.source_uri, body.metadata, level)
+        if not ok:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Document '{body.source_uri}' not found in '{name}'.")
     return {"ok": True}
 
 
@@ -416,10 +425,12 @@ def delete_collection(
     user: User = Depends(get_current_user),
 ):
     assert_collection_moderator(user, name, h)
-    deleted = h.container.require_db_provider().delete_collection(name)
-    if not deleted:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail=f"Collection '{name}' not found.")
+    with audited(audit.data_action, actor_id=str(user.id), action="collection_delete", target=name):
+        deleted = h.container.require_db_provider().delete_collection(name)
+        if not deleted:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Collection '{name}' not found.")
+
     users_svc = h.container.services.get("users")
     if users_svc:
         users_svc.remove_collection_grants(name)

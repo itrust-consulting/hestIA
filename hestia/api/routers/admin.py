@@ -15,7 +15,7 @@ from hestia.api.security import (
 from hestia.api.schemas.requests import CreateUserRequest, CreateOrgRequest, UpdateOrgRequest
 from hestia.domain.auth.models import User
 from hestia.handler import RequestHandler
-from hestia.infrastructure.logging.audit import audit
+from hestia.infrastructure.logging.audit import audit, audited
 from hestia.infrastructure.logging.query import count_failed_logins
 
 router = APIRouter()
@@ -93,23 +93,21 @@ def update_user(
 ):
     assert_admin(user)
     svc = h.container.services.get("users")
-    svc.update_user(
-        uuid.UUID(uid),
-        username=req.get("username", ""),
-        email=req.get("email", ""),
-        first_name=req.get("first_name", ""),
-        last_name=req.get("last_name", ""),
-        expires_at=req.get("expires_at"),
-        role_ids=req.get("role_ids"),
-        new_password=req.get("new_password") or None,
-    )
-    audit.admin_action(
-        actor_id=str(user.id), action="user_update", target=uid,
-        detail={
-            "username": req.get("username"), "email": req.get("email"), "role_ids": req.get("role_ids"),
-            "expires_at": req.get("expires_at"), "password_reset": bool(req.get("new_password")),
-        },
-    )
+    detail = {
+        "username": req.get("username"), "email": req.get("email"), "role_ids": req.get("role_ids"),
+        "expires_at": req.get("expires_at"), "password_reset": bool(req.get("new_password")),
+    }
+    with audited(audit.admin_action, actor_id=str(user.id), action="user_update", target=uid, detail=detail):
+        svc.update_user(
+            uuid.UUID(uid),
+            username=req.get("username", ""),
+            email=req.get("email", ""),
+            first_name=req.get("first_name", ""),
+            last_name=req.get("last_name", ""),
+            expires_at=req.get("expires_at"),
+            role_ids=req.get("role_ids"),
+            new_password=req.get("new_password") or None,
+        )
     return {"ok": True}
 
 
@@ -120,8 +118,8 @@ def delete_user(
     user: User = Depends(get_current_user),
 ):
     assert_admin(user)
-    h.container.services.get("users").delete_user(uuid.UUID(uid))
-    audit.admin_action(actor_id=str(user.id), action="user_delete", target=uid)
+    with audited(audit.admin_action, actor_id=str(user.id), action="user_delete", target=uid):
+        h.container.services.get("users").delete_user(uuid.UUID(uid))
     return {"ok": True}
 
 
@@ -134,20 +132,24 @@ def create_user(
     assert_admin(user)
     if not req.username or not req.password:
         raise HTTPException(400, "Username and password required")
-    user_id = h.container.services.get("users").create_user(
-        username=req.username,
-        email=req.email,
-        password=req.password,
-        first_name=req.first_name,
-        last_name=req.last_name,
-        roles=req.roles,
-        organization=req.organization,
-        expires_at=req.expires_at,
-    )
-    audit.admin_action(
-        actor_id=str(user.id), action="user_create", target=str(user_id),
-        detail={"username": req.username, "roles": req.roles, "organization": req.organization},
-    )
+    detail = {"username": req.username, "roles": req.roles, "organization": req.organization}
+    try:
+        user_id = h.container.services.get("users").create_user(
+            username=req.username,
+            email=req.email,
+            password=req.password,
+            first_name=req.first_name,
+            last_name=req.last_name,
+            roles=req.roles,
+            organization=req.organization,
+            expires_at=req.expires_at,
+        )
+    except Exception as e:
+        audit.admin_action(actor_id=str(user.id), action="user_create", target=req.username,
+                            detail=detail, success=False, reason=str(e))
+        raise
+    detail["user_id"] = str(user_id)
+    audit.admin_action(actor_id=str(user.id), action="user_create", target=str(user_id), detail=detail, success=True)
     return {"ok": True, "user_id": str(user_id)}
 
 
@@ -187,13 +189,10 @@ def create_organization(
     assert_admin(user)
     if not req.name or not req.abbreviation:
         raise HTTPException(400, "Organization name and abbreviation required")
-    created = h.container.services.get("users").create_org(name=req.name, abbreviation=req.abbreviation)
-    if not created:
-        raise HTTPException(409, "A tenant with that name or abbreviation already exists.")
-    audit.admin_action(
-        actor_id=str(user.id), action="org_create", target=req.name,
-        detail={"abbreviation": req.abbreviation},
-    )
+    with audited(audit.admin_action, actor_id=str(user.id), action="org_create", target=req.name, detail={"abbreviation": req.abbreviation}):
+        created = h.container.services.get("users").create_org(name=req.name, abbreviation=req.abbreviation)
+        if not created:
+            raise HTTPException(409, "A tenant with that name or abbreviation already exists.")
     return {"ok": True}
 
 
@@ -207,11 +206,9 @@ def update_organization(
     assert_admin(user)
     if not req.name or not req.abbreviation:
         raise HTTPException(400, "Organization name and abbreviation required")
-    h.container.services.get("users").update_org(org_id=org_id, name=req.name, abbreviation=req.abbreviation)
-    audit.admin_action(
-        actor_id=str(user.id), action="org_update", target=str(org_id),
-        detail={"name": req.name, "abbreviation": req.abbreviation},
-    )
+    detail = {"name": req.name, "abbreviation": req.abbreviation}
+    with audited(audit.admin_action, actor_id=str(user.id), action="org_update", target=str(org_id), detail=detail):
+        h.container.services.get("users").update_org(org_id=org_id, name=req.name, abbreviation=req.abbreviation)
     return {"ok": True}
 
 
@@ -222,8 +219,8 @@ def delete_organization(
     user: User = Depends(get_current_user),
 ):
     assert_admin(user)
-    h.container.services.get("users").delete_org(org_id=org_id)
-    audit.admin_action(actor_id=str(user.id), action="org_delete", target=str(org_id))
+    with audited(audit.admin_action, actor_id=str(user.id), action="org_delete", target=str(org_id)):
+        h.container.services.get("users").delete_org(org_id=org_id)
     return {"ok": True}
 
 
@@ -246,10 +243,10 @@ def add_organization_member(
     user: User = Depends(get_current_user),
 ):
     assert_tenant_moderator(user, org_id)
-    h.container.services.get("users").add_user_to_org(
-        user_id=uuid.UUID(user_id), org_id=org_id
-    )
-    audit.admin_action(actor_id=str(user.id), action="org_member_add", target=f"{org_id}:{user_id}")
+    with audited(audit.admin_action, actor_id=str(user.id), action="org_member_add", target=f"{org_id}:{user_id}"):
+        h.container.services.get("users").add_user_to_org(
+            user_id=uuid.UUID(user_id), org_id=org_id
+        )
     return {"ok": True}
 
 
@@ -261,10 +258,10 @@ def remove_organization_member(
     user: User = Depends(get_current_user),
 ):
     assert_tenant_moderator(user, org_id)
-    h.container.services.get("users").remove_user_from_org(
-        user_id=uuid.UUID(user_id), org_id=org_id
-    )
-    audit.admin_action(actor_id=str(user.id), action="org_member_remove", target=f"{org_id}:{user_id}")
+    with audited(audit.admin_action, actor_id=str(user.id), action="org_member_remove", target=f"{org_id}:{user_id}"):
+        h.container.services.get("users").remove_user_from_org(
+            user_id=uuid.UUID(user_id), org_id=org_id
+        )
     return {"ok": True}
 
 
@@ -317,17 +314,15 @@ def add_tenant_collection(
         assert_collection_moderator(user, collection_id, h)
     raw_cap = req.get("max_classification")
     max_classification = int(raw_cap) if raw_cap is not None else None
-    h.container.services.get("users").add_tenant_collection(
-        org_id, collection_id, role=role, max_classification=max_classification
-    )
+    detail = {"role": role, "max_classification": max_classification}
+    with audited(audit.admin_action, actor_id=str(user.id), action="tenant_collection_grant", target=f"{org_id}:{collection_id}", detail=detail):
+        h.container.services.get("users").add_tenant_collection(
+            org_id, collection_id, role=role, max_classification=max_classification
+        )
     if role == "owner":
         db = h.container.providers.get("db")
         if db is not None:
             db.update_collection_owner(collection_id, org_id)
-    audit.admin_action(
-        actor_id=str(user.id), action="tenant_collection_grant", target=f"{org_id}:{collection_id}",
-        detail={"role": role, "max_classification": max_classification},
-    )
     return {"ok": True}
 
 
@@ -339,8 +334,8 @@ def remove_tenant_collection(
     user: User = Depends(get_current_user),
 ):
     assert_collection_moderator(user, collection_id, h)
-    h.container.services.get("users").remove_tenant_collection(org_id, collection_id)
-    audit.admin_action(actor_id=str(user.id), action="tenant_collection_revoke", target=f"{org_id}:{collection_id}")
+    with audited(audit.admin_action, actor_id=str(user.id), action="tenant_collection_revoke", target=f"{org_id}:{collection_id}"):
+        h.container.services.get("users").remove_tenant_collection(org_id, collection_id)
     return {"ok": True}
 
 
@@ -355,11 +350,8 @@ def set_member_classification(
 ):
     assert_tenant_moderator(user, org_id)
     level = int(req.get("level", 0))
-    h.container.services.get("users").set_member_classification(uuid.UUID(user_id), org_id, level)
-    audit.admin_action(
-        actor_id=str(user.id), action="member_classification_set", target=f"{org_id}:{user_id}",
-        detail={"level": level},
-    )
+    with audited(audit.admin_action, actor_id=str(user.id), action="member_classification_set", target=f"{org_id}:{user_id}", detail={"level": level}):
+        h.container.services.get("users").set_member_classification(uuid.UUID(user_id), org_id, level)
     return {"ok": True}
 
 
@@ -373,11 +365,8 @@ def set_member_tenant_role(
 ):
     assert_tenant_role_assigner(user, org_id)
     role = req.get("role")  # 'moderator', 'co-moderator', or None
-    h.container.services.get("users").set_member_tenant_role(uuid.UUID(user_id), org_id, role)
-    audit.admin_action(
-        actor_id=str(user.id), action="member_tenant_role_set", target=f"{org_id}:{user_id}",
-        detail={"role": role},
-    )
+    with audited(audit.admin_action, actor_id=str(user.id), action="member_tenant_role_set", target=f"{org_id}:{user_id}", detail={"role": role}):
+        h.container.services.get("users").set_member_tenant_role(uuid.UUID(user_id), org_id, role)
     return {"ok": True}
 
 
@@ -403,18 +392,15 @@ def create_collection(
     if owner_org_id is not None and not user.permissions.is_admin:
         if owner_org_id not in user.permissions.moderated_tenants:
             raise HTTPException(403, "You can only assign collections to organizations you moderate.")
-    try:
+    with audited(audit.admin_action, actor_id=str(user.id), action="collection_create", target=name, detail={"owner_org_id": owner_org_id}):
         db.initialize(name, {"dense_dim": dense_dim, "create_indexes": True, "owner_org_id": owner_org_id})
-    except Exception as e:
-        raise HTTPException(500, f"Failed to create collection: {e}")
+
     if owner_org_id is not None:
         svc = h.container.services.get("users")
         if svc:
-            svc.add_tenant_collection(owner_org_id, name, role="owner")
-    audit.admin_action(
-        actor_id=str(user.id), action="collection_create", target=name,
-        detail={"owner_org_id": owner_org_id},
-    )
+            with audited(audit.admin_action, actor_id=str(user.id), action="tenant_collection_grant",
+                         target=f"{owner_org_id}:{name}", detail={"role": "owner"}):
+                svc.add_tenant_collection(owner_org_id, name, role="owner")
     return {"ok": True, "name": name}
 
 
@@ -429,11 +415,15 @@ def broadcast_notification(
     svc = h.container.services.get("notifications")
     if svc is None:
         raise HTTPException(503, "Notification service unavailable.")
-    notif_id = svc.broadcast(req.get("title", ""), body=req.get("body") or None, link=req.get("link") or None)
-    audit.admin_action(
-        actor_id=str(user.id), action="notification_broadcast", target=str(notif_id),
-        detail={"title": req.get("title")},
-    )
+    detail = {"title": req.get("title")}
+    try:
+        notif_id = svc.broadcast(req.get("title", ""), body=req.get("body") or None, link=req.get("link") or None)
+    except Exception as e:
+        audit.admin_action(actor_id=str(user.id), action="notification_broadcast", target=req.get("title", ""),
+                            detail=detail, success=False, reason=str(e))
+        raise
+    detail["notification_id"] = str(notif_id)
+    audit.admin_action(actor_id=str(user.id), action="notification_broadcast", target=str(notif_id), detail=detail, success=True)
     return {"ok": True, "notification_id": str(notif_id)}
 
 
@@ -482,14 +472,12 @@ def approve_tenant_join_request(
     svc = h.container.services.get("notifications")
     if svc is None:
         raise HTTPException(503, "Notification service unavailable.")
-    svc.approve_join_request(
-        uuid.UUID(req_id), user.id,
-        tenant_role=tenant_role, classification_level=int(req.get("classification_level") or 0),
-    )
-    audit.admin_action(
-        actor_id=str(user.id), action="join_request_approve", target=req_id,
-        detail={"org_id": org_id, "tenant_role": tenant_role, "classification_level": req.get("classification_level")},
-    )
+    detail = {"org_id": org_id, "tenant_role": tenant_role, "classification_level": req.get("classification_level")}
+    with audited(audit.admin_action, actor_id=str(user.id), action="join_request_approve", target=req_id, detail=detail):
+        svc.approve_join_request(
+            uuid.UUID(req_id), user.id,
+            tenant_role=tenant_role, classification_level=int(req.get("classification_level") or 0),
+        )
     return {"ok": True}
 
 
@@ -505,8 +493,8 @@ def reject_tenant_join_request(
     svc = h.container.services.get("notifications")
     if svc is None:
         raise HTTPException(503, "Notification service unavailable.")
-    svc.reject_join_request(uuid.UUID(req_id), user.id, reason=req.get("reason") or None)
-    audit.admin_action(actor_id=str(user.id), action="join_request_reject", target=req_id, detail={"org_id": org_id})
+    with audited(audit.admin_action, actor_id=str(user.id), action="join_request_reject", target=req_id, detail={"org_id": org_id}):
+        svc.reject_join_request(uuid.UUID(req_id), user.id, reason=req.get("reason") or None)
     return {"ok": True}
 
 
@@ -523,11 +511,15 @@ def invite_tenant_user(
     if svc is None:
         raise HTTPException(503, "Notification service unavailable.")
     identifier = req.get("identifier") or ""
-    inv_id = svc.invite_user(org_id, identifier, user.id, message=req.get("message") or None)
-    audit.admin_action(
-        actor_id=str(user.id), action="tenant_invitation_send", target=str(inv_id),
-        detail={"org_id": org_id, "identifier": identifier},
-    )
+    detail = {"org_id": org_id, "identifier": identifier}
+    try:
+        inv_id = svc.invite_user(org_id, identifier, user.id, message=req.get("message") or None)
+    except Exception as e:
+        audit.admin_action(actor_id=str(user.id), action="tenant_invitation_send", target=identifier,
+                            detail=detail, success=False, reason=str(e))
+        raise
+    detail["invitation_id"] = str(inv_id)
+    audit.admin_action(actor_id=str(user.id), action="tenant_invitation_send", target=str(inv_id), detail=detail, success=True)
     return {"ok": True, "invitation_id": str(inv_id)}
 
 
@@ -556,8 +548,8 @@ def cancel_tenant_invitation(
     svc = h.container.services.get("notifications")
     if svc is None:
         raise HTTPException(503, "Notification service unavailable.")
-    svc.cancel_invitation(uuid.UUID(inv_id), org_id)
-    audit.admin_action(actor_id=str(user.id), action="tenant_invitation_cancel", target=inv_id, detail={"org_id": org_id})
+    with audited(audit.admin_action, actor_id=str(user.id), action="tenant_invitation_cancel", target=inv_id, detail={"org_id": org_id}):
+        svc.cancel_invitation(uuid.UUID(inv_id), org_id)
     return {"ok": True}
 
 
@@ -576,11 +568,15 @@ def file_tenant_share_request(
     svc = h.container.services.get("notifications")
     if svc is None:
         raise HTTPException(503, "Notification service unavailable.")
-    req_id = svc.file_share_request(org_id, int(target_org_id), user.id, message=req.get("message") or None)
-    audit.admin_action(
-        actor_id=str(user.id), action="share_request_file", target=str(req_id),
-        detail={"requesting_org_id": org_id, "target_org_id": target_org_id},
-    )
+    detail = {"requesting_org_id": org_id, "target_org_id": target_org_id}
+    try:
+        req_id = svc.file_share_request(org_id, int(target_org_id), user.id, message=req.get("message") or None)
+    except Exception as e:
+        audit.admin_action(actor_id=str(user.id), action="share_request_file", target=f"{org_id}->{target_org_id}",
+                            detail=detail, success=False, reason=str(e))
+        raise
+    detail["request_id"] = str(req_id)
+    audit.admin_action(actor_id=str(user.id), action="share_request_file", target=str(req_id), detail=detail, success=True)
     return {"ok": True, "request_id": str(req_id)}
 
 
@@ -614,11 +610,9 @@ def approve_tenant_share_request(
     share_req = svc.repo.get_share_request(uuid.UUID(req_id))
     if not share_req or share_req["target_org_id"] != org_id:
         raise HTTPException(404, "Share request not found for this tenant.")
-    svc.approve_share_request(uuid.UUID(req_id), user.id, req.get("collections") or [])
-    audit.admin_action(
-        actor_id=str(user.id), action="share_request_approve", target=req_id,
-        detail={"org_id": org_id, "collections": req.get("collections")},
-    )
+    detail = {"org_id": org_id, "collections": req.get("collections")}
+    with audited(audit.admin_action, actor_id=str(user.id), action="share_request_approve", target=req_id, detail=detail):
+        svc.approve_share_request(uuid.UUID(req_id), user.id, req.get("collections") or [])
     return {"ok": True}
 
 
@@ -637,8 +631,8 @@ def reject_tenant_share_request(
     share_req = svc.repo.get_share_request(uuid.UUID(req_id))
     if not share_req or share_req["target_org_id"] != org_id:
         raise HTTPException(404, "Share request not found for this tenant.")
-    svc.reject_share_request(uuid.UUID(req_id), user.id, reason=req.get("reason") or None)
-    audit.admin_action(actor_id=str(user.id), action="share_request_reject", target=req_id, detail={"org_id": org_id})
+    with audited(audit.admin_action, actor_id=str(user.id), action="share_request_reject", target=req_id, detail={"org_id": org_id}):
+        svc.reject_share_request(uuid.UUID(req_id), user.id, reason=req.get("reason") or None)
     return {"ok": True}
 
 

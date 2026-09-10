@@ -19,6 +19,8 @@ class AuthSettings(BaseModel):
     password_min_length: int = 15
     max_failed_attempts: int = 5
     lockout_duration_minutes: int = 5
+    ip_rate_limit_max_attempts: int = 30      # shared anti-spraying budget across all logins,
+    ip_rate_limit_window_minutes: int = 1     # see login_ip_key/login_ip_rate_limit (api/limiter.py)
     token_secret_key: str = ""          # required when auth is enabled
     token_encoding_alg: str = "HS256"
     token_lifetime_minutes: int = 60  # was 360 -- see M1 in the full-stack audit: with logout now
@@ -125,6 +127,21 @@ class Settings(BaseModel):
         "secret", "secret (se)",
     ]
 
+    def insecure_llm_urls(self) -> list[tuple[str, str]]:
+        """(setting_name, url) pairs among llm_url/emb_url/rrk_url that are
+        explicitly http:// (not just schemeless/misconfigured) and not
+        localhost/127.0.0.1 -- HttpClient sends these an
+        Authorization: Bearer <api_key> header, so a non-https, non-local
+        base_url means that key travels in cleartext."""
+        from urllib.parse import urlparse
+        insecure = []
+        for name in ("llm_url", "emb_url", "rrk_url"):
+            url = getattr(self, name)
+            parsed = urlparse(url)
+            if parsed.scheme == "http" and parsed.hostname not in ("localhost", "127.0.0.1"):
+                insecure.append((name, url))
+        return insecure
+
     # ---------------------------------------------------------------------------
     # Factory — the single place all env vars are read
     # ---------------------------------------------------------------------------
@@ -197,6 +214,8 @@ def _load_auth_settings() -> AuthSettings:
         password_min_length=int(os.getenv("AUTH_PW_LENGTH", "15")),
         max_failed_attempts=int(os.getenv("AUTH_MAX_ATTEMPTS", "5")),
         lockout_duration_minutes=int(os.getenv("AUTH_LOCKOUT_DURATION", "5")),
+        ip_rate_limit_max_attempts=int(os.getenv("AUTH_IP_RATE_LIMIT_ATTEMPTS", "30")),
+        ip_rate_limit_window_minutes=int(os.getenv("AUTH_IP_RATE_LIMIT_WINDOW_MINUTES", "1")),
         token_secret_key=os.getenv("AUTH_SECRET_KEY", ""),
         token_encoding_alg=os.getenv("AUTH_ENCODING_ALGORITHM", "HS256"),
         token_lifetime_minutes=int(os.getenv("AUTH_TOKEN_LIFETIME", "60")),

@@ -61,7 +61,7 @@ QueryMode = Literal["semantic", "keyword", "hybrid"]
 class SearchRequest(Request):
     mode: QueryMode = Field("dense")
     query: List[float | int] | Dict[str, Any]
-    collection: str
+    collection: str = Field(min_length=1)
     options: Dict[str, Any] = None
 
 

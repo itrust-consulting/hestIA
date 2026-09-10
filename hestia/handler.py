@@ -334,20 +334,21 @@ class PersistChat:
                                 tag_buf = tag_buf[start + len("<think>"):]
                                 in_think = True
 
-            used = _extract_used_citekeys(final_text)
-            citations = [c for c in cite_list if _normalize_citekey(c["key"]) in used]
-            c_id, user_msg_id, assistant_msg_id = await asyncio.to_thread(
-                self._persist, req, final_text, slot, citations=citations, thinking=thinking_text or None
-            )
-            usage_fields = await self._usage_fields(req, c_id)
-            yield (json.dumps({
-                "conversation_id": str(c_id),
-                "user_message_id": str(user_msg_id) if user_msg_id else None,
-                "assistant_message_id": str(assistant_msg_id),
-                "citations": citations,
-                "thinking": thinking_text or None,
-                **usage_fields,
-            }) + "\n").encode("utf-8")
+            if req.save_chat:
+                used = _extract_used_citekeys(final_text)
+                citations = [c for c in cite_list if _normalize_citekey(c["key"]) in used]
+                c_id, user_msg_id, assistant_msg_id = await asyncio.to_thread(
+                    self._persist, req, final_text, slot, citations=citations, thinking=thinking_text or None
+                )
+                usage_fields = await self._usage_fields(req, c_id)
+                yield (json.dumps({
+                    "conversation_id": str(c_id),
+                    "user_message_id": str(user_msg_id) if user_msg_id else None,
+                    "assistant_message_id": str(assistant_msg_id),
+                    "citations": citations,
+                    "thinking": thinking_text or None,
+                    **usage_fields,
+                }) + "\n").encode("utf-8")
 
         return generator()
 
@@ -542,7 +543,19 @@ class RequestHandler:
         runner = PersistChat(self.runner, req) if req.save_chat else self.runner
 
         t0 = time.perf_counter()
-        response, _ = await runner.run(graph, stream=False)
+        try:
+            response, _ = await runner.run(graph, stream=False)
+        except Exception as e:
+            latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+            audit.ai_response(
+                user_id=user_id,
+                exec_type=req.exec_type,
+                response_len=0,
+                latency_ms=latency_ms,
+                success=False,
+                error=str(e),
+            )
+            raise
         latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
         audit.ai_response(
@@ -585,7 +598,14 @@ class RequestHandler:
                 # req.history stays whatever the client sent — never break the stream over this
 
         graph = self.builder.build(req, template)
-        runner = PersistChat(self.runner, req) if req.save_chat else self.runner
+        # Unlike the non-streaming branch above, always wrap in PersistChat here
+        # -- _wrap_stream is what JSON-encodes each provider chunk before it
+        # reaches StreamingResponse, not just what persists the turn. Skipping
+        # it for save_chat=False (as the non-streaming path safely can, since
+        # raw Runner.run(stream=False) already returns a plain string) leaves
+        # the raw provider generator's dict chunks unencoded, crashing the
+        # stream. _wrap_stream itself skips persistence when save_chat is False.
+        runner = PersistChat(self.runner, req)
         try:
             # gen, _ = await runner.run(...) runs the RAG retrieve/augment
             # nodes eagerly (before any chunk exists), so a provider failure
