@@ -138,3 +138,24 @@ class TestChatRouter:
         # resolve was called with stream=True
         _, kwargs = handler.resolve.call_args
         assert kwargs.get("stream") is True or handler.resolve.call_args[0][1] is True
+
+
+class TestActiveModel:
+
+    def test_returns_current_default_model_of_generate_service(self):
+        handler = MagicMock()
+        handler.container.services = {"generate": MagicMock(default_model="llama3.1:8b")}
+
+        client = TestClient(_app(handler=handler))
+        resp = client.get("/chat/model")
+        assert resp.status_code == 200
+        assert resp.json() == {"model": "llama3.1:8b"}
+
+    def test_returns_null_when_generate_service_not_registered(self):
+        handler = MagicMock()
+        handler.container.services = {}
+
+        client = TestClient(_app(handler=handler))
+        resp = client.get("/chat/model")
+        assert resp.status_code == 200
+        assert resp.json() == {"model": None}

@@ -68,3 +68,13 @@ async def chat(
         gen = abort_on_disconnect(request, await h.resolve(exec_req, stream=True))
         return StreamingResponse(gen, media_type="application/json")
     return Response(json.dumps({"content": await h.resolve(exec_req)}), media_type="application/json")
+
+
+# @SRS-013
+@router.get("/chat/model")
+async def active_model(
+    h: RequestHandler = Depends(get_handler),
+    user: User = Depends(get_current_user),
+):
+    generator = h.container.services.get("generate")
+    return {"model": generator.default_model if generator else None}

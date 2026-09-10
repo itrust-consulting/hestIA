@@ -22,6 +22,7 @@
   import type { ChatMessage, Citation } from '$lib/types';
   import { isIsmsActive, activeCorpusId, activeCorpusName, toggleIsmsActive, requestOpenIsmsModal, selectCorpus } from '$lib/stores/isms';
   import { corpora, loadCorpora } from '$lib/stores/corpora';
+  import { loadActiveModel } from '$lib/stores/generationModel';
   import ChevronIcon from '$lib/components/icons/chevronIcon.svelte';
 
   import { addToast } from '$lib/stores/toast';
@@ -73,6 +74,9 @@
   });
   onMount(() => {
     loadCorpora(get(page).data.user);
+  });
+  onMount(() => {
+    loadActiveModel();
   });
   
 
