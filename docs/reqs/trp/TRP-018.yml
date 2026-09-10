@@ -5,7 +5,7 @@ failed-steps: '1'
 header: ''
 level: 1.18
 links:
-- SRS-005
+- TST-018
 normative: true
 not-executed-steps: '0'
 passed-steps: '7'

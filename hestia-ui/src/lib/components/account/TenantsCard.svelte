@@ -6,6 +6,7 @@
   import SearchIcon from '$lib/components/icons/searchIcon.svelte';
   import InboxRequestRow from '$lib/components/InboxRequestRow.svelte';
   import CheckLgIcon from '$lib/components/icons/checkLgIcon.svelte';
+  import { CLASSIFICATION_LABELS } from '$lib/classification';
 
   let {
     myOrgs,
@@ -53,7 +54,6 @@
   const pendingInvitations = $derived(invitations.filter((i) => i.status === 'pending'));
   const invitedOrgIds = $derived(new Set(pendingInvitations.map((i) => i.org_id)));
 
-  const CLASSIFICATION_LABELS = ['Public', 'Internal', 'Confidential', 'Restricted', 'Secret'];
   const classificationLabel = (level: number | null) =>
     level !== null && CLASSIFICATION_LABELS[level] ? CLASSIFICATION_LABELS[level] : 'Unknown';
 

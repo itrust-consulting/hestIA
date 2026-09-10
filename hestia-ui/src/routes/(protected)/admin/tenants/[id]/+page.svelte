@@ -15,6 +15,7 @@
   import SendIcon from '$lib/components/icons/sendIcon.svelte';
   import InboxRequestRow from '$lib/components/InboxRequestRow.svelte';
   import { tooltip } from '$lib/actions/tooltip';
+  import { CLASSIFICATION_OPTIONS, CLASSIFICATION_LABELS } from '$lib/classification';
 
   const { data }: { data: PageData } = $props();
 
@@ -624,11 +625,9 @@
                 <select class="inline-select" value={m.classification_level}
                   onchange={(e) => setClassification(m.id, Number((e.currentTarget as HTMLSelectElement).value))}
                   disabled={savingMember[m.id]}>
-                  <option value={0}>Public</option>
-                  <option value={1}>Internal</option>
-                  <option value={2}>Confidential</option>
-                  <option value={3}>Restricted</option>
-                  <option value={4}>Secret</option>
+                  {#each CLASSIFICATION_OPTIONS as lvl}
+                    <option value={lvl}>{CLASSIFICATION_LABELS[lvl]}</option>
+                  {/each}
                 </select>
               </td>
               <td onclick={(e) => e.stopPropagation()}>
@@ -861,11 +860,9 @@
     <label class="field">
       <span>Classification level</span>
       <select bind:value={approveClassification}>
-        <option value={0}>Public</option>
-        <option value={1}>Internal</option>
-        <option value={2}>Confidential</option>
-        <option value={3}>Restricted</option>
-        <option value={4}>Secret</option>
+        {#each CLASSIFICATION_OPTIONS as lvl}
+          <option value={lvl}>{CLASSIFICATION_LABELS[lvl]}</option>
+        {/each}
       </select>
     </label>
     <label class="field">
@@ -951,11 +948,9 @@
               <td class="name">{col.id}</td>
               <td>
                 <select class="inline-select" bind:value={shareSelections[col.id].max_classification} disabled={!shareSelections[col.id].checked}>
-                  <option value={0}>Public</option>
-                  <option value={1}>Internal</option>
-                  <option value={2}>Confidential</option>
-                  <option value={3}>Restricted</option>
-                  <option value={4}>Secret</option>
+                  {#each CLASSIFICATION_OPTIONS as lvl}
+                    <option value={lvl}>{CLASSIFICATION_LABELS[lvl]}</option>
+                  {/each}
                 </select>
               </td>
             </tr>
