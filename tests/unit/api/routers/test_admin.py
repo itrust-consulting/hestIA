@@ -22,8 +22,8 @@ def _app(user=None, handler=None):
     return app
 
 
-def _client(user=None, handler=None):
-    return TestClient(_app(user=user, handler=handler))
+def _client(user=None, handler=None, raise_server_exceptions=True):
+    return TestClient(_app(user=user, handler=handler), raise_server_exceptions=raise_server_exceptions)
 
 
 def _handler(services: dict | None = None, providers: dict | None = None):
@@ -545,6 +545,24 @@ class TestAddTenantCollection:
         users_svc.add_tenant_collection.assert_called_once_with(1, "col1", role="owner", max_classification=2)
         db.update_collection_owner.assert_called_once_with("col1", 1)
 
+    def test_owner_update_failure_after_successful_grant_still_audits_grant_as_success(self):
+        # Regression test: updating the Qdrant collection's owner metadata is
+        # a separate step from recording the DB grant -- a failure there
+        # must not make the audit trail claim the grant itself failed.
+        users_svc = MagicMock()
+        db = MagicMock()
+        db.update_collection_owner.side_effect = RuntimeError("boom")
+        h = _handler({"users": users_svc}, providers={"db": db})
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = _client(user=_make_user(is_admin=True), handler=h, raise_server_exceptions=False).put(
+                "/organizations/1/collections/col1", json={"role": "owner"}
+            )
+        assert resp.status_code == 500
+        users_svc.add_tenant_collection.assert_called_once_with(1, "col1", role="owner", max_classification=None)
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "tenant_collection_grant"
+        assert kwargs["success"] is True
+
     def test_owner_role_as_admin_when_no_db_provider_skips_owner_update(self):
         users_svc = MagicMock()
         h = _handler({"users": users_svc}, providers={})
@@ -756,8 +774,46 @@ class TestCreateCollection:
         db = MagicMock()
         db.initialize.side_effect = RuntimeError("boom")
         h = _handler({"ingestion": self._pipeline()}, providers={"db": db})
-        resp = _client(user=_make_user(is_admin=True), handler=h).post("/collections/create", json={"name": "x"})
+        resp = _client(user=_make_user(is_admin=True), handler=h, raise_server_exceptions=False).post(
+            "/collections/create", json={"name": "x"}
+        )
         assert resp.status_code == 500
+
+    def test_db_initialize_failure_preserves_real_error_in_audit_reason(self):
+        # Regression test: create_collection used to mask db.initialize's
+        # real exception behind a generic HTTPException before audited()
+        # could see it, so the audit trail never recorded what actually
+        # went wrong.
+        db = MagicMock()
+        db.initialize.side_effect = RuntimeError("qdrant unreachable")
+        h = _handler({"ingestion": self._pipeline()}, providers={"db": db})
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            _client(user=_make_user(is_admin=True), handler=h, raise_server_exceptions=False).post(
+                "/collections/create", json={"name": "x"}
+            )
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "collection_create"
+        assert kwargs["success"] is False
+        assert kwargs["reason"] == "qdrant unreachable"
+
+    def test_grant_failure_after_successful_create_still_audits_create_as_success(self):
+        # Regression test: the ownership grant is a separate step from
+        # creating the Qdrant collection -- a failure there must not make
+        # the audit trail claim collection_create itself failed.
+        db = MagicMock()
+        pipeline = self._pipeline()
+        users_svc = MagicMock()
+        users_svc.add_tenant_collection.side_effect = RuntimeError("boom")
+        h = _handler({"ingestion": pipeline, "users": users_svc}, providers={"db": db})
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = _client(user=_make_user(is_admin=True), handler=h, raise_server_exceptions=False).post(
+                "/collections/create", json={"name": "newcol", "owner_org_id": 5}
+            )
+        assert resp.status_code == 500
+        db.initialize.assert_called_once()
+        calls = {c.kwargs["action"]: c.kwargs for c in mock_audit.admin_action.call_args_list}
+        assert calls["collection_create"]["success"] is True
+        assert calls["tenant_collection_grant"]["success"] is False
 
     def test_plain_user_forbidden(self):
         h = _handler({})

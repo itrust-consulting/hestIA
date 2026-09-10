@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from unittest.mock import MagicMock, patch
 
@@ -123,6 +124,17 @@ class TestUserServiceAuthenticate:
         result = user_service.authenticate("alice", "pw")
         assert result.success is False
         assert "expired" in result.message.lower()
+
+    def test_future_expires_at_account_succeeds(self, user_service, mock_repo):
+        # Regression test: expires_at is epoch SECONDS, but the expiry check
+        # used to compare it against now_epoch() (milliseconds) unconverted,
+        # so any account with an expires_at -- however far in the future --
+        # was treated as already expired.
+        row = self._make_user_row(user_service, password="pw")
+        row["expires_at"] = int(time.time()) + 3600
+        mock_repo.get_user_for_login.return_value = row
+        result = user_service.authenticate("alice", "pw")
+        assert result.success is True
 
     def test_ldap_user_not_verified_locally(self, user_service, mock_repo):
         salt = user_service._generate_salt()

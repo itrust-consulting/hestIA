@@ -193,10 +193,12 @@ async def upload_document(
                     requested = Classification.from_label(classification_override)
                     if requested is not None:
                         h.container.require_db_provider().bump_classification(collection, owner, requested.level)
-            sync_repo.upsert_entry(collection, sync_id, file.filename, content_hash, int(time.time()))
         else:
             result = await asyncio.to_thread(pipeline.ingest, req)
         detail["deduped"] = deduped
+
+    if sync_id and content_hash:
+        sync_repo.upsert_entry(collection, sync_id, file.filename, content_hash, int(time.time()))
 
     Path(tmp_path).unlink(missing_ok=True)
 
@@ -312,11 +314,12 @@ def delete_document(
 
         if should_delete_content:
             db.delete_document(name, source_uri)
-            sparse_enc = h.container.services.get("encSparse")
-            if sparse_enc is not None:
-                sparse_enc.remove_document(source_uri, name)
 
-        sync_repo.delete_entry(name, source_uri)
+    if should_delete_content:
+        sparse_enc = h.container.services.get("encSparse")
+        if sparse_enc is not None:
+            sparse_enc.remove_document(source_uri, name)
+    sync_repo.delete_entry(name, source_uri)
     return {"ok": True, "deleted": source_uri}
 
 
@@ -427,11 +430,12 @@ def delete_collection(
         if not deleted:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail=f"Collection '{name}' not found.")
-        users_svc = h.container.services.get("users")
-        if users_svc:
-            users_svc.remove_collection_grants(name)
-        sparse_enc = h.container.services.get("encSparse")
-        if sparse_enc is not None:
-            sparse_enc.delete_corpus(name)
-        h.container.services["sync_manifest"].delete_collection(name)
+
+    users_svc = h.container.services.get("users")
+    if users_svc:
+        users_svc.remove_collection_grants(name)
+    sparse_enc = h.container.services.get("encSparse")
+    if sparse_enc is not None:
+        sparse_enc.delete_corpus(name)
+    h.container.services["sync_manifest"].delete_collection(name)
     return {"ok": True, "deleted": name}

@@ -107,7 +107,7 @@ def update_connection(
             compaction_context_window=req.compaction_context_window,
             compaction_summary_length=req.compaction_summary_length,
         )
-        h.container.apply_connection_update(connection_id)
+    h.container.apply_connection_update(connection_id)
     return {"ok": True}
 
 
@@ -120,10 +120,11 @@ def delete_connection(
     assert_admin(user)
     repo = h.container.services["llm_settings"]
     row = repo.get_connection(connection_id)
+    purpose = row["purpose"] if row else None
     with audited(audit.connection_action, actor_id=str(user.id), action="connection_delete", target=str(connection_id),
-                 detail={"purpose": row["purpose"] if row else None}):
+                 detail={"purpose": purpose}):
         repo.delete_connection(connection_id=connection_id)
-        h.container.apply_connection_delete(connection_id, row["purpose"] if row else None)
+    h.container.apply_connection_delete(connection_id, purpose)
     return {"ok": True}
 
 
@@ -144,7 +145,7 @@ def activate_connection(
         raise HTTPException(404, "Connection not found")
     with audited(audit.connection_action, actor_id=str(user.id), action="connection_activate", target=str(connection_id)):
         repo.activate_connection(connection_id=connection_id)
-        h.container.apply_connection_update(connection_id)
+    h.container.apply_connection_update(connection_id)
     return {"ok": True}
 
 

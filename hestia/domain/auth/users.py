@@ -75,7 +75,11 @@ class UserService:
         if not self._verify_password(password, user["salt"], user["password_hash"]):
             return AuthResult.nack()
 
-        if user["expires_at"] and user["expires_at"] < now_epoch():
+        # expires_at is epoch SECONDS (CreateUserRequest / the DB column,
+        # admin-supplied), but now_epoch() returns milliseconds -- without
+        # the conversion, any account with an expires_at reads as already
+        # expired regardless of how far in the future it's set.
+        if user["expires_at"] and user["expires_at"] < now_epoch() // 1000:
             return AuthResult.nack(message="Account expired")
 
         return AuthResult(

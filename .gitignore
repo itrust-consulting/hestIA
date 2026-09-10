@@ -6,6 +6,7 @@ test_docs/
 __pycache__/
 .claude/
 .coverage
+.venv
 coverage.xml
 coverage.json
 htmlcov/

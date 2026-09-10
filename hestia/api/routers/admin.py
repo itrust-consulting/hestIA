@@ -1,4 +1,3 @@
-import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -20,8 +19,6 @@ from hestia.infrastructure.logging.audit import audit, audited
 from hestia.infrastructure.logging.query import count_failed_logins
 
 router = APIRouter()
-
-_log = logging.getLogger("hestia.system")
 
 # A few multiples of the frontend's 45s heartbeat interval -- forgiving of
 # browsers throttling setInterval in backgrounded tabs.
@@ -322,10 +319,10 @@ def add_tenant_collection(
         h.container.services.get("users").add_tenant_collection(
             org_id, collection_id, role=role, max_classification=max_classification
         )
-        if role == "owner":
-            db = h.container.providers.get("db")
-            if db is not None:
-                db.update_collection_owner(collection_id, org_id)
+    if role == "owner":
+        db = h.container.providers.get("db")
+        if db is not None:
+            db.update_collection_owner(collection_id, org_id)
     return {"ok": True}
 
 
@@ -396,14 +393,13 @@ def create_collection(
         if owner_org_id not in user.permissions.moderated_tenants:
             raise HTTPException(403, "You can only assign collections to organizations you moderate.")
     with audited(audit.admin_action, actor_id=str(user.id), action="collection_create", target=name, detail={"owner_org_id": owner_org_id}):
-        try:
-            db.initialize(name, {"dense_dim": dense_dim, "create_indexes": True, "owner_org_id": owner_org_id})
-        except Exception:
-            _log.exception("collection_create_failed", extra={"collection_name": name})
-            raise HTTPException(500, "Failed to create collection.")
-        if owner_org_id is not None:
-            svc = h.container.services.get("users")
-            if svc:
+        db.initialize(name, {"dense_dim": dense_dim, "create_indexes": True, "owner_org_id": owner_org_id})
+
+    if owner_org_id is not None:
+        svc = h.container.services.get("users")
+        if svc:
+            with audited(audit.admin_action, actor_id=str(user.id), action="tenant_collection_grant",
+                         target=f"{owner_org_id}:{name}", detail={"role": "owner"}):
                 svc.add_tenant_collection(owner_org_id, name, role="owner")
     return {"ok": True, "name": name}
 

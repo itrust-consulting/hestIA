@@ -29,7 +29,7 @@ class TestGenerateRouter:
         resp = client.post("/generate", json={"prompt": "hello"})
 
         assert resp.status_code == 200
-        assert resp.text == "generated text"
+        assert resp.json() == {"content": "generated text"}
         call_req = handler.resolve.call_args[0][0]
         assert call_req.prompt == "hello"
 

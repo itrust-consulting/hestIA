@@ -255,6 +255,23 @@ class TestUpdateConnection:
         assert kwargs["target"] == "1"
         assert kwargs["success"] is False
 
+    def test_apply_failure_still_audits_update_as_success(self):
+        # Regression test: applying the new settings to the live client is a
+        # separate step from persisting them to the DB -- a failure there
+        # must not make the audit trail claim the DB write itself failed.
+        handler = MagicMock()
+        repo = MagicMock(get_connection=MagicMock(return_value={"id": 1}))
+        handler.container.services = {"llm_settings": repo}
+        handler.container.apply_connection_update.side_effect = RuntimeError("boom")
+        client = TestClient(_app(handler=handler), raise_server_exceptions=False)
+        with patch("hestia.api.routers.llm_settings.audit") as mock_audit:
+            resp = client.put("/llm/connections/1", json=self._payload())
+        assert resp.status_code == 500
+        repo.update_connection.assert_called_once()
+        _, kwargs = mock_audit.connection_action.call_args
+        assert kwargs["action"] == "connection_update"
+        assert kwargs["success"] is True
+
     def test_non_admin_gets_403(self):
         client = TestClient(_app(user=_make_user(is_admin=False)))
         resp = client.put("/llm/connections/1", json=self._payload())
@@ -302,6 +319,23 @@ class TestDeleteConnection:
         assert kwargs["action"] == "connection_delete"
         assert kwargs["success"] is False
 
+    def test_apply_delete_failure_still_audits_delete_as_success(self):
+        # Regression test: unwiring the live service is a separate step from
+        # deleting the DB row -- a failure there must not make the audit
+        # trail claim the delete itself failed.
+        handler = MagicMock()
+        repo = MagicMock(get_connection=MagicMock(return_value={"purpose": "generation"}))
+        handler.container.services = {"llm_settings": repo}
+        handler.container.apply_connection_delete.side_effect = RuntimeError("boom")
+        client = TestClient(_app(handler=handler), raise_server_exceptions=False)
+        with patch("hestia.api.routers.llm_settings.audit") as mock_audit:
+            resp = client.delete("/llm/connections/1")
+        assert resp.status_code == 500
+        repo.delete_connection.assert_called_once_with(connection_id=1)
+        _, kwargs = mock_audit.connection_action.call_args
+        assert kwargs["action"] == "connection_delete"
+        assert kwargs["success"] is True
+
     def test_non_admin_gets_403(self):
         client = TestClient(_app(user=_make_user(is_admin=False)))
         resp = client.delete("/llm/connections/1")
@@ -345,6 +379,23 @@ class TestActivateConnection:
         _, kwargs = mock_audit.connection_action.call_args
         assert kwargs["action"] == "connection_activate"
         assert kwargs["success"] is False
+
+    def test_apply_failure_still_audits_activate_as_success(self):
+        # Regression test: rewiring the live provider is a separate step from
+        # activating the row -- a failure there must not make the audit
+        # trail claim the activation itself failed.
+        handler = MagicMock()
+        repo = MagicMock(get_connection=MagicMock(return_value={"id": 1}))
+        handler.container.services = {"llm_settings": repo}
+        handler.container.apply_connection_update.side_effect = RuntimeError("boom")
+        client = TestClient(_app(handler=handler), raise_server_exceptions=False)
+        with patch("hestia.api.routers.llm_settings.audit") as mock_audit:
+            resp = client.post("/llm/connections/1/activate")
+        assert resp.status_code == 500
+        repo.activate_connection.assert_called_once_with(connection_id=1)
+        _, kwargs = mock_audit.connection_action.call_args
+        assert kwargs["action"] == "connection_activate"
+        assert kwargs["success"] is True
 
     def test_non_admin_gets_403(self):
         client = TestClient(_app(user=_make_user(is_admin=False)))

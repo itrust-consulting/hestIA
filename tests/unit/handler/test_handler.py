@@ -1165,7 +1165,7 @@ class TestStreamWithBudgetNotice:
         h.runner.container = container
 
         async def fake_stream():
-            yield b'{"content": "hi"}\n'
+            yield {"content": "hi"}
 
         h.runner.run = AsyncMock(return_value=(fake_stream(), {}))
         return h
@@ -1290,7 +1290,7 @@ class TestStreamWithBudgetNotice:
         h = self._handler(users, generator)
 
         async def broken_stream():
-            yield b'{"content": "partial"}\n'
+            yield {"content": "partial"}
             raise RuntimeError("provider connection dropped mid-chunk")
 
         h.runner.run = AsyncMock(return_value=(broken_stream(), {}))
@@ -1300,3 +1300,21 @@ class TestStreamWithBudgetNotice:
 
         assert chunks[0] == b'{"content": "partial"}\n'
         assert b"Something went wrong" in chunks[1]
+
+    def test_save_chat_false_still_encodes_chunks_and_does_not_persist(self):
+        # Regression test: save_chat=False used to skip PersistChat entirely,
+        # leaving the raw provider generator's dict chunks unencoded and
+        # crashing StreamingResponse with AttributeError: 'dict' object has
+        # no attribute 'encode'. Encoding must always happen; only
+        # persistence is conditional on save_chat.
+        users = MagicMock()
+        generator = MagicMock()
+        h = self._handler(users, generator)
+        req = self._req(save_chat=False)
+        req.exec_type = "generate"  # skip the budget-check machinery entirely
+
+        chunks = asyncio.run(self._collect(h._stream_with_budget_notice(req, "template")))
+
+        assert chunks == [b'{"content": "hi"}\n']
+        users.append_conversation_message.assert_not_called()
+        users.create_user_conversation.assert_not_called()

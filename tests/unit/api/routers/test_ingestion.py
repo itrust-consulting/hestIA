@@ -372,6 +372,42 @@ class TestUploadDocument:
         assert args[2] == "sub/doc.md"
         assert args[3] == "abc123"
 
+    def test_upsert_entry_failure_after_successful_ingest_still_audits_upload_as_success(self):
+        # Regression test: recording the sync-manifest entry is a separate
+        # step from ingesting the document into Qdrant -- a failure there
+        # must not make the audit trail claim the upload itself failed.
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.settings.classification_labels = []
+
+        mock_pipeline = MagicMock()
+        from hestia.application.ingestion import IngestionResult
+        mock_pipeline.ingest.return_value = IngestionResult(
+            collection="test-col", source="doc", n_chunks=1, n_upserted=1, elapsed_ms=1.0
+        )
+        handler.container.services.get.return_value = mock_pipeline
+        sync_manifest = MagicMock()
+        sync_manifest.claim_owner.return_value = "sub/doc.md"
+        sync_manifest.upsert_entry.side_effect = RuntimeError("manifest db down")
+        handler.container.services.__getitem__.side_effect = lambda k: sync_manifest if k == "sync_manifest" else MagicMock()
+
+        from io import BytesIO
+        client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.post(
+                "/upload",
+                data={
+                    "collection": "test-col", "tenants": "[]",
+                    "sync_id": "my-repo", "content_hash": "abc123",
+                },
+                files={"file": ("sub/doc.md", BytesIO(b"# Title\n\nBody"), "text/plain")},
+            )
+        assert resp.status_code == 500
+        mock_pipeline.ingest.assert_called_once()
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "document_upload"
+        assert kwargs["success"] is True
+
     def test_skips_ingest_when_content_already_owned_elsewhere(self):
         user = _make_user(is_admin=True)
         handler = MagicMock()
@@ -568,6 +604,32 @@ class TestDeleteDocument:
         assert kwargs["action"] == "document_delete"
         assert kwargs["success"] is False
         assert kwargs["reason"] == "db down"
+
+    def test_sparse_index_failure_after_successful_delete_still_audits_delete_as_success(self):
+        # Regression test: removing the document from the sparse-search
+        # index is a separate step from deleting it from Qdrant -- a
+        # failure there must not make the audit trail claim the delete
+        # itself failed.
+        sync_manifest = MagicMock()
+        sync_manifest.get_hash_for_source.return_value = None
+        sparse_enc = MagicMock()
+        sparse_enc.remove_document.side_effect = RuntimeError("index down")
+        services = {"sync_manifest": sync_manifest, "encSparse": sparse_enc}
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        handler.container.require_db_provider.return_value = MagicMock()
+        handler.container.services.__getitem__.side_effect = lambda k: services[k]
+        handler.container.services.get.side_effect = lambda k, default=None: services.get(k, default)
+        client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.request("DELETE", "/collections/test-col/documents", params={"source_uri": "sub/doc.md"})
+
+        assert resp.status_code == 500
+        handler.container.require_db_provider.return_value.delete_document.assert_called_once_with("test-col", "sub/doc.md")
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "document_delete"
+        assert kwargs["success"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -891,3 +953,29 @@ class TestDeleteCollection:
         resp = client.request("DELETE", "/collections/test-col")
 
         assert resp.status_code == 403
+
+    def test_grant_cleanup_failure_after_successful_delete_still_audits_delete_as_success(self):
+        # Regression test: removing collection grants/index data is a
+        # separate step from the actual Qdrant delete -- a failure there
+        # must not make the audit trail claim the delete itself failed.
+        user = _make_user(is_admin=True)
+        handler = MagicMock()
+        db = MagicMock()
+        db.delete_collection.return_value = True
+        handler.container.require_db_provider.return_value = db
+        users_svc = MagicMock()
+        users_svc.remove_collection_grants.side_effect = RuntimeError("boom")
+        sync_manifest = MagicMock()
+        services = {"sync_manifest": sync_manifest, "users": users_svc}
+        handler.container.services.__getitem__.side_effect = lambda k: services.get(k, MagicMock())
+        handler.container.services.get.side_effect = lambda k, default=None: services.get(k, default)
+
+        client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+        with patch("hestia.api.routers.ingestion.audit") as mock_audit:
+            resp = client.request("DELETE", "/collections/test-col")
+
+        assert resp.status_code == 500
+        db.delete_collection.assert_called_once_with("test-col")
+        _, kwargs = mock_audit.data_action.call_args
+        assert kwargs["action"] == "collection_delete"
+        assert kwargs["success"] is True

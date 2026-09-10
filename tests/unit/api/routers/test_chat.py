@@ -37,6 +37,21 @@ class TestChatRouter:
         call_req = handler.resolve.call_args[0][0]
         assert call_req.last_user_message == "last user message"
 
+    def test_non_streaming_response_is_valid_json(self):
+        # Regression test: the non-streaming response used to be the raw
+        # resolved string handed straight to Response(), labeled
+        # application/json without ever being json.dumps'd -- resp.json()
+        # failed on any real (non-empty, non-JSON-shaped) reply.
+        handler = MagicMock()
+        handler.resolve = AsyncMock(return_value="response")
+
+        client = TestClient(_app(handler=handler))
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "hi"}],
+        })
+        assert resp.status_code == 200
+        assert resp.json() == {"content": "response"}
+
     def test_exec_type_is_rag_chat_when_collection_given(self):
         handler = MagicMock()
         handler.resolve = AsyncMock(return_value="response")
