@@ -10,6 +10,7 @@ import {
 import { activeConversationId, loadConversations, forceEvictStaleHeadNow } from '$lib/stores/conversations';
 import { setContextBudget, announceCompaction } from '$lib/stores/contextBudget';
 import { activeCorpusName, isIsmsActive, migrateNewChatSelection } from '$lib/stores/isms';
+import { activeModel } from '$lib/stores/generationModel';
 import { api } from '$lib/api/client';
 import type { ContentPart } from '$lib/types';
 
@@ -98,7 +99,7 @@ export async function streamFromHistoryInto(
 
     const res = await api.stream('/api/chat', {
       messages: payloadMessages,
-      model: 'ministral-3:14b',
+      model: get(activeModel),
       model_kwargs: {},
       collection: get(isIsmsActive) ? get(activeCorpusName) : undefined,
       query_kwargs: { limit: 20 },
