@@ -1,0 +1,66 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.49
+links:
+- TST-005: 6fPWhX8BDKnkKdAHNUNgngvzLrVQPAkTDZPW9ELXUiM=
+normative: true
+not-executed-steps: '3'
+passed-steps: '0'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: _-H1cbP1iCoGREmeF6RDs_gCTMqO8wjurDAiRexRwso=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-005 (LDAP authentication)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst005_ldap_authentication.py -v`.
+    The instance under test is configured with AUTH_MODE=oidc, not ldap, and
+    no `HESTIA_LDAP_TEST_USERNAME`/`_PASSWORD` were supplied -- both are
+    required preconditions for this TST (a reachable LDAP directory with a
+    known test user) that this environment does not provide.
+
+  ## Test execution results
+
+  **Test case step 1 (log in using the LDAP test user's directory credentials)**:
+  - `test_valid_ldap_user_authenticates` SKIPPED -- no LDAP test credentials
+    configured for this environment. ?c5-defect-0
+
+  **Test case step 2 (incorrect password for the same LDAP user is rejected)**:
+  - `test_incorrect_password_rejected` SKIPPED, same reason. ?c5-defect-0
+
+  **Test case step 3 (nonexistent LDAP username is rejected)**:
+  - `test_nonexistent_ldap_username_rejected` SKIPPED, same reason. ?c5-defect-0
+
+  ### Defect summary description
+
+  Not executed against this environment: defect category ?c5-defect-0 (no
+  defect -- the suite skips cleanly by design when LDAP isn't configured,
+  per `tests_integration/README.md`, rather than failing).
+
+  ### Test execution evidence
+
+  `3 skipped` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  This is an environment-applicability gap, not a product defect: the
+  currently deployed instance runs AUTH_MODE=oidc. Re-run against an
+  instance configured with AUTH_MODE=ldap and a reachable test directory
+  (`HESTIA_LDAP_TEST_USERNAME`/`_PASSWORD`) to actually exercise this TST.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

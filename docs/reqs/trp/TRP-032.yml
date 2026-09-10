@@ -1,0 +1,77 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.58
+links:
+- TST-032: 9CwrtR-R3tqIPuvwyqDidEUmhLEMnKGIFO9Orc6_umA=
+normative: true
+not-executed-steps: '1'
+passed-steps: '4'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: opoOdpdoOaTjK1klArbWErzaSLNoHLTEXdbRy9OwO7Q=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-032 (REST API access)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst032_rest_api_access.py -v`,
+    against a live instance freshly rebuilt from current source.
+
+  ## Test execution results
+
+  **Test case step 1 (authenticate via the API to obtain an access token)**:
+  - `test_token_issued_and_accepted` PASSED. ?c5-defect-0
+
+  **Test case step 2 (use the token to call a core feature through the API)**:
+  - `test_core_feature_usable_end_to_end_via_api` PASSED: document ingested
+    and searched purely via the API. ?c5-defect-0
+
+  **Test case step 3 (inspect the response, confirm it matches the
+  documented API schema)**:
+  - Not distinctly exercised: step 2's test checks `ok: true`/200 status
+    only, not a dedicated schema-conformance assertion against the OpenAPI
+    spec. ?c5-defect-0
+
+  **Test case step 4 (submit an invalid/missing-parameter request, verify
+  the error response)**:
+  - `test_error_response_describes_the_problem` PASSED: a search with a
+    missing query returns 400/422 with a descriptive `detail`. ?c5-defect-0
+
+  **Test case step 5 (retrieve the API documentation, confirm exercised
+  operations are described)**:
+  - `test_openapi_documentation_available` PASSED: `GET /openapi.json`
+    returns a schema listing `/login` among other paths. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution for the automated portion, i.e., defect
+  category: ?c5-defect-0. Token issuance, end-to-end API usability, clear
+  error responses, and documentation availability are all confirmed;
+  step 3's schema-conformance check is only informally covered.
+
+  ### Test execution evidence
+
+  `4 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  If strict schema conformance matters beyond "the call succeeds with the
+  expected top-level fields," step 3 would benefit from a dedicated
+  assertion against the OpenAPI-generated response model rather than ad hoc
+  field checks.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

@@ -1,0 +1,109 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.61
+links:
+- TST-037: uz-iVGe4ohPt5OKbbo66de-v5bujVObJQaDl_1o5a5A=
+normative: true
+not-executed-steps: '3'
+passed-steps: '4'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: iG_ABp97bq0QLszi8xsYe0z3AiUr_LoZiThAeEdbMtI=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-037 (Access and modification audit logging)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst037_audit_logging.py -v`,
+    against a live instance freshly rebuilt from current source.
+    `test_tst037_audit_logging.py`'s own docstring scopes itself to
+    "the API-testable subset" of SRS-027 -- it does not attempt every one of
+    TST-037's 8 documented steps, deferring code-review-only portions to a
+    separate design review (TST-076 per that docstring).
+
+  ## Test execution results
+
+  **Test case step 1 (log in and out as the standard user)**:
+  - Not directly exercised as a dedicated login/logout audit check; a
+    *failed* login is exercised instead (next item). ?c5-defect-0
+
+  **Test case step 2 (standard user denied access outside their tenant)**:
+  - Not exercised by this script. ?c5-defect-0
+
+  **Test case step 3 (moderator ingests then deletes a document)**:
+  - Not exercised by this script (see `KNOWN_ISSUES.md`/`docs/sdd.md` for
+    the separately known metadata/classification gap in that same code
+    path -- unrelated to auditing). ?c5-defect-0
+
+  **Test case step 4 (admin changes a user's role/classification, a
+  collection grant, a workflow, and the log level)**:
+  - `test_admin_action_produces_audit_entry` PASSED as a proxy for this
+    mechanism: creating a user via `POST /admin/users/create` produces a
+    correctly-shaped `admin_action`/`user_create` entry with all expected
+    fields (ts, level, logger, request_id, msg). The specific scenarios
+    listed (role/classification change, grant edit, workflow edit, log
+    level change) were not each individually exercised. ?c5-defect-0
+  - `test_failed_login_produces_audit_entry` PASSED: a failed login produces
+    an `auth_attempt`/`success=false` entry (confirms `AUTH_AUDIT_LOGS` is
+    enabled on this instance, per `.env.test.ps1`'s `AUTH_AUDIT_LOGS=true`).
+    ?c5-defect-0
+
+  **Test case step 5 (admin queries the audit log, filtered by time range
+  and type, confirms steps 1-4's events are present)**:
+  - Confirmed narrowly (the two entries above, via `GET /admin/logs`), not
+    for the full set of step-1-4 scenarios. ?c5-defect-0
+
+  **Test case step 6 (export the filtered log as ndjson/csv, verify it
+  matches the queried entries)**:
+  - Export itself is exercised (see step 8 below); content-parity between
+    the exported file and the queried entries is not separately verified.
+    ?c5-defect-0
+
+  **Test case step 7 (standard user denied audit log query/export access)**:
+  - `test_non_admin_denied_audit_log_access` PASSED: 403 for a non-admin.
+    ?c5-defect-0
+
+  **Test case step 8 (confirm the log query/export actions themselves are audited)**:
+  - `test_audit_log_access_is_itself_audited` PASSED: `GET /admin/logs/export`
+    itself produces an `admin_action` entry. Per the test's own docstring,
+    only *export* is confirmed self-auditing this way -- a plain `GET
+    /admin/logs` query was never separately confirmed to produce its own
+    entry. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution for the automated subset, i.e., defect
+  category: ?c5-defect-0. The four scripted checks (admin-action logging,
+  failed-login logging, non-admin denial, and export self-auditing) all
+  passed. Steps 1-3, the full breadth of step 4's individual scenarios, and
+  step 6's export-content-matches-query verification are not covered by
+  this script -- by the script's own explicit scoping, not an oversight
+  discovered here.
+
+  ### Test execution evidence
+
+  `4 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  This TCER only closes the "API-testable subset" the script itself
+  targets. Full closure of TST-037 as documented would need either
+  additional automated coverage (moderator ingest/delete, cross-tenant
+  denial, export-content parity) or the separate TST-076 design review the
+  script's docstring points to.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

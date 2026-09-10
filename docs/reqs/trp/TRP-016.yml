@@ -1,0 +1,62 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.56
+links:
+- TST-016: oYeLH6vVS0QjTz5rjA3WS-kYVGxPlVcAl_DeIH7hRjw=
+normative: true
+not-executed-steps: '0'
+passed-steps: '1'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: 921oT_C5Eh4MxphsmfWvIXAXHH1vBxw6VQjYxsVxg54=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-016 (Unauthorized moderator access)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst016_moderator_page_access.py -v`,
+    against a live instance freshly rebuilt from current source.
+
+  ## Test execution results
+
+  **Test case step 1 (as a plain user, try to access moderator-accessible
+  pages)**:
+  - `test_plain_user_denied_moderator_endpoint` PASSED. ?c5-defect-0
+  - `test_plain_user_denied_tenant_moderator_endpoint` PASSED. ?c5-defect-0
+  - `test_non_member_denied_org_summary` PASSED. ?c5-defect-0
+  - `test_non_role_assigner_denied_setting_member_role` PASSED. ?c5-defect-0
+  - `test_non_moderator_denied_collection_delete` PASSED. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. All 5
+  sampled moderator-only actions correctly return 403 for a non-moderator
+  user, including finer-grained cases (non-member of the org, not a
+  role-assigner, not the collection's own moderator) beyond the single
+  generic scenario in the TST's own text.
+
+  ### Test execution evidence
+
+  `5 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  Coverage is broader than the TST's one documented step: it separately
+  exercises org-membership, role-assignment, and per-collection moderator
+  boundaries rather than a single generic "moderator page" check.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

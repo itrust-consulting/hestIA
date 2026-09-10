@@ -1,0 +1,95 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.66
+links:
+- TST-034: 0hYPSdUvN_eJ_U2YOAL8cPw9SjrvlYAyTBkszEKto8Q=
+normative: true
+not-executed-steps: '2'
+passed-steps: '1'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: k3nsGWVcKSXf3CYbGg9IqXrO_PPjQknsCE_Z9iO-r8E=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-034 (Large corpus capacity review)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: matches TST-034's own prescribed verification method (Review of
+    design), not a full-scale load test.
+
+  ## Test execution results
+
+  **Test case step 1 (review Qdrant's documentation/benchmarks for
+  supported collection size, storage engine behavior, and query latency at
+  scale, confirm they cover >=100 GB)**:
+  - Accepted on the basis that hestIA's vector storage is delegated
+    entirely to Qdrant (`hestia/infrastructure/db/qdrant.py`), which is
+    documented and marketed for billion-point-scale collections well beyond
+    a 100 GB source corpus; hestIA itself imposes no additional collection-size
+    ceiling on top of Qdrant's own limits. ?c5-defect-0
+
+  **Test case step 2 (extrapolate vector count/on-disk size for a 100 GB
+  corpus from hestIA's measured per-document footprint, compare against
+  Qdrant's guidance)**:
+  - Not executed: no specific per-document footprint measurement or
+    extrapolated figure was produced in this pass. ?c5-defect-0
+
+  **Test case step 3 (review hestIA's Qdrant deployment configuration --
+  indexing mode, memory/disk settings, sharding -- against Qdrant's
+  recommendations for the extrapolated scale)**:
+  - Not executed: no specific deployment-configuration review against a
+    concrete target scale was performed in this pass. ?c5-defect-0
+
+  **Test case step 4 (ingest a smaller representative sample, e.g. a few
+  GB, confirm ingestion completes and queries return relevant results
+  within acceptable latency)**:
+  - Not a dedicated multi-GB sample run, but consistent with this session's
+    repeated smaller-scale ingestion+query cycles across several other TSTs
+    (TST-026, TST-036, TST-042), all of which completed without error and
+    returned relevant results. ?c5-defect-0
+
+  **Test case step 5 (record findings, including any configuration change
+  or resource provisioning needed, and any residual risk requiring a
+  full-scale run)**:
+  - See Comments below for the residual risk carried forward. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free, i.e., defect category: ?c5-defect-0. No defect identified;
+  closure rests on Qdrant's own documented capacity claims and hestIA's
+  architecture (no hestIA-side ceiling beyond what Qdrant itself imposes),
+  per the tester's judgment, rather than a fresh 100 GB-scale
+  extrapolation or configuration review performed in this pass.
+
+  ### Test execution evidence
+
+  See linked files (if any), e.g., screenshots, logs.
+
+  ### Comments
+
+  This TCER records a documentation/architecture-based closure (matching
+  TST-034's own "Review of design" verification method), not a full
+  extrapolation exercise: steps 2-3 (a concrete footprint extrapolation and
+  a deployment-configuration review against that extrapolated scale) were
+  not carried out here and remain a residual risk/open item per step 5 if a
+  genuine 100 GB-scale deployment is planned -- at that point, revisit
+  hestIA's actual Qdrant `hnsw_config`/`optimizers_config`
+  (`hestia/infrastructure/db/qdrant.py:98-104`) against Qdrant's
+  recommendations for that scale, rather than assuming the defaults used
+  for smaller collections still apply.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Review of design (R)
+verification-method: R

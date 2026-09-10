@@ -1,0 +1,89 @@
+active: true
+defect-category: 2 = minor defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.54
+links:
+- TST-014: b6fGxqfeIHGORIk8fQv3uY6OQrDpT4dhwpnxhGqxdm0=
+normative: true
+not-executed-steps: '1'
+passed-steps: '2'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: runXxqx9mGU6Fvd26TO1Je7PvtzlMu7BdrfFR7Jvneo=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-014 (User access expiration)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst014_user_access_expiration.py -v`,
+    against a live instance freshly rebuilt from current source (see Comments).
+
+  ## Test execution results
+
+  **Test case step 1-2 (set expires_at a few minutes in the future, confirm
+  the user functions normally before it)**:
+  - `test_user_functions_normally_before_expiry` PASSED. ?c5-defect-0
+
+  **Test case step 3 (wait until after expires_at, attempt to log in again)**:
+  - `test_access_denied_after_expiry` PASSED: access denied after expiry.
+    ?c5-defect-0
+
+  **Test case step 4-5 (set a tenant-role grant with a future starts_at,
+  confirm access is withheld before it and granted after)**:
+  - `test_role_grant_starts_at_gates_access` SKIPPED --
+    `UserService.create_user`/`update_user` (`hestia/domain/auth/users.py`)
+    always hardcode a role grant's `starts_ts` to creation time; no admin
+    API path accepts a caller-supplied future `starts_at`, even though
+    `user_roles.starts_at` exists at the DB layer. ?c5-defect-2
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-2 (minor defect). Steps 1-3 (account-level
+  `expires_at`) pass cleanly. Steps 4-5 (role-grant `starts_at`) cannot be
+  exercised at all: this is a confirmed, real gap between SRS-005's
+  time-bounded-access criterion and the current API surface, not a test
+  limitation -- no endpoint anywhere accepts a future `starts_at` for a role
+  grant.
+
+  ### Test execution evidence
+
+  `2 passed, 1 skipped` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  This TCER required a rebuild mid-investigation: the first run (against
+  the previously-running, not-yet-rebuilt container) failed both
+  `test_user_functions_normally_before_expiry` and
+  `test_access_denied_after_expiry` with a generic 401 "Invalid username or
+  password" on the very first login attempt for a freshly created user with
+  any non-null `expires_at`. Root cause, confirmed by diffing the running
+  container's loaded source against disk (`docker exec ... python -c
+  "import inspect; ..."`) and reproduced independently via curl outside the
+  test harness: `UserService.authenticate` compared `expires_at` (epoch
+  *seconds*) directly against `now_epoch()` (epoch *milliseconds*, always
+  numerically larger), so any account with a non-null `expires_at` read as
+  already expired regardless of how far in the future it was set. The
+  current on-disk source already carries the fix (`now_epoch() // 1000`,
+  with a comment describing exactly this bug) -- it simply wasn't in the
+  deployed image, which had never been rebuilt after that fix landed.
+  Rebuilding (`docker compose up -d --build`) resolved it; this TCER
+  reflects the rebuilt instance only.
+
+  For steps 4-5: recommend either exposing `starts_at` on the relevant admin
+  endpoints (`POST /admin/users/create`, role-grant endpoints) or re-scoping
+  SRS-005/this TST if future-dated role activation is not actually required.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

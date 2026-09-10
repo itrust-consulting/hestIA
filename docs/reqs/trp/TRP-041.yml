@@ -1,0 +1,71 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.62
+links:
+- TST-041: U9DZskc6nHbGm3a099aTiwIuE9SXjX9FQxgAAg6eB-A=
+normative: true
+not-executed-steps: '0'
+passed-steps: '2'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: RyXPla8Dp7gPEM52i4CKNtY_bk_dxWJxTzOZ18thpHg=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-041 (Streaming response delivery)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst041_streaming_response.py -v`,
+    against a live instance freshly rebuilt from current source.
+
+  ## Test execution results
+
+  **Test case step 1-3 (stream=true delivers tokens incrementally; compare
+  the reassembled streamed content to the non-streaming response)**:
+  - `test_stream_delivers_incrementally` PASSED: multiple chunks received,
+    non-empty assembled content. ?c5-defect-0
+  - `test_streamed_content_matches_non_streaming` PASSED: both the
+    streaming and non-streaming calls for the same prompt succeed and
+    return non-empty content (exact-body equivalence isn't asserted, since
+    a fresh LLM call isn't guaranteed deterministic). ?c5-defect-0
+
+  **Test case step 4-5 (forcibly disconnect mid-stream; confirm the server
+  stays healthy for subsequent requests)**:
+  - `test_mid_stream_disconnect_does_not_crash_server` PASSED: the
+    connection is closed after the first chunk, and a follow-up `GET
+    /account` still returns 200. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. Streaming
+  delivers content incrementally, produces non-empty output equivalent in
+  kind to the non-streaming path, and a mid-stream client disconnect is
+  handled gracefully with no server-side impact on subsequent requests.
+
+  ### Test execution evidence
+
+  `3 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  `test_streamed_content_matches_non_streaming` failed once (0 streamed
+  bytes) against the not-yet-rebuilt container (see TRP-014's Comments for
+  the rebuild); it passed cleanly on this corrected re-run, and did not
+  recur. As with TST-033, the stale image was not specifically confirmed as
+  the cause of that one prior failure -- worth watching for recurrence
+  rather than treating as fully closed.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

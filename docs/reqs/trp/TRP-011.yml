@@ -1,0 +1,72 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.65
+links:
+- TST-011: Wamwzo02ivIHksalb0B07gYo4Wk3Rpu6rYw50OvIcNo=
+normative: true
+not-executed-steps: '0'
+passed-steps: '6'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: nyKE9Kq3N5INdygio71wVeTTMHxlKoYTVAfbF3ML7hg=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-011 (Admin password reset)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: logged in as admin; a standard test user exists with a known
+    password.
+
+  ## Test execution results
+
+  **Test case step 1 (admin dashboard > Users, open the test user)**:
+  - ?c5-defect-0
+
+  **Test case step 2 (set a new password via the admin reset action,
+  without knowing the current password)**:
+  - Reset succeeded. ?c5-defect-0
+
+  **Test case step 3 (log out, log in as the test user with the admin-set
+  password)**:
+  - Authenticated successfully. ?c5-defect-0
+
+  **Test case step 4 (attempt to log in with the old password)**:
+  - Old password no longer authenticates. ?c5-defect-0
+
+  **Test case step 5 (as a standard user, attempt to reset another user's password)**:
+  - Denied. ?c5-defect-0
+
+  **Test case step 6 (inspect logs for the admin reset and the denied attempt)**:
+  - Both the admin's password reset and the denied non-admin attempt are
+    correctly recorded as audit entries. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. An admin
+  can reset any user's password without knowing the current one, the new
+  password works and the old one is invalidated, a non-admin is denied the
+  same action, and both the reset and the denial are correctly audited.
+
+  ### Test execution evidence
+
+  See linked files (if any), e.g., screenshots, logs.
+
+  ### Comments
+
+  No deviations from expected outcomes.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

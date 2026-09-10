@@ -1,0 +1,58 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.55
+links:
+- TST-015: 2xpjgChFGugBXB9iHbqFpVT5RFvqcocWLjxrZ7d0djE=
+normative: true
+not-executed-steps: '0'
+passed-steps: '1'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: Ie8ucAVfNddCMMTRZgOLhmKlCWaNvZLIXXRio8Qd8Rw=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-015 (Unauthorized user access)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst015_unauthenticated_access_denied.py -v`,
+    against a live instance freshly rebuilt from current source.
+
+  ## Test execution results
+
+  **Test case step 1 (access any page without a valid access token)**:
+  - `test_protected_endpoint_denied_without_token`, parametrized across
+    `GET /account`, `GET /admin/organizations`, `GET /admin/logs`, and
+    `POST /api/search` -- all 4 PASSED, each correctly denied without a
+    token. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. No page
+  or API endpoint sampled is accessible without a valid access token.
+
+  ### Test execution evidence
+
+  `4 passed` (parametrized cases of one test function; see the full-suite
+  summary referenced in TRP-004).
+
+  ### Comments
+
+  Sampled 4 representative protected endpoints across plain, admin, and
+  API-only surfaces rather than every route; no deviation found across any
+  of them.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

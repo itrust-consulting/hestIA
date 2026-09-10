@@ -1,0 +1,65 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.48
+links:
+- TST-004: Zevc_DFAmDY7a5Mhi3hkRSi8p3rodA3HYyzYr9MBLyI=
+normative: true
+not-executed-steps: '0'
+passed-steps: '4'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: 8bplmZ1YmD-RevZh7FYAomTCQjgetU99b2aio9O-Z7A=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-004 (Local authentication)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst004_local_authentication.py -v`,
+    against a live instance freshly rebuilt from current source (`docker compose up -d --build`),
+    AUTH_MODE=local (bootstrap admin authenticates locally regardless of the
+    instance's configured AUTH_MODE, per `AuthenticationService.authenticate`
+    trying local first).
+
+  ## Test execution results
+
+  **Test case step 1 (access a protected feature without authenticating)**:
+  - `test_protected_endpoint_denied_without_auth` PASSED. ?c5-defect-0
+
+  **Test case step 2-3 (log in with valid local credentials, access the same
+  protected feature)**:
+  - `test_valid_credentials_grant_access` PASSED. ?c5-defect-0
+
+  **Test case step 4 (log out, then attempt login with an incorrect password)**:
+  - `test_invalid_credentials_rejected_with_clear_error` PASSED. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0.
+  All 3 automated checks passed: the protected endpoint is inaccessible
+  without a token, valid credentials grant access, and an incorrect password
+  is rejected with a clear error and no access granted.
+
+  ### Test execution evidence
+
+  `3 passed` (full-suite run summary: `36 passed, 1 failed, 8 skipped in 216.43s`,
+  see TRP-012 for the one unrelated failure in that run).
+
+  ### Comments
+
+  No deviations from expected outcomes.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

@@ -1,0 +1,56 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.57
+links:
+- TST-017: cwKfF-YXnhnrJS5RrbnzY8BlmqYYmPgmztLpjDskGLQ=
+normative: true
+not-executed-steps: '0'
+passed-steps: '1'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: 33Xuek_7o9jE7rxjh_U0FMbteOzRtoLM9ZzEQHOHvVo=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-017 (Unauthorized admin access)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst017_admin_page_access.py -v`,
+    against a live instance freshly rebuilt from current source.
+
+  ## Test execution results
+
+  **Test case step 1 (as a user or moderator, try to access admin-accessible
+  pages)**:
+  - `test_plain_user_denied_admin_only_endpoint` PASSED. ?c5-defect-0
+  - `test_tenant_moderator_denied_admin_only_endpoint` PASSED: a tenant
+    moderator (not a system admin) is also correctly denied. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. Both a
+  plain user and a tenant moderator are correctly denied (403) on an
+  admin-only endpoint.
+
+  ### Test execution evidence
+
+  `2 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  No deviations from expected outcomes.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

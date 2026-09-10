@@ -1,0 +1,72 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.51
+links:
+- TST-008: jgmN1YDVyDZFCwvUjNL0ByH6I4ZSTdut_SgsfCtFL5k=
+normative: true
+not-executed-steps: '4'
+passed-steps: '0'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: bEfe02vQHbdezERlwOchLFnTJ3mxil6Ujxqmigmf3-o=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-008 (LDAP role mapping)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst008_ldap_role_mapping.py -v`.
+    Same environment gap as TRP-005: AUTH_MODE=oidc, no reachable LDAP
+    directory or LDAP test-user env vars configured.
+
+  ## Test execution results
+
+  **Test case step 1 (configure LDAP_HOST/PORT/SEARCH_BASE/APP_DN/APP_PASSWORD/
+  USER_DN_TEMPLATE, restart)**:
+  - Not executed -- requires restarting the shared instance with different
+    AUTH_MODE/LDAP configuration, out of scope for this black-box script.
+    ?c5-defect-0
+
+  **Test case step 2 (log in as a group1 user, confirm mapped role)**:
+  - `test_group1_user_gets_mapped_role` SKIPPED -- no LDAP test user
+    configured. ?c5-defect-0
+
+  **Test case step 3 (log in as a group2 user, confirm a different mapped role)**:
+  - `test_group2_user_gets_a_different_mapped_role` SKIPPED, same reason.
+    ?c5-defect-0
+
+  **Test case step 4 (enable LDAP_USE_SSL, confirm connectivity still works)**:
+  - Not executed -- requires a restart with a different LDAP transport
+    setting. ?c5-defect-0
+
+  ### Defect summary description
+
+  Not executed against this environment: defect category ?c5-defect-0.
+  Same environment-applicability gap as TRP-005, compounded by steps 1 and 4
+  needing a service restart with different configuration, which is outside
+  this black-box script's scope regardless of LDAP availability.
+
+  ### Test execution evidence
+
+  `2 skipped` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  Re-run against an instance configured with AUTH_MODE=ldap, a reachable
+  test directory with at least two LDAP_GROUP_MAPPING-mapped groups, and
+  `HESTIA_LDAP_TEST_USERNAME`/`_PASSWORD`/`_ROLE` (+ the group2 variants) set.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

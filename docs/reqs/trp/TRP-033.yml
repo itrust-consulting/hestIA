@@ -1,0 +1,81 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.59
+links:
+- TST-033: t_FLyasIlKd6tbdCxz4_ZMVzRuRkUlQmL6OXUo_XqdM=
+normative: true
+not-executed-steps: '1'
+passed-steps: '4'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: Rz4Z-Tf_db2ZgIsScIbLSgtqIVXur-FfBYbBlgfKkbk=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-033 (Multilingual operation)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst033_multilingual_query.py -v`,
+    against a live instance freshly rebuilt from current source. Uses the
+    EN/FR/DE fixtures under `docs/specs/tst/assets/multilingual/`; response
+    language is checked with a stopword heuristic, not a language-detector
+    dependency.
+
+  ## Test execution results
+
+  **Test case step 1-2 (submit a French query, verify the response is in French)**:
+  - Covered by `test_multilingual_query_response_language`, PASSED for `fr`.
+    ?c5-defect-0
+
+  **Test case step 3 (repeat with an English query)**:
+  - Covered by the same test, PASSED for `en`. ?c5-defect-0
+
+  **Test case step 4 (repeat with a German query)**:
+  - Covered by the same test, PASSED for `de`. ?c5-defect-0
+
+  **Test case step 5 (query in a language different from the ingested
+  documents' language, verify retrieval quality is not significantly degraded)**:
+  - Not distinctly exercised: the test ingests all three language variants
+    of the same document and queries each in its matching language, so it
+    doesn't isolate a query/document language mismatch the way step 5
+    describes. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution for the automated portion, i.e., defect
+  category: ?c5-defect-0. Each of French, English, and German queries
+  received a response correctly dominated by that language's stopwords,
+  per the heuristic.
+
+  ### Test execution evidence
+
+  `1 passed` (one test function looping over all three languages; see the
+  full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  This test previously failed once (empty response body /
+  `JSONDecodeError` on `resp.json()`) against the not-yet-rebuilt container
+  (see TRP-014's Comments for the rebuild); it passed cleanly on this
+  corrected re-run. Unlike TST-014, the stale image was not specifically
+  confirmed as the cause here -- an empty body is equally consistent with a
+  transient network/provider hiccup against the real remote vLLM endpoint.
+  Treated as non-reproducing rather than a confirmed defect, since it did
+  not recur on re-run; worth watching for recurrence rather than closing
+  outright. A dedicated mismatched-language retrieval check (step 5) would
+  need a separate test case.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

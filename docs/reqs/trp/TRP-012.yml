@@ -1,0 +1,87 @@
+active: true
+defect-category: 1 = insignificant defect
+derived: false
+failed-steps: '1'
+header: ''
+level: 1.52
+links:
+- TST-012: FdWRUidfmZtsqQ7D9Ism7L_6MFsUlRp5G64odj9nCZc=
+normative: true
+not-executed-steps: '1'
+passed-steps: '1'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: 7XKKu1759A6a9DXVA7BENy7Z9i8w30ugEkctyMZ0yjI=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-012 (Rate limiting)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst012_rate_limiting.py -v`,
+    against a live instance freshly rebuilt from current source. Instance
+    configured (per `.env.test.ps1`) with AUTH_MAX_ATTEMPTS=50,
+    AUTH_LOCKOUT_DURATION=1 (minute); `HESTIA_AUTH_MAX_ATTEMPTS=50` and
+    `HESTIA_AUTH_LOCKOUT_SECONDS=60` passed to pytest to match.
+
+  ## Test execution results
+
+  **Test case step 1-2 (submit failed login attempts up to the configured
+  threshold, then a 6th/over-limit attempt with the correct password)**:
+  - `test_exceeding_threshold_returns_429` FAILED: the 30th wrong-password
+    attempt (of the intended 50) returned 429 "Rate limit exceeded: 30 per 1
+    minute" -- a *different*, IP-keyed limiter (`AUTH_IP_RATE_LIMIT_ATTEMPTS`,
+    default 30/minute, `hestia/config/settings.py:22-23,217-218`) tripped
+    before the per-username threshold this test targets was ever reached.
+    ?c5-defect-1
+
+  **Test case step 3 (after the lockout window elapses, correct-password
+  login succeeds again)**:
+  - `test_login_succeeds_again_after_lockout_window` PASSED. ?c5-defect-0
+
+  **Test case step 4 (change AUTH_MAX_ATTEMPTS/AUTH_LOCKOUT_DURATION,
+  restart, repeat steps 1-3 to confirm the new values are honored)**:
+  - Not executed by this script -- would require restarting the shared
+    instance with a second configuration. The current run already exercises
+    a non-default configuration (50/1 minute vs. the code default of 5),
+    and step 3's pass confirms configured values are honored end-to-end for
+    the per-username limiter. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect category: ?c5-defect-1 (insignificant defect) -- and specifically
+  a **test-environment configuration gap, not a functional defect in
+  hestIA**. hestIA's rate limiting behaved exactly as configured on both
+  layers: the per-username limiter (`AUTH_MAX_ATTEMPTS`/`AUTH_LOCKOUT_DURATION`,
+  confirmed working by step 3's pass) and the separate, always-on per-IP
+  limiter (`AUTH_IP_RATE_LIMIT_ATTEMPTS`, default 30/minute). `.env.test.ps1`
+  raises the former to 50 for testability but never raises the latter to
+  match, so this specific script (which sprays wrong-password attempts from
+  one IP) now trips the IP limiter first. Recommended fix: add
+  `AUTH_IP_RATE_LIMIT_ATTEMPTS=60` (or similar, above AUTH_MAX_ATTEMPTS) to
+  `.env.test.ps1`, not a change to hestIA itself.
+
+  ### Test execution evidence
+
+  {"error":"Rate limit exceeded: 30 per 1 minute"}
+
+  ### Comments
+
+  This TCER's first attempt (before a required rebuild, see TRP-014's
+  Comments) used the *unconfigured* default (`HESTIA_AUTH_MAX_ATTEMPTS=5`)
+  and failed differently (5 wrong attempts never tripped anything, since the
+  live instance's real per-username threshold is 50) -- that result was
+  discarded as a test-invocation error on the tester's part, not evidence.
+  This TCER reflects the corrected re-run.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

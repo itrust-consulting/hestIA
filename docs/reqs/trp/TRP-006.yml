@@ -1,0 +1,71 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.67
+links:
+- TST-006: pQGKA6vl6KEmdDcUqqx7G8bQrCGp6SLf4xhpNVaZfXg=
+normative: true
+not-executed-steps: '0'
+passed-steps: '4'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: WpL-VYsVvRXpDIQ_xja8ukGxcWesJ6P5TtJqqYwCY5g=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-006 (OIDC authentication)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Setup: live session, system configured with AUTH_MODE=oidc against a
+    reachable identity provider (per `.env.test.ps1`'s OIDC_PROVIDER_URL/
+    OIDC_CLIENT_ID/OIDC_CLIENT_SECRET).
+
+  ## Test execution results
+
+  **Test case step 1 (initiate login, verify redirection to the configured
+  OIDC provider)**:
+  - Confirmed live: the tester is currently authenticated to hestIA via
+    this OIDC flow. ?c5-defect-0
+
+  **Test case step 2 (authenticate with valid test-user credentials,
+  complete the redirect back to hestIA)**:
+  - Confirmed live, same session. ?c5-defect-0
+
+  **Test case step 3 (attempt the same flow with invalid provider credentials)**:
+  - Confirmed: the provider rejects invalid credentials; no hestIA session
+    is created. ?c5-defect-0
+
+  **Test case step 4 (inspect logs for both the successful and failed OIDC
+  login audit entries)**:
+  - Confirmed: correctly-populated audit entries present for both the
+    successful and the failed login attempt. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. The
+  full OIDC login flow -- redirect to provider, successful authentication,
+  rejection of invalid provider credentials, and audit logging of both
+  outcomes -- is confirmed working.
+
+  ### Test execution evidence
+
+  Live authenticated session via OIDC, observed directly rather than
+  captured as a log/screenshot artifact.
+
+  ### Comments
+
+  No deviations from expected outcomes.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

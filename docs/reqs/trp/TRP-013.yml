@@ -1,0 +1,74 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.53
+links:
+- TST-013: HjqR-8uYdSbRwi6TycSS-N2JnQxofPo5b_GfP35LCkw=
+normative: true
+not-executed-steps: '2'
+passed-steps: '1'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: e5oW4HlpsB4wtIYzsEF4bPfUwXYxyg3znTzaJKQJRgE=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-013 (Session expiration)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst013_session_token_expiration.py -v`,
+    against a live instance freshly rebuilt from current source. No
+    `HESTIA_AUTH_TOKEN_LIFETIME_SECONDS` override was set, so the natural-expiry
+    sub-scenario (which needs a short token lifetime to be practical in a
+    test run) is skipped by design, per `tests_integration/README.md`.
+
+  ## Test execution results
+
+  **Test case step 1 (wait past AUTH_TOKEN_LIFETIME, then access a
+  protected feature)**:
+  - `test_token_rejected_after_natural_expiry` SKIPPED --
+    `HESTIA_AUTH_TOKEN_LIFETIME_SECONDS` not set to a short value on this
+    run. ?c5-defect-0
+
+  **Test case step 2-3 (log in, log out, then attempt to reuse the
+  pre-logout token)**:
+  - `test_logout_revokes_token_immediately` PASSED: the token is rejected
+    immediately after logout, without waiting for natural expiry.
+    ?c5-defect-0
+
+  **Test case step 4 (restore a longer AUTH_TOKEN_LIFETIME, confirm normal
+  session length)**:
+  - Not executed -- requires restarting the shared instance with a
+    different token-lifetime configuration. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution for the automated portion, i.e., defect
+  category: ?c5-defect-0. Logout-based token revocation (the
+  security-critical half of this TST) is confirmed working; the
+  natural-expiry half and the restart-based reconfiguration check are not
+  exercised by this run.
+
+  ### Test execution evidence
+
+  `1 passed, 1 skipped` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  Re-run with `HESTIA_AUTH_TOKEN_LIFETIME_SECONDS` set to a short value
+  (<=180s, matching the live instance's actual `AUTH_TOKEN_LIFETIME`) to
+  exercise the natural-expiry sub-scenario as well.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

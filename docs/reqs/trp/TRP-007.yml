@@ -1,0 +1,67 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.50'
+links:
+- TST-007: YIhxcFpwm8fdqr2D-EYZqlkEqtNBM3gyaPa0GY6Nli4=
+normative: true
+not-executed-steps: '2'
+passed-steps: '1'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: aSQKP0p9_JHrifmode6csUdmTZYapBWQeS1fhWFngLE=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-007 (Local authentication - Configuration)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst007_local_auth_secret_key.py -v`,
+    against the shared live instance.
+
+  ## Test execution results
+
+  **Test case step 1 (confirm local auth mode: login form accepts
+  credentials directly, no LDAP/OIDC redirect)**:
+  - `test_local_login_succeeds_with_no_external_redirect` PASSED: local
+    login via POST /login succeeds directly, no redirect. ?c5-defect-0
+
+  **Test case step 2 (start with AUTH_SECRET_KEY unset or too short)**:
+  - Not executed. Requires restarting the shared backend process with a
+    deliberately broken configuration, which this black-box script
+    (running against a live, shared instance) does not do. ?c5-defect-0
+
+  **Test case step 3 (restore a valid AUTH_SECRET_KEY and restart)**:
+  - Not executed, same reason as step 2. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution for the automatable portion, i.e., defect
+  category: ?c5-defect-0. Steps 2-3 require a service restart with
+  intentionally invalid configuration and are out of scope for an automated
+  script targeting a shared, running instance -- not a product gap, an
+  automation-scope limitation.
+
+  ### Test execution evidence
+
+  `1 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  Steps 2-3 would need a dedicated, isolated environment (start the process
+  fresh with a bad/then-good AUTH_SECRET_KEY and observe startup behavior)
+  rather than HTTP calls against an already-running shared instance.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

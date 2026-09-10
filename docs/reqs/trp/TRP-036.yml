@@ -1,0 +1,63 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: '1.60'
+links:
+- TST-036: V-j4orfq9MHBCBn79pAyTVqsLbiOcFRj4ULd1B6rtNA=
+normative: true
+not-executed-steps: '0'
+passed-steps: '3'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: gERHBsqtOx3_qmZZk5r74CESvShC_83SHzgeoOP_5q8=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-036 (API-based single document ingestion)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst036_api_document_ingestion.py -v`,
+    against a live instance freshly rebuilt from current source.
+
+  ## Test execution results
+
+  **Test case step 1-2 (submit a document + collection + classification to
+  the ingestion API, confirm the response indicates acceptance)**:
+  - `test_single_document_ingested_via_api` PASSED. ?c5-defect-0
+
+  **Test case step 3 (submit an invalid/missing-parameter request, verify a
+  clear error)**:
+  - `test_rejected_document_reports_clear_error` PASSED. ?c5-defect-0
+
+  **Test case step 4 (query the target collection via chat, verify the
+  document's content is retrievable)**:
+  - `test_ingested_document_queryable_afterwards` PASSED. ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. A
+  document is ingested through a single API call with no UI involvement,
+  invalid requests get a clear error, and the ingested content is queryable
+  via chat afterwards.
+
+  ### Test execution evidence
+
+  `3 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  No deviations from expected outcomes.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T

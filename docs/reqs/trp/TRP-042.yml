@@ -1,0 +1,74 @@
+active: true
+defect-category: 0 = no defect
+derived: false
+failed-steps: '0'
+header: ''
+level: 1.63
+links:
+- TST-042: L1mdWL-N7p684d272wWj3RFaY7_uOJLGatyg5jplsyw=
+normative: true
+not-executed-steps: '0'
+passed-steps: '2'
+ref: ''
+references:
+- path: ''
+  type: file
+release-version: ''
+reviewed: PvB5Sdl4-3vBvFxrqpr2iw8DgoncKsUEH9ZoFr0Zlo8=
+test-date: 2026/09/10
+tester: HFR
+text: |
+  # TCER: TST-042 (Hybrid retrieval mode comparison)
+
+  ## Relevant test environment and configuration details
+
+  - Software deviations: aligned with test case specification, N/A
+  - Hardware deviations: aligned with test case specification, N/A
+  - Method: automated black-box run, `pytest tests_integration/test_tst042_hybrid_retrieval.py -v`,
+    against a live instance freshly rebuilt from current source. Uses
+    `docs/specs/tst/assets/hybrid_retrieval/api-access-controls.md`, written
+    so semantic and keyword search diverge (an exact term used once, plus a
+    longer conceptually-related passage that never uses it).
+
+  ## Test execution results
+
+  **Test case step 1-3 (submit the same query to /search in semantic,
+  keyword, and hybrid mode)**:
+  - `test_search_modes_return_results` PASSED: all three modes return
+    non-empty result data. Ranking-order differences between modes (the
+    qualitative behavior TST-042's expected outcomes 1-3 describe) are not
+    separately asserted -- this checks accessibility/non-emptiness, not
+    ranking quality. ?c5-defect-0
+
+  **Test case step 4 (submit the same query via /chat and /generate, each
+  of the three modes)**:
+  - `test_modes_accessible_via_chat_and_generate` PASSED: all three modes
+    succeed via both `/api/chat` and `/api/generate` when a collection is
+    specified, using a real tenant-member client (required since these
+    endpoints enforce `CollectionAccessPolicy` with no admin bypass, unlike
+    `/api/search`). ?c5-defect-0
+
+  ### Defect summary description
+
+  Defect-free test execution, i.e., defect category: ?c5-defect-0. All
+  three retrieval modes are reachable and return results via `/search`, and
+  are also reachable via `/chat` and `/generate` when a collection is
+  specified.
+
+  ### Test execution evidence
+
+  `2 passed` (see the full-suite summary referenced in TRP-004).
+
+  ### Comments
+
+  This confirms mode *accessibility*, not the qualitative ranking
+  distinctions TST-042's expected outcomes describe (semantic favoring
+  conceptual matches, keyword favoring exact terms, hybrid merging both) --
+  a stricter check would need to assert on result ordering/scores, not just
+  non-empty data.
+
+  ## Guide
+
+  - Defect category: ?c5-defect-0; ?c5-defect-1; ?c5-defect-2; ?c5-defect-3; ?c5-defect-4
+  - Verification method (VM): Test (T)
+verification-method: T
