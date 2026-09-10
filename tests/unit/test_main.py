@@ -14,6 +14,7 @@ def _settings(**overrides):
     base = dict(
         version="v1", port=5555, services_to_start=["chat"],
         project_root=pathlib.Path("/fake/root"), app_data=pathlib.Path("/fake/data"),
+        insecure_llm_urls=lambda: [],
     )
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -91,6 +92,8 @@ class TestLifespan:
         auth_svc = MagicMock()
         auth_svc.config.max_failed_attempts = 7
         auth_svc.config.lockout_duration_minutes = 3
+        auth_svc.config.ip_rate_limit_max_attempts = 40
+        auth_svc.config.ip_rate_limit_window_minutes = 2
         container = _container(services={"auth": auth_svc})
 
         with patch("hestia.main.Settings") as mock_settings_cls, \
@@ -100,13 +103,15 @@ class TestLifespan:
              patch("hestia.main.RequestHandler"), \
              patch("hestia.main.include_routers"), \
              patch("hestia.main.shutdown_logging"), \
-             patch("hestia.main.login_rate_limit") as mock_rate_limit:
+             patch("hestia.main.login_rate_limit") as mock_rate_limit, \
+             patch("hestia.main.login_ip_rate_limit") as mock_ip_rate_limit:
             mock_settings_cls.load.return_value = _settings()
 
             with TestClient(app):
                 pass
 
         mock_rate_limit.configure.assert_called_once_with(7, 3)
+        mock_ip_rate_limit.configure.assert_called_once_with(40, 2)
 
     def test_skips_rate_limit_configuration_when_auth_service_absent(self):
         app = create_api()
@@ -119,13 +124,15 @@ class TestLifespan:
              patch("hestia.main.RequestHandler"), \
              patch("hestia.main.include_routers"), \
              patch("hestia.main.shutdown_logging"), \
-             patch("hestia.main.login_rate_limit") as mock_rate_limit:
+             patch("hestia.main.login_rate_limit") as mock_rate_limit, \
+             patch("hestia.main.login_ip_rate_limit") as mock_ip_rate_limit:
             mock_settings_cls.load.return_value = _settings()
 
             with TestClient(app):
                 pass
 
         mock_rate_limit.configure.assert_not_called()
+        mock_ip_rate_limit.configure.assert_not_called()
 
     def test_shutdown_runs_even_when_startup_fails_before_container_is_stored(self):
         # If build_container itself raises, app.state.container was never

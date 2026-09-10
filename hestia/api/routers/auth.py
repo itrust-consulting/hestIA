@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
 from hestia.api.dependencies import get_container
-from hestia.api.limiter import limiter, login_key, login_rate_limit, stash_login_identifier
+from hestia.api.limiter import limiter, login_ip_key, login_ip_rate_limit, login_key, login_rate_limit, stash_login_identifier
 from hestia.api.security import _issue_token, get_current_user, oauth2_scheme
 from hestia.container import Container
 from hestia.domain.auth.models import User
@@ -20,6 +20,7 @@ router = APIRouter()
 
 @router.post("/login")
 @limiter.limit(login_rate_limit, key_func=login_key)
+@limiter.limit(login_ip_rate_limit, key_func=login_ip_key)
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),

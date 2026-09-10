@@ -93,6 +93,20 @@ class TestCollectionAccessPolicy:
         r = self.policy.check(_req(exec_type="rag_generate", collection="col-1"))
         assert r.decision == PolicyDecision.DENY
 
+    def test_search_exec_type_also_checked(self):
+        # Regression test: direct search used to bypass this policy entirely
+        # (only "rag_chat"/"rag_generate" were gated), leaving the
+        # classification filter fully client-controlled.
+        r = self.policy.check(_req(exec_type="search", collection="secret-col"))
+        assert r.decision == PolicyDecision.DENY
+
+        user = _user(allowed_collections={
+            "col-1": CollectionPermission(access=True, max_classification=3)
+        })
+        r = self.policy.check(_req(exec_type="search", user=user))
+        assert r.decision == PolicyDecision.FILTER
+        assert r.filters["max_classification"] == 3
+
 
 # ---------------------------------------------------------------------------
 # ExecutionPolicy

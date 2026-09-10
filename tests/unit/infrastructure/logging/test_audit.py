@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hestia.infrastructure.logging.audit import AuditLogger
+from hestia.infrastructure.logging.audit import AuditLogger, audited
 
 
 @pytest.fixture
@@ -77,4 +77,55 @@ class TestAdminAction:
             logger.admin_action(actor_id="admin1", action="delete_user", target="user-uuid")
         extra = mock_log.info.call_args.kwargs["extra"]
         assert extra["action"] == "delete_user"
-        assert extra["target"] == "user-uuid"
+
+
+class TestConnectionAction:
+
+    def test_logs_action_and_target(self, logger):
+        with patch("hestia.infrastructure.logging.audit._log") as mock_log:
+            logger.connection_action(actor_id="admin1", action="connection_create", target="5")
+        extra = mock_log.info.call_args.kwargs["extra"]
+        assert extra["action"] == "connection_create"
+        assert extra["target"] == "5"
+        assert extra["success"] is True
+        assert extra["reason"] is None
+
+    def test_supports_success_false_and_reason(self, logger):
+        # Regression test: connection_action used to lack success/reason,
+        # so llm_settings.py's connection mutations couldn't be wrapped in
+        # audited() and a failure left no audit trail at all.
+        with patch("hestia.infrastructure.logging.audit._log") as mock_log:
+            logger.connection_action(
+                actor_id="admin1", action="connection_delete", target="5",
+                success=False, reason="boom",
+            )
+        extra = mock_log.info.call_args.kwargs["extra"]
+        assert extra["success"] is False
+        assert extra["reason"] == "boom"
+
+
+class TestAudited:
+
+    def test_success_calls_log_fn_with_success_true(self):
+        log_fn = MagicMock()
+        with audited(log_fn, actor_id="u1", action="thing_update", target="t1"):
+            pass
+        log_fn.assert_called_once_with(actor_id="u1", action="thing_update", target="t1", success=True)
+
+    def test_failure_calls_log_fn_with_success_false_and_reraises(self):
+        log_fn = MagicMock()
+        with pytest.raises(ValueError):
+            with audited(log_fn, actor_id="u1", action="thing_update", target="t1"):
+                raise ValueError("x")
+        log_fn.assert_called_once_with(
+            actor_id="u1", action="thing_update", target="t1", success=False, reason="x"
+        )
+
+    def test_kwargs_without_target_or_detail_are_forwarded_as_given(self):
+        # Mirrors account.py's usage of audit.user_action, which has no
+        # detail parameter -- audited() must not assume every log_fn shares
+        # admin_action/data_action's full signature.
+        log_fn = MagicMock()
+        with audited(log_fn, actor_id="u1", action="password_change"):
+            pass
+        log_fn.assert_called_once_with(actor_id="u1", action="password_change", success=True)

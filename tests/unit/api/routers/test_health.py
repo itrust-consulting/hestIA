@@ -41,6 +41,19 @@ class TestReady:
         assert body["services"] == ["auth", "chat"]
         assert body["providers"] == ["db"]
 
+    def test_does_not_require_authentication(self):
+        # Regression test: /ready is part of the health-check surface used
+        # by orchestrators/load balancers (see docs/icd.md) and must stay
+        # reachable without a bearer token.
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_container] = lambda: MagicMock()
+        client = TestClient(app)
+
+        resp = client.get("/ready")
+
+        assert resp.status_code == 200
+
 
 class TestCollections:
 
@@ -73,3 +86,18 @@ class TestModels:
         resp = client.get("/models")
 
         assert resp.status_code == 500
+
+    def test_does_not_require_authentication(self):
+        # Regression test: /models is part of the health-check surface used
+        # by orchestrators/load balancers (see docs/icd.md) and must stay
+        # reachable without a bearer token.
+        container = MagicMock()
+        container.providers = {"llm": MagicMock(models=["m1"])}
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_container] = lambda: container
+        client = TestClient(app)
+
+        resp = client.get("/models")
+
+        assert resp.status_code == 200

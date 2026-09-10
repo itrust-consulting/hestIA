@@ -1156,6 +1156,21 @@ class TestLdapLookupUserDn:
         assert dn == "uid=alice,dc=example,dc=com"
         assert attrs is None
 
+    @patch("hestia.domain.auth.users.Connection")
+    def test_service_bind_failure_is_logged(self, mock_connection_cls, caplog):
+        # Regression test: a service-bind/search failure (directory down,
+        # bad bind creds) used to be swallowed with no log at all, showing
+        # up only as a generic "login failed" with no cause recorded.
+        from hestia.domain.auth.users import LDAPService
+        svc = LDAPService(
+            host="ldap.example.com", search_base="dc=example,dc=com",
+            bind_dn="cn=svc,dc=example,dc=com", bind_password="pw",
+        )
+        mock_connection_cls.side_effect = Exception("bind failed")
+        with caplog.at_level("WARNING", logger="hestia.system"):
+            svc._lookup_user_dn("alice")
+        assert any(r.message == "ldap_service_bind_failed" for r in caplog.records)
+
     def test_direct_dn_uses_template_when_configured(self):
         from hestia.domain.auth.users import LDAPService
         svc = LDAPService(

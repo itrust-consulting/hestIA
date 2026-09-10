@@ -542,7 +542,19 @@ class RequestHandler:
         runner = PersistChat(self.runner, req) if req.save_chat else self.runner
 
         t0 = time.perf_counter()
-        response, _ = await runner.run(graph, stream=False)
+        try:
+            response, _ = await runner.run(graph, stream=False)
+        except Exception as e:
+            latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+            audit.ai_response(
+                user_id=user_id,
+                exec_type=req.exec_type,
+                response_len=0,
+                latency_ms=latency_ms,
+                success=False,
+                error=str(e),
+            )
+            raise
         latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
         audit.ai_response(

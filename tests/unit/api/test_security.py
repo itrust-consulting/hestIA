@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from unittest.mock import patch
 
 import jwt
 import pytest
@@ -35,6 +36,15 @@ class TestAssertAdmin:
         with pytest.raises(HTTPException) as exc:
             assert_admin(plain_user)
         assert exc.value.status_code == 403
+
+    def test_denial_is_audited(self, plain_user):
+        with patch("hestia.api.security.audit") as mock_audit:
+            with pytest.raises(HTTPException):
+                assert_admin(plain_user)
+        mock_audit.access_denied.assert_called_once_with(
+            actor_id=str(plain_user.id), action="assert_admin", target=None,
+            reason="Admin access required.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +327,29 @@ class TestGetCurrentUser:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 401
+
+    def test_expired_token_denial_is_audited(self, admin_user):
+        from hestia.api.security import get_current_user
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from hestia.api.dependencies import get_container
+
+        token = create_access_token(admin_user.id, key=SECRET, algorithm=ALG, expiration_time=-1)
+        container = self._container(user=admin_user)
+        app = FastAPI()
+        app.dependency_overrides[get_container] = lambda: container
+
+        @app.get("/me")
+        def me(user=__import__("fastapi").Depends(get_current_user)):
+            return {}
+
+        client = TestClient(app, raise_server_exceptions=False)
+        with patch("hestia.api.security.audit") as mock_audit:
+            resp = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 401
+        mock_audit.access_denied.assert_called_once_with(
+            actor_id="unknown", action="get_current_user", reason="token_expired",
+        )
 
     def test_raises_500_on_disallowed_signing_algorithm(self, admin_user):
         # Regression test: a misconfigured (or, if ever admin-exposed,

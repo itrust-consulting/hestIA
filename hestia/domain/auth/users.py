@@ -10,6 +10,7 @@ import uuid
 from typing import Callable
 
 from ldap3 import ALL, SIMPLE, SUBTREE, Connection, Server, Tls
+from ldap3.core.exceptions import LDAPBindError
 from ldap3.utils.conv import escape_filter_chars
 
 from hestia.domain.auth.models import AuthResult, CollectionPermission, Permissions, User
@@ -659,7 +660,8 @@ class LDAPService:
         try:
             return Connection(self._server(), user=self.bind_dn, password=self.bind_password,
                               authentication=SIMPLE, auto_bind=True)
-        except Exception:
+        except Exception as e:
+            _log.warning("ldap_service_bind_failed", extra={"host": self.host, "error": str(e)})
             return None
 
     def _search_user(self, conn: Connection, identifier: str) -> tuple[str | None, dict | None]:
@@ -668,7 +670,8 @@ class LDAPService:
             try:
                 conn.search(search_base=self.search_base, search_filter=filt,
                             search_scope=SUBTREE, attributes=["uid", "sAMAccountName", "mail", "givenName", "sn", "memberOf"])
-            except Exception:
+            except Exception as e:
+                _log.warning("ldap_search_failed", extra={"host": self.host, "filter": filt, "error": str(e)})
                 continue
             if conn.entries:
                 entry = conn.entries[0]
@@ -706,7 +709,13 @@ class LDAPService:
         try:
             Connection(self._server(), user=dn, password=password, authentication=SIMPLE, auto_bind=True)
             return True
-        except Exception:
+        except LDAPBindError:
+            # Wrong credentials -- an expected outcome of a login attempt,
+            # not a directory failure. Not logged here; the caller's
+            # AuthenticationService audits the overall auth attempt.
+            return False
+        except Exception as e:
+            _log.warning("ldap_bind_error", extra={"host": self.host, "error": str(e)})
             return False
 
     def _normalize_ldap_groups(self, member_of: list[str]) -> set[str]:
@@ -732,8 +741,8 @@ class LDAPService:
                 )
                 if conn.entries:
                     attrs = conn.entries[0].entry_attributes_as_dict
-            except Exception:
-                pass
+            except Exception as e:
+                _log.warning("ldap_attrs_lookup_failed", extra={"host": self.host, "error": str(e)})
             attrs = attrs or {}
 
         groups = self._normalize_ldap_groups(attrs.get("memberOf") or [])

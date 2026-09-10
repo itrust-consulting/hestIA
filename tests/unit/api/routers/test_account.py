@@ -116,8 +116,8 @@ class TestChangePassword:
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
         users_svc.change_password.assert_called_once_with(user.id, "old-pass", "newpassword123")
-        mock_audit.admin_action.assert_called_once_with(
-            actor_id=str(user.id), action="password_change", target=str(user.id)
+        mock_audit.user_action.assert_called_once_with(
+            actor_id=str(user.id), action="password_change", success=True
         )
 
     def test_only_ever_changes_the_authenticated_users_own_password(self):
@@ -202,7 +202,7 @@ class TestChangePassword:
 
         assert resp.status_code == 404
 
-    def test_failure_does_not_emit_audit_log(self):
+    def test_failure_emits_audit_log_with_success_false(self):
         user = _make_user()
         handler = MagicMock()
         users_svc = MagicMock()
@@ -216,7 +216,32 @@ class TestChangePassword:
                 json={"current_pw": "wrong", "new_pw": "newpassword123"},
             )
 
-        mock_audit.admin_action.assert_not_called()
+        mock_audit.user_action.assert_called_once_with(
+            actor_id=str(user.id), action="password_change", success=False, reason="Incorrect current password."
+        )
+
+    def test_unexpected_exception_is_also_audited_and_reraised(self):
+        # Regression test: change_password used to only audit failures that
+        # were a HestiaError -- an unexpected exception (bad connection,
+        # bug) left no audit trail at all, unlike every other mutation's
+        # audited() wrapper (admin.py, ingestion.py).
+        user = _make_user()
+        handler = MagicMock()
+        users_svc = MagicMock()
+        users_svc.change_password.side_effect = RuntimeError("boom")
+        handler.container.services.get.return_value = users_svc
+
+        with patch("hestia.api.routers.account.audit") as mock_audit:
+            client = TestClient(_app(user=user, handler=handler), raise_server_exceptions=False)
+            resp = client.patch(
+                "/account/password",
+                json={"current_pw": "old-pass", "new_pw": "newpassword123"},
+            )
+
+        assert resp.status_code == 500
+        mock_audit.user_action.assert_called_once_with(
+            actor_id=str(user.id), action="password_change", success=False, reason="boom"
+        )
 
 
 # ---------------------------------------------------------------------------

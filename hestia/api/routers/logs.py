@@ -28,6 +28,7 @@ def list_logs(
     offset: int = Query(0, ge=0),
 ):
     assert_admin(user)
+    audit.admin_action(actor_id=str(user.id), action="logs_view", target=log_type)
     entries, total = query_logs(
         h.container.settings.log_dir, log_type, level=level, search=search,
         since=since, until=until, limit=limit, offset=offset,

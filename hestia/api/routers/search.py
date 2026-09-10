@@ -5,9 +5,13 @@ from hestia.api.schemas.requests import SearchRequest
 from hestia.api.security import get_current_user
 from hestia.container import Container
 from hestia.domain.auth.models import User
+from hestia.domain.policies.guard import ExecutionPolicy, PolicyDecision
+from hestia.domain.rag.graph import ExecutionRequest
 from hestia.domain.rag.types import DenseVector, HybridQuery, SparseVector
 
 router = APIRouter()
+
+_policy = ExecutionPolicy()
 
 
 # @MRS-034, @MRS-085
@@ -19,6 +23,22 @@ async def search(
 ):
     if not user.permissions.can_read_collection(req.collection):
         raise HTTPException(403, "Access to this collection is not permitted.")
+
+    # Admins bypass can_read_collection above regardless of an explicit ACL
+    # entry (User.permissions.can_read_collection), so the policy check below
+    # -- which has no such bypass -- only runs for non-admins. For everyone
+    # else, this forces the same server-side max_classification cap the RAG
+    # path already applies (handler.py's resolve()), instead of trusting
+    # whatever (or no) classification filter the client put in req.options.
+    if not user.permissions.is_admin:
+        policy_req = ExecutionRequest(user=user, exec_type="search", collection=req.collection)
+        result = _policy.check(policy_req)
+        if result.decision == PolicyDecision.DENY:
+            raise HTTPException(403, result.msg or "Access to this collection is not permitted.")
+        if result.decision == PolicyDecision.FILTER:
+            req.options = req.options or {}
+            req.options["filters"] = result.filters
+
     retriever = c.require_service("search")
 
     if req.mode == "semantic":

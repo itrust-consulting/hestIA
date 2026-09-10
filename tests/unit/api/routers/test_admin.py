@@ -160,6 +160,38 @@ class TestUpdateUser:
         resp = _client(user=_make_user(), handler=h).patch(f"/users/user/{uuid.uuid4()}", json={})
         assert resp.status_code == 403
 
+    def test_success_is_audited(self):
+        users_svc = MagicMock()
+        h = _handler({"users": users_svc})
+        uid = uuid.uuid4()
+        user = _make_user(is_admin=True)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = _client(user=user, handler=h).patch(f"/users/user/{uid}", json={"username": "new"})
+        assert resp.status_code == 200
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["actor_id"] == str(user.id)
+        assert kwargs["action"] == "user_update"
+        assert kwargs["target"] == str(uid)
+        assert kwargs["success"] is True
+
+    def test_failure_is_audited_with_reason(self):
+        # Regression test: admin actions used to be logged only on success --
+        # a mutation that fails after authorization passes left no trace.
+        users_svc = MagicMock()
+        users_svc.update_user.side_effect = ValueError("boom")
+        h = _handler({"users": users_svc})
+        uid = uuid.uuid4()
+        user = _make_user(is_admin=True)
+        client = TestClient(_app(user=user, handler=h), raise_server_exceptions=False)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = client.patch(f"/users/user/{uid}", json={"username": "new"})
+        assert resp.status_code == 500  # unhandled ValueError -> default 500
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["actor_id"] == str(user.id)
+        assert kwargs["action"] == "user_update"
+        assert kwargs["success"] is False
+        assert kwargs["reason"] == "boom"
+
 
 # ---------------------------------------------------------------------------
 # DELETE /users/user/{uid}
@@ -222,6 +254,37 @@ class TestCreateUser:
         resp = _client(user=_make_user(), handler=h).post("/users/create", json=self._payload())
         assert resp.status_code == 403
 
+    def test_success_is_audited_with_created_id_as_target(self):
+        # Regression test: target must stay the created user's id (what
+        # TST-037 correlates on), not the submitted username.
+        users_svc = MagicMock()
+        user_id = uuid.uuid4()
+        users_svc.create_user.return_value = user_id
+        h = _handler({"users": users_svc})
+        user = _make_user(is_admin=True)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = _client(user=user, handler=h).post("/users/create", json=self._payload())
+        assert resp.status_code == 200
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "user_create"
+        assert kwargs["target"] == str(user_id)
+        assert kwargs["success"] is True
+
+    def test_failure_is_audited_with_username_as_target(self):
+        users_svc = MagicMock()
+        users_svc.create_user.side_effect = ValueError("username taken")
+        h = _handler({"users": users_svc})
+        user = _make_user(is_admin=True)
+        client = TestClient(_app(user=user, handler=h), raise_server_exceptions=False)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = client.post("/users/create", json=self._payload())
+        assert resp.status_code == 500
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "user_create"
+        assert kwargs["target"] == "newuser"
+        assert kwargs["success"] is False
+        assert kwargs["reason"] == "username taken"
+
 
 # ---------------------------------------------------------------------------
 # GET /organizations, /organizations/list
@@ -266,6 +329,11 @@ class TestListOrganizations:
     def test_plain_user_forbidden(self):
         h = _handler({"users": MagicMock()})
         resp = _client(user=_make_user(), handler=h).get("/organizations")
+        assert resp.status_code == 403
+
+    def test_alias_route_plain_user_forbidden(self):
+        h = _handler({"users": MagicMock()})
+        resp = _client(user=_make_user(), handler=h).get("/organizations/list")
         assert resp.status_code == 403
 
 
@@ -725,6 +793,34 @@ class TestNotificationsBroadcast:
         resp = _client(user=_make_user(), handler=h).post("/notifications/broadcast", json={"title": "Hi"})
         assert resp.status_code == 403
 
+    def test_success_is_audited_with_notification_id_as_target(self):
+        notif_svc = MagicMock()
+        notif_id = uuid.uuid4()
+        notif_svc.broadcast.return_value = notif_id
+        h = _handler({"notifications": notif_svc})
+        user = _make_user(is_admin=True)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = _client(user=user, handler=h).post("/notifications/broadcast", json={"title": "Hi"})
+        assert resp.status_code == 200
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "notification_broadcast"
+        assert kwargs["target"] == str(notif_id)
+        assert kwargs["success"] is True
+
+    def test_failure_is_audited_with_title_as_target(self):
+        notif_svc = MagicMock()
+        notif_svc.broadcast.side_effect = ValueError("boom")
+        h = _handler({"notifications": notif_svc})
+        user = _make_user(is_admin=True)
+        client = TestClient(_app(user=user, handler=h), raise_server_exceptions=False)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = client.post("/notifications/broadcast", json={"title": "Hi"})
+        assert resp.status_code == 500
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "notification_broadcast"
+        assert kwargs["target"] == "Hi"
+        assert kwargs["success"] is False
+
 
 class TestNotificationHistory:
     def test_admin_gets_history(self):
@@ -867,6 +963,36 @@ class TestTenantInvitations:
         resp = _client(user=_make_user(), handler=h).post("/organizations/1/invitations", json={})
         assert resp.status_code == 403
 
+    def test_invite_success_is_audited_with_invitation_id_as_target(self):
+        notif_svc = MagicMock()
+        inv_id = uuid.uuid4()
+        notif_svc.invite_user.return_value = inv_id
+        h = _handler({"notifications": notif_svc})
+        user = _make_user(moderated_tenants=[1])
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = _client(user=user, handler=h).post(
+                "/organizations/1/invitations", json={"identifier": "bob@x.com"}
+            )
+        assert resp.status_code == 200
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "tenant_invitation_send"
+        assert kwargs["target"] == str(inv_id)
+        assert kwargs["success"] is True
+
+    def test_invite_failure_is_audited_with_identifier_as_target(self):
+        notif_svc = MagicMock()
+        notif_svc.invite_user.side_effect = ValueError("boom")
+        h = _handler({"notifications": notif_svc})
+        user = _make_user(moderated_tenants=[1])
+        client = TestClient(_app(user=user, handler=h), raise_server_exceptions=False)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = client.post("/organizations/1/invitations", json={"identifier": "bob@x.com"})
+        assert resp.status_code == 500
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "tenant_invitation_send"
+        assert kwargs["target"] == "bob@x.com"
+        assert kwargs["success"] is False
+
     def test_invite_service_unavailable(self):
         h = _handler({"notifications": None})
         resp = _client(user=_make_user(moderated_tenants=[1]), handler=h).post(
@@ -945,6 +1071,36 @@ class TestTenantShareRequests:
             "/organizations/1/share-requests", json={"target_org_id": 2}
         )
         assert resp.status_code == 403
+
+    def test_success_is_audited_with_request_id_as_target(self):
+        notif_svc = MagicMock()
+        req_id = uuid.uuid4()
+        notif_svc.file_share_request.return_value = req_id
+        h = _handler({"notifications": notif_svc})
+        user = _make_user(moderated_tenants=[1])
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = _client(user=user, handler=h).post(
+                "/organizations/1/share-requests", json={"target_org_id": 2}
+            )
+        assert resp.status_code == 200
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "share_request_file"
+        assert kwargs["target"] == str(req_id)
+        assert kwargs["success"] is True
+
+    def test_failure_is_audited_with_org_pair_as_target(self):
+        notif_svc = MagicMock()
+        notif_svc.file_share_request.side_effect = ValueError("boom")
+        h = _handler({"notifications": notif_svc})
+        user = _make_user(moderated_tenants=[1])
+        client = TestClient(_app(user=user, handler=h), raise_server_exceptions=False)
+        with patch("hestia.api.routers.admin.audit") as mock_audit:
+            resp = client.post("/organizations/1/share-requests", json={"target_org_id": 2})
+        assert resp.status_code == 500
+        _, kwargs = mock_audit.admin_action.call_args
+        assert kwargs["action"] == "share_request_file"
+        assert kwargs["target"] == "1->2"
+        assert kwargs["success"] is False
 
     def test_file_share_request_service_unavailable(self):
         h = _handler({"notifications": None})

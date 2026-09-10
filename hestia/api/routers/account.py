@@ -5,7 +5,7 @@ from hestia.api.security import get_current_user
 from hestia.domain.auth.models import User
 from hestia.domain.auth.users import now_epoch
 from hestia.handler import RequestHandler
-from hestia.infrastructure.logging.audit import audit
+from hestia.infrastructure.logging.audit import audit, audited
 
 router = APIRouter()
 
@@ -31,8 +31,8 @@ def change_password(
         raise HTTPException(400, "Missing fields: current_pw, new_pw")
 
     svc = h.container.services.get("users")
-    svc.change_password(user.id, current_pw, new_pw)
-    audit.admin_action(actor_id=str(user.id), action="password_change", target=str(user.id))
+    with audited(audit.user_action, actor_id=str(user.id), action="password_change"):
+        svc.change_password(user.id, current_pw, new_pw)
     return {"status": "ok"}
 
 

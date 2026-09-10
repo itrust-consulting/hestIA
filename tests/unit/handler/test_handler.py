@@ -1010,6 +1010,24 @@ class TestRequestHandlerResolve:
         h.builder.build.assert_called_once_with(req, RequestHandler.TEMPLATE_MAP["generate"])
         h.runner.run.assert_awaited_once_with("graph", stream=False)
 
+    def test_non_streaming_failure_is_audited_and_reraised(self):
+        # Regression test: a non-streaming model failure used to log
+        # ai_request but never ai_response, leaving the failure invisible in
+        # the audit trail.
+        h = self._handler()
+        h.runner.run = AsyncMock(side_effect=RuntimeError("model unreachable"))
+        req = self._req(exec_type="generate")
+
+        with patch("hestia.handler.audit") as mock_audit:
+            with pytest.raises(RuntimeError):
+                asyncio.run(h.resolve(req, stream=False))
+
+        mock_audit.ai_response.assert_called_once()
+        _, kwargs = mock_audit.ai_response.call_args
+        assert kwargs["success"] is False
+        assert kwargs["error"] == "model unreachable"
+        assert kwargs["response_len"] == 0
+
     def test_sets_query_filters_when_policy_decision_is_filter(self):
         h = self._handler()
         h.policy.check.return_value = PolicyResult(
