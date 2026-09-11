@@ -5,12 +5,10 @@ import pytest
 
 # Real test file from tests/test_inputs/
 DOCX_FILE = pathlib.Path(__file__).parents[4] / "tests" / "test_inputs" / "Test-Document.docx"
-DOCX_ITR = pathlib.Path(__file__).parents[4] / "tests" / "test_inputs" / "Test-Document-ITR.docx"
 
 skip_if_missing = pytest.mark.skipif(not DOCX_FILE.exists(), reason="Test DOCX not found")
-skip_if_itr_missing = pytest.mark.skipif(not DOCX_ITR.exists(), reason="ITR DOCX not found")
 
-from hestia.infrastructure.parsers.docx import DOCXParser, ITRDOCXParser
+from hestia.infrastructure.parsers.docx import DOCXParser
 
 
 @skip_if_missing
@@ -225,62 +223,3 @@ class TestDOCXParserListItems:
         md = p.to_markdown()
         assert isinstance(md, str)
         assert len(md) > 0
-
-
-@skip_if_itr_missing
-class TestITRDOCXParser:
-
-    @pytest.fixture(scope="class")
-    def parser(self):
-        return ITRDOCXParser(file=str(DOCX_ITR))
-
-    def test_loads_without_error(self, parser):
-        assert parser.doc is not None
-
-    def test_metadata_merged_from_cover_page(self, parser):
-        meta = parser.get_metadata(builtIn_only=False)
-        assert isinstance(meta, dict)
-
-    def test_to_markdown_returns_string(self, parser):
-        md = parser.to_markdown()
-        assert isinstance(md, str)
-        assert len(md) > 0
-
-    def test_get_metadata_builtin_only_default_skips_cover_page(self, parser):
-        # builtIn_only defaults to True, so get_metadata_from_cover_page is never called
-        meta = parser.get_metadata()
-        assert "source" in meta
-
-    def test_get_metadata_applies_mask(self, parser):
-        meta = parser.get_metadata(mask_name="rag_default")
-        assert isinstance(meta, dict)
-
-
-class TestITRDOCXParserCoverPageEdgeCases:
-
-    def test_cover_page_metadata_empty_with_fewer_than_two_tables(self, tmp_path):
-        import docx
-        doc = docx.Document()
-        doc.add_paragraph("no tables here")
-        path = tmp_path / "no_cover.docx"
-        doc.save(str(path))
-
-        p = ITRDOCXParser(file=str(path))
-        result = p.get_metadata_from_cover_page(str(path))
-        assert result == {}
-
-    def test_get_metadata_swallows_cover_page_errors(self, tmp_path, monkeypatch):
-        import docx
-        doc = docx.Document()
-        doc.add_paragraph("content")
-        path = tmp_path / "err.docx"
-        doc.save(str(path))
-
-        p = ITRDOCXParser(file=str(path))
-
-        def boom(file):
-            raise IndexError("bad cover page")
-
-        monkeypatch.setattr(p, "get_metadata_from_cover_page", boom)
-        meta = p.get_metadata(builtIn_only=False)
-        assert "source" in meta

@@ -47,7 +47,6 @@ class IngestionRequest:
     uploaded_by: str = ""
     classification_labels: list[str] = field(default_factory=list)
     mask_name: str = "rag_default"
-    itrust_template: bool = False
     original_filename: str | None = None
     metadata_overrides: dict | None = None
     language: str = "english"
@@ -97,10 +96,10 @@ class IngestionPipeline:
             "tenants": req.tenants,
         })
 
-        parser = self._get_parser(file_path, req.itrust_template, req.selected_sheets)
+        parser = self._get_parser(file_path, req.selected_sheets)
         try:
             body = parser.to_markdown()
-            metadata = parser.get_metadata(builtIn_only=not req.itrust_template, mask_name=req.mask_name)
+            metadata = parser.get_metadata(mask_name=req.mask_name)
         finally:
             parser.close()
 
@@ -203,7 +202,7 @@ class IngestionPipeline:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _get_parser(self, file_path: Path, itrust_template: bool, selected_sheets: list[str] | None = None) -> BaseParser:
+    def _get_parser(self, file_path: Path, selected_sheets: list[str] | None = None) -> BaseParser:
         ext = file_path.suffix.lower()
         if ext not in SUPPORTED_EXTENSIONS:
             raise ValidationError(
@@ -211,21 +210,12 @@ class IngestionPipeline:
                 f"Supported: {', '.join(SUPPORTED_EXTENSIONS)}"
             )
         if ext == ".docx":
-            if itrust_template:
-                from hestia.infrastructure.parsers.docx import ITRDOCXParser
-                return ITRDOCXParser(file=str(file_path))
             from hestia.infrastructure.parsers.docx import DOCXParser
             return DOCXParser(file=str(file_path))
         if ext == ".pdf":
-            if itrust_template:
-                from hestia.infrastructure.parsers.pdf import ITRPDFParser
-                return ITRPDFParser(file=str(file_path))
             from hestia.infrastructure.parsers.pdf import PDFParser
             return PDFParser(file=str(file_path))
         if ext in (".xlsx", ".xlsm"):
-            if itrust_template:
-                from hestia.infrastructure.parsers.xlsx import ITRXLSXParser
-                return ITRXLSXParser(file=str(file_path), selected_sheets=selected_sheets)
             from hestia.infrastructure.parsers.xlsx import XLSXParser
             return XLSXParser(file=str(file_path), selected_sheets=selected_sheets)
         if ext == ".json":

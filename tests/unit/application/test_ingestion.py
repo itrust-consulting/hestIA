@@ -60,7 +60,7 @@ class TestGetParser:
         # `from ... import` inside the function picks up the mock.
         with patch("hestia.infrastructure.parsers.docx.DOCXParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
         MockP.assert_called_once()
 
     def test_pdf_extension_returns_pdf_parser(self, pipeline, tmp_path):
@@ -68,37 +68,21 @@ class TestGetParser:
         f.write_bytes(b"")
         with patch("hestia.infrastructure.parsers.pdf.PDFParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
-        MockP.assert_called_once()
-
-    def test_itrust_docx_returns_itr_parser(self, pipeline, tmp_path):
-        f = tmp_path / "test.docx"
-        f.write_bytes(b"")
-        with patch("hestia.infrastructure.parsers.docx.ITRDOCXParser") as MockP:
-            MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=True, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
         MockP.assert_called_once()
 
     def test_unsupported_extension_raises(self, pipeline, tmp_path):
         f = tmp_path / "test.xyz"
         f.write_bytes(b"")
         with pytest.raises(ValidationError, match="not supported"):
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
 
     def test_csv_extension_dispatched(self, pipeline, tmp_path):
         f = tmp_path / "data.csv"
         f.write_bytes(b"")
         with patch("hestia.infrastructure.parsers.csv.CSVParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
-        MockP.assert_called_once()
-
-    def test_itrust_pdf_returns_itr_parser(self, pipeline, tmp_path):
-        f = tmp_path / "test.pdf"
-        f.write_bytes(b"")
-        with patch("hestia.infrastructure.parsers.pdf.ITRPDFParser") as MockP:
-            MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=True, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
         MockP.assert_called_once()
 
     def test_xlsx_extension_returns_xlsx_parser(self, pipeline, tmp_path):
@@ -106,23 +90,15 @@ class TestGetParser:
         f.write_bytes(b"")
         with patch("hestia.infrastructure.parsers.xlsx.XLSXParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=["Sheet1"])
+            pipeline._get_parser(f, selected_sheets=["Sheet1"])
         MockP.assert_called_once_with(file=str(f), selected_sheets=["Sheet1"])
-
-    def test_itrust_xlsx_returns_itr_xlsx_parser(self, pipeline, tmp_path):
-        f = tmp_path / "test.xlsx"
-        f.write_bytes(b"")
-        with patch("hestia.infrastructure.parsers.xlsx.ITRXLSXParser") as MockP:
-            MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=True, selected_sheets=None)
-        MockP.assert_called_once()
 
     def test_json_extension_dispatched(self, pipeline, tmp_path):
         f = tmp_path / "data.json"
         f.write_bytes(b"")
         with patch("hestia.infrastructure.parsers.json.JSONParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
         MockP.assert_called_once()
 
     def test_txt_extension_dispatched(self, pipeline, tmp_path):
@@ -130,7 +106,7 @@ class TestGetParser:
         f.write_bytes(b"")
         with patch("hestia.infrastructure.parsers.txt.TXTParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
         MockP.assert_called_once()
 
     def test_md_extension_dispatched(self, pipeline, tmp_path):
@@ -138,7 +114,7 @@ class TestGetParser:
         f.write_bytes(b"")
         with patch("hestia.infrastructure.parsers.md.MarkdownParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
         MockP.assert_called_once()
 
     def test_pptx_extension_dispatched(self, pipeline, tmp_path):
@@ -146,7 +122,7 @@ class TestGetParser:
         f.write_bytes(b"")
         with patch("hestia.infrastructure.parsers.pptx.PPTXParser") as MockP:
             MockP.return_value = MagicMock()
-            pipeline._get_parser(f, itrust_template=False, selected_sheets=None)
+            pipeline._get_parser(f, selected_sheets=None)
         MockP.assert_called_once()
 
 

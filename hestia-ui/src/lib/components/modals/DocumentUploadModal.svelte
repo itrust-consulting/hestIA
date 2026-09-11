@@ -61,7 +61,6 @@
   // Current-file state
   let uploadFile: File | null   = $state(null);
   let uploadTenants: string[]   = $state([...defaultTenants]);
-  let uploadITR                 = $state(false);
   let uploadLanguage            = $state('');
   let uploadChunkingStrategy    = $state('auto');
   let uploadMaxChars: number | undefined = $state(undefined);
@@ -203,7 +202,6 @@
     batchMode        = null;
     autoRunning      = false;
     uploadTenants    = [...defaultTenants];
-    uploadITR              = false;
     uploadLanguage         = '';
     uploadChunkingStrategy = 'auto';
     uploadMaxChars         = undefined;
@@ -258,7 +256,6 @@
       try {
         const fd = new FormData();
         fd.append('file', file);
-        fd.append('itrust_template', String(uploadITR));
         const pr   = await fetch('/api/admin/collections/parse', { method: 'POST', body: fd });
         const pdat = await pr.json();
         if (pr.ok && !pdat.parse_error)
@@ -276,7 +273,6 @@
         relPath: batchItems[i].relPath,
         collection: collectionName,
         tenants: uploadTenants,
-        itrTemplate: uploadITR,
         metadata: parsedMeta,
         language: uploadLanguage,
         chunkingStrategy: uploadChunkingStrategy,
@@ -324,7 +320,6 @@
 
     const form = new FormData();
     form.append('file', uploadFile);
-    form.append('itrust_template', String(uploadITR));
 
     try {
       const res  = await fetch('/api/admin/collections/parse', { method: 'POST', body: form });
@@ -358,8 +353,6 @@
     }
   }
 
-  function onITRChange() { if (uploadFile) triggerParse(); }
-
   async function _enqueue(i: number) {
     const file = batchFiles[i];
     batchItems[i] = { ...batchItems[i], status: 'queued' };
@@ -371,7 +364,6 @@
       relPath: batchItems[i].relPath,
       collection: collectionName,
       tenants: uploadTenants,
-      itrTemplate: uploadITR,
       metadata: { ...metadata, ...customFieldsRecord },
       language: uploadLanguage,
       chunkingStrategy: uploadChunkingStrategy,
@@ -546,13 +538,6 @@
               <input type="file" accept=".docx,.pdf,.xlsx,.xlsm,.json,.csv,.txt,.md,.markdown,.pptx" multiple onchange={onFileChange} />
             </label>
           {/if}
-          <label class="field toggle-field">
-            <input type="checkbox" bind:checked={uploadITR} onchange={onITRChange} />
-            <span>itrust document template
-              <span class="info-icon" use:tooltip={"Parser will assume itrust template to extract metadata."}><InfoIcon/></span>
-            </span>
-          </label>
-
           {#if isExcel && allSheets.length > 1 && parseDone}
             <div class="field">
               <span>Sheets
@@ -960,7 +945,6 @@
   outline: none; border-color: var(--color-blue-500);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-blue-500) 15%, transparent);
 }
-.toggle-field { flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 400; color: var(--color-neutral-800); }
 .req { color: var(--color-red-500); }
 
 /* ── Buttons ── */

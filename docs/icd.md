@@ -226,8 +226,8 @@ All require a Bearer JWT; ownership is enforced inside the `users` service (a re
 
 | Method & Path | Purpose | Auth |
 |---|---|---|
-| `POST /api/parse` | parse-only preview, no persistence; `multipart/form-data` (`file`, `itrust_template`) → `{"metadata": {...}, "markdown": str, "filename": str}` | Bearer JWT (no collection-level check — nothing is targeted yet) |
-| `POST /api/upload` | ingest; `multipart/form-data` (`file`, `collection`, `tenants` (JSON-encoded list), `itrust_template`, `original_filename`, `metadata_overrides` (JSON), `language`, `selected_sheets` (JSON), `chunking_strategy`, `max_chars`, `max_depth`) → `{"ok": true, "collection": str, "source": str, "n_chunks": int, "n_upserted": int, "elapsed_ms": float}` | `assert_collection_moderator` |
+| `POST /api/parse` | parse-only preview, no persistence; `multipart/form-data` (`file`) → `{"metadata": {...}, "markdown": str, "filename": str}` | Bearer JWT (no collection-level check — nothing is targeted yet) |
+| `POST /api/upload` | ingest; `multipart/form-data` (`file`, `collection`, `tenants` (JSON-encoded list), `original_filename`, `metadata_overrides` (JSON), `language`, `selected_sheets` (JSON), `chunking_strategy`, `max_chars`, `max_depth`) → `{"ok": true, "collection": str, "source": str, "n_chunks": int, "n_upserted": int, "elapsed_ms": float}` | `assert_collection_moderator` |
 | `GET /api/collections` | list collections visible to the caller | Bearer JWT, filtered by `can_read_collection` — **this is the only collections-listing endpoint; the prior ICD's reference to a separate unauthenticated `GET /collections` on the health router does not correspond to any route in the current codebase** |
 | `GET /api/collections/document-counts` | per-collection counts | filtered as above |
 | `GET /api/collections/{name}` | collection detail; moderators/owners see extra `tenants`/`owner_tenant` fields | filtered as above |

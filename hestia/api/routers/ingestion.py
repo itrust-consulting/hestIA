@@ -34,7 +34,7 @@ def _save_temp(file_bytes: bytes, suffix: str) -> str:
         return tmp.name
 
 
-def _get_parser_direct(file_path: Path, itrust_template: bool):
+def _get_parser_direct(file_path: Path):
     from hestia.application.ingestion import SUPPORTED_EXTENSIONS
     from hestia.domain.exceptions import ValidationError as DomainValidationError
 
@@ -44,21 +44,12 @@ def _get_parser_direct(file_path: Path, itrust_template: bool):
             f"File type '{ext}' not supported. Supported: {', '.join(SUPPORTED_EXTENSIONS)}"
         )
     if ext == ".docx":
-        if itrust_template:
-            from hestia.infrastructure.parsers.docx import ITRDOCXParser
-            return ITRDOCXParser(file=str(file_path))
         from hestia.infrastructure.parsers.docx import DOCXParser
         return DOCXParser(file=str(file_path))
     if ext == ".pdf":
-        if itrust_template:
-            from hestia.infrastructure.parsers.pdf import ITRPDFParser
-            return ITRPDFParser(file=str(file_path))
         from hestia.infrastructure.parsers.pdf import PDFParser
         return PDFParser(file=str(file_path))
     if ext in (".xlsx", ".xlsm"):
-        if itrust_template:
-            from hestia.infrastructure.parsers.xlsx import ITRXLSXParser
-            return ITRXLSXParser(file=str(file_path))
         from hestia.infrastructure.parsers.xlsx import XLSXParser
         return XLSXParser(file=str(file_path))
     if ext == ".json":
@@ -84,7 +75,6 @@ def _get_parser_direct(file_path: Path, itrust_template: bool):
 @router.post("/parse")
 async def parse_document(
     file: UploadFile = File(...),
-    itrust_template: bool = Form(False),
     _user: User = Depends(get_current_user),
 ):
     """Parse a document and return its metadata without ingesting."""
@@ -97,8 +87,8 @@ async def parse_document(
     tmp_path = _save_temp(data, suffix)
     parser = None
     try:
-        parser = _get_parser_direct(Path(tmp_path), itrust_template)
-        metadata = parser.get_metadata(builtIn_only=not itrust_template, mask_name="rag_default")
+        parser = _get_parser_direct(Path(tmp_path))
+        metadata = parser.get_metadata(mask_name="rag_default")
         metadata["source"] = Path(file.filename).stem
         metadata["source_uri"] = file.filename
         markdown = parser.to_markdown()
@@ -120,7 +110,6 @@ async def upload_document(
     file: UploadFile = File(...),
     collection: str = Form(...),
     tenants: str = Form("[]"),
-    itrust_template: bool = Form(False),
     metadata_overrides: str = Form("{}"),
     language: str = Form("english"),
     selected_sheets: str = Form("[]"),
@@ -162,7 +151,6 @@ async def upload_document(
         tenants=tenants_list,
         uploaded_by=user.username,
         classification_labels=h.container.settings.classification_labels,
-        itrust_template=itrust_template,
         original_filename=file.filename,
         metadata_overrides=overrides,
         language=language,

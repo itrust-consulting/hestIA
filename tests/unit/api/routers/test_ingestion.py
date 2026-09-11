@@ -58,25 +58,14 @@ class TestGetParserDirect:
     def test_unsupported_extension_raises(self, tmp_path):
         f = tmp_path / "file.xyz"
         with pytest.raises(DomainValidationError):
-            _get_parser_direct(f, itrust_template=False)
+            _get_parser_direct(f)
 
     def test_txt_returns_txt_parser(self, tmp_path):
         f = tmp_path / "file.txt"
         f.write_text("hello world")
         from hestia.infrastructure.parsers.txt import TXTParser
-        parser = _get_parser_direct(f, itrust_template=False)
+        parser = _get_parser_direct(f)
         assert isinstance(parser, TXTParser)
-
-    def test_docx_itr_returns_itr_parser(self, tmp_path):
-        f = tmp_path / "file.docx"
-        f.write_bytes(b"")
-        # _get_parser_direct imports lazily inside the function body.
-        # Patch the class on the source module so the `from ... import` inside
-        # the function picks up the mock (Python resolves it from sys.modules).
-        with patch("hestia.infrastructure.parsers.docx.ITRDOCXParser") as MockP:
-            MockP.return_value = MagicMock()
-            _get_parser_direct(f, itrust_template=True)
-        MockP.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +252,6 @@ class TestParseDocument:
         with patch("hestia.api.routers.ingestion._get_parser_direct", return_value=mock_parser):
             resp = client.post(
                 "/parse",
-                data={"itrust_template": "false"},
                 files={"file": ("doc.txt", BytesIO(b"hello world"), "text/plain")},
             )
 
@@ -286,7 +274,6 @@ class TestParseDocument:
         with patch("hestia.api.routers.ingestion._get_parser_direct", return_value=mock_parser):
             resp = client.post(
                 "/parse",
-                data={"itrust_template": "false"},
                 files={"file": ("doc.txt", BytesIO(b"hello world"), "text/plain")},
             )
 

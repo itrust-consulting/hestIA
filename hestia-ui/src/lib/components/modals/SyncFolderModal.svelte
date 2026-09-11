@@ -53,7 +53,7 @@
   let bulkLanguage = $state('english');
 
   // Chunking config applies once to the whole sync run, not per-file --
-  // matches how tenants/itrust-template are already applied uniformly here.
+  // matches how tenants are already applied uniformly here.
   let syncChunkingStrategy = $state('auto');
   let syncMaxChars: number | undefined = $state(undefined);
   let syncMaxDepth: number | undefined = $state(undefined);
@@ -230,7 +230,6 @@
         relPath: item.relPath,
         collection: collectionName,
         tenants: defaultTenants,
-        itrTemplate: false,
         metadata: classification ? { classification } : {},
         language: languageByPath[item.relPath] || 'english',
         chunkingStrategy: syncChunkingStrategy,

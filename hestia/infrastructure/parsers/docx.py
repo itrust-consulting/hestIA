@@ -250,39 +250,3 @@ class DOCXParser(BaseParser):
         self.body = "\n\n".join(lines)
         _log.debug("docx_to_markdown", extra={"file": self.filepath, "n_blocks": len(lines)})
         return self.body
-
-
-class ITRDOCXParser(DOCXParser):
-    """DOCXParser extended for iTrust document templates (cover-page metadata)."""
-
-    def __init__(self, file=None):
-        super().__init__(file=file)
-
-    def get_metadata_from_cover_page(self, file: str) -> dict:
-        doc = Document(file)
-        if len(doc.tables) < 2:
-            return {}
-        rows = self.extract_table_text(doc.tables[1])
-        metadata = {}
-        for row in rows:
-            if len(row) == 2 and row[0].strip():
-                metadata[row[0].strip()] = row[1].strip()
-        return metadata
-
-    def get_metadata(self, builtIn_only: bool = True, mask_name: str | None = None) -> dict:
-        stem = Path(self.filepath).stem
-        builtin = self.get_builtin_metadata(self.filepath)
-        metadata = {**builtin, "source": stem, "source_uri": str(self.filepath)}
-
-        if not builtIn_only:
-            try:
-                custom = self.get_metadata_from_cover_page(self.filepath)
-                metadata = {**metadata, **custom}
-            except (IndexError, KeyError) as e:
-                _log.warning("cover_page_metadata_failed", extra={"file": self.filepath, "error": str(e)})
-
-        if mask_name:
-            metadata = MetadataFilter().filter(metadata, mask_name)
-
-        self.meta = metadata
-        return metadata

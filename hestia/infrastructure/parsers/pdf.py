@@ -99,29 +99,3 @@ class PDFParser(BaseParser):
         self.body = md
         _log.debug("pdf_to_markdown", extra={"file": self.filepath, "length": len(md)})
         return md
-
-
-class ITRPDFParser(PDFParser):
-    """PDFParser extended for iTrust document templates (cover-page metadata)."""
-
-    def __init__(self, file=None):
-        super().__init__(file=file)
-
-    # @MRS-013
-    def get_metadata(self, builtIn_only: bool = True, mask_name: str | None = None) -> dict:
-        stem = Path(self.filepath).stem
-        builtin = self.get_builtin_metadata()
-        metadata = {**builtin, "source": stem, "source_uri": str(self.filepath)}
-
-        if not builtIn_only:
-            try:
-                custom = self.get_metadata_from_cover_page()
-                metadata = {**metadata, **custom}
-            except (IndexError, KeyError, AttributeError) as e:
-                _log.warning("cover_page_metadata_failed", extra={"file": self.filepath, "error": str(e)})
-
-        if mask_name:
-            metadata = MetadataFilter().filter(metadata, mask_name)
-
-        self.meta = metadata
-        return metadata

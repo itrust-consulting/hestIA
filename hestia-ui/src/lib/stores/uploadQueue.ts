@@ -28,7 +28,6 @@ export type UploadJob = {
   relPath?: string;
   collection: string;
   tenants: string[];
-  itrTemplate: boolean;
   metadata: Record<string, string>;
   language: string;
   chunkingStrategy?: string;
@@ -99,7 +98,6 @@ async function _processNext() {
     form.append('file', job.file, job.relPath || job.file.name);
     form.append('collection', job.collection);
     form.append('tenants', JSON.stringify(job.tenants));
-    form.append('itrust_template', String(job.itrTemplate));
     form.append('metadata_overrides', JSON.stringify(job.metadata));
     form.append('language', job.language);
     if (job.chunkingStrategy) {

@@ -4,12 +4,10 @@ import pathlib
 import pytest
 
 PDF_FILE = pathlib.Path(__file__).parents[4] / "tests" / "test_inputs" / "Test-Document.pdf"
-PDF_ITR = pathlib.Path(__file__).parents[4] / "tests" / "test_inputs" / "Test-Document-ITR.pdf"
 
 skip_if_missing = pytest.mark.skipif(not PDF_FILE.exists(), reason="Test PDF not found")
-skip_if_itr_missing = pytest.mark.skipif(not PDF_ITR.exists(), reason="ITR PDF not found")
 
-from hestia.infrastructure.parsers.pdf import PDFParser, ITRPDFParser
+from hestia.infrastructure.parsers.pdf import PDFParser
 
 
 @skip_if_missing
@@ -130,39 +128,3 @@ class TestPDFParserIgnoreImages:
         md = parser.to_markdown(ignore_images=True)
         # pymupdf4llm uses markers like "![img-N.jpeg]" — should be absent
         assert "![" not in md
-
-
-@skip_if_itr_missing
-class TestITRPDFParser:
-
-    @pytest.fixture(scope="class")
-    def parser(self):
-        p = ITRPDFParser(file=str(PDF_ITR))
-        yield p
-        p.close()
-
-    def test_loads_without_error(self, parser):
-        assert parser.doc is not None
-
-    def test_metadata_returned(self, parser):
-        meta = parser.get_metadata(builtIn_only=False)
-        assert isinstance(meta, dict)
-
-    def test_to_markdown_non_empty(self, parser):
-        md = parser.to_markdown()
-        assert len(md) > 0
-
-    def test_metadata_with_mask(self, parser):
-        meta = parser.get_metadata(mask_name="rag_default")
-        assert "source" in meta
-
-    def test_metadata_swallows_cover_page_errors(self, monkeypatch):
-        p = ITRPDFParser(file=str(PDF_ITR))
-        try:
-            def boom():
-                raise KeyError("bad cover page")
-            monkeypatch.setattr(p, "get_metadata_from_cover_page", boom)
-            meta = p.get_metadata(builtIn_only=False)
-            assert "source" in meta
-        finally:
-            p.close()
