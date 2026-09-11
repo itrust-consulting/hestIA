@@ -361,3 +361,7 @@ A1_Prototypes/
 ├── Dockerfile                  # Backend container
 └── docker-compose.yml          # Multi-service orchestration
 ```
+
+## Disclaimer
+
+Claude Code was used during the development of this application.
