@@ -6,7 +6,7 @@ title: Administration
 # Administration
 
 > [!NOTE]
-> The Admin panel is accessible to users with the **admin** or **moderator** role. Open it via the account menu in the top-right corner and select **Admin Panel**.
+> The Admin panel is accessible to users with the **admin**, **moderator**, or **co-moderator** role. Open it via the account menu in the top-right corner and select **Admin Panel**.
 
 ---
 
@@ -34,8 +34,8 @@ Admins have platform-wide access. They manage users and organisations, and can p
 #### Adding a user
 
 1. Click **Add User** (top-right of the Users page).
-2. Fill in **First name**, **Last name**, **Email**, **Username**, and optionally an **Expiry date**.
-3. Save. The user can log in immediately with the provided credentials.
+2. Fill in **First name**, **Last name**, **Email**, **Username**, and a **Default Password** (use **Generate** for a random one), plus optionally an **Expiry date**.
+3. Save. The user can log in immediately with the credentials you set.
 
 > [!TIP]
 > For LDAP / OIDC deployments, accounts are created automatically on first login. You can still add users manually to pre-assign roles or set expiry dates before their first sign-in.
@@ -131,8 +131,7 @@ Admins can create collections from the Collections list or from inside an organi
 
 #### Deleting a collection
 
-- **From the list**: click **Delete** on the row (takes effect immediately — no confirmation dialog).
-- **From the detail page**: click **Delete collection** in the header and confirm.
+Click **Delete** on the row in the Collections list, or **Delete collection** in the detail page header — both ask you to confirm before deleting.
 
 ---
 
@@ -203,7 +202,7 @@ Moderators manage collections **owned** by their organisation. Collections grant
 
 1. Open the collection detail page.
 2. Click **Add document** in the header.
-3. Select a supported file (PDF, DOCX, XLSX/XLSM, PPTX, TXT, CSV).
+3. Select a supported file (PDF, DOCX, XLSX/XLSM, PPTX, TXT, CSV, JSON, Markdown).
 4. Confirm. Indexing runs in the background — the document becomes queryable once complete.
 
 > [!WARNING]
@@ -211,7 +210,7 @@ Moderators manage collections **owned** by their organisation. Collections grant
 
 #### Replacing a document
 
-Click **Replace** on the document row in the collection, confirm the prompt, then upload the new version. Old index entries are removed and the replacement is indexed automatically.
+Click **Replace** on the document row, confirm the prompt — this removes the existing document and its index entries — then the upload dialog opens for you to pick and upload the new version, going through the same steps as a fresh upload.
 
 #### Deleting a document
 
@@ -219,16 +218,16 @@ Click **Delete** on the document row and confirm.
 
 #### Granting another organisation access
 
-1. Click **Manage access** in the collection detail header.
-2. Select a **tenant** from the dropdown and set the **maximum classification level** they may access.
-3. Click **Grant access**.
+1. Click **Manage Access** in the collection detail header.
+2. Search for and select the tenant you want to grant — access is created immediately, capped at **Public** by default.
+3. Adjust the cap using the classification dropdown on that tenant's row in the same modal.
 
 > [!TIP]
 > The maximum classification cap applies on top of each user's individual ceiling — whichever is stricter wins. If an external user is cleared to Confidential but the collection is capped at Internal for their organisation, they only see Internal-level passages.
 
 #### Revoking access
 
-In the **Manage access** modal, click **Revoke** on the organisation's row.
+In the **Manage Access** modal, click **Revoke** on the tenant's row — this takes effect immediately.
 
 ```mermaid
 flowchart TD

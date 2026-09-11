@@ -75,7 +75,7 @@ Click the <img src="/icons/plus-circle.svg" class="icon-img" alt="plus"> plus ic
 
 **Supported formats:**
  
-**PDF · DOCX · XLSX / XLSM · PPTX · TXT · CSV · JSON**
+**PDF · DOCX · XLSX / XLSM · PPTX · TXT · CSV · JSON · Markdown**
 
 
 <br>

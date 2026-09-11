@@ -9,7 +9,7 @@ title: FAQ
 
 Check that Caps Lock is off and that you are using your username (not your e-mail address, unless your administrator has configured e-mail login). If your organisation uses SSO, use the SSO button rather than the username/password form.
 
-If the problem persists, your account may be disabled or expired. Contact your **system administrator** to verify your account status.
+If the problem persists, your account may be temporarily locked out after too many failed attempts, or it may have expired. Contact your **system administrator** to verify your account status.
 </details>
 
 <details>
@@ -53,7 +53,7 @@ hestIA shows you the passage it retrieved, but it does not provide a download li
 <details>
 <summary>I attached a file but hestIA does not seem to use it.</summary>
 
-Make sure the file is in a supported format (PDF, DOCX, XLSX/XLSM, PPTX, TXT, CSV) and that it uploaded successfully (you should see it appear in the input bar before sending). If the file is very large or heavily image-based (e.g. a scanned PDF with no text layer), extraction may be limited. Try asking explicitly: "Based on the attached document, …"
+Make sure the file is in a supported format (PDF, DOCX, XLSX/XLSM, PPTX, TXT, CSV, JSON, Markdown) and that it uploaded successfully (you should see it appear in the input bar before sending). If the file is very large or heavily image-based (e.g. a scanned PDF with no text layer), extraction may be limited. Try asking explicitly: "Based on the attached document, …"
 </details>
 
 <details>

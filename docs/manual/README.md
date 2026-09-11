@@ -54,11 +54,19 @@ Navigate to the hestIA URL provided by your administrator.
 
 **SSO / OIDC:** If your organisation uses single sign-on (e.g., Keycloak), click the SSO button on the login page and authenticate through your organisation's identity provider.
 
-> Sessions remain active for up to 6 hours by default. You will be returned to the login page when your session expires.
 
 ### 2.3 Changing Your Password
 
 Go to **Account → Overview** in the top navigation. Enter your current password and your new password, then save. Password changes take effect immediately.
+
+### 2.4 Joining a Tenant
+
+You can only query a department's or team's documents once you're a member of the corresponding tenant. This happens one of two ways:
+
+- **Invitation** — a tenant moderator invites you directly. You'll see the invitation among your account notifications and can accept or decline it.
+- **Self-service request** — if you know which tenant you need, you can file a join request yourself; a moderator of that tenant reviews it and approves or rejects it.
+
+Until you're a member of a tenant, you can still use hestIA for general-purpose questions, but you won't get answers grounded in that tenant's documents.
 
 ---
 
@@ -111,6 +119,8 @@ The following file types can be ingested into document collections or attached i
 | PowerPoint presentation | `.pptx` |
 | Plain text | `.txt` |
 | CSV | `.csv` |
+| Markdown | `.md`, `.markdown` |
+| JSON | `.json` |
 
 ### 4.2 How Documents Are Indexed
 
@@ -130,12 +140,18 @@ This section is intended for users with the **admin** role or **tenant moderator
 
 ### 5.1 Role Overview
 
-| Role | Scope | Capabilities |
-|---|---|---|
-| `admin` | Platform-wide | Full access: users, roles, tenants, collections |
-| `moderator` | Tenant | Manage tenant members and their access levels |
-| `co-moderator` | Tenant | Assist the moderator with tenant management |
-| `user` | Tenant | Query collections they have access to |
+Roles work on two independent levels: a **platform role** (`admin` or `user`) that is the
+same everywhere, and an optional **tenant role** (`moderator` or `co-moderator`) that only
+applies within one specific tenant a person belongs to. Someone with no tenant role in a
+given tenant is simply a **member** of it.
+
+| Role | Level | Scope | Capabilities |
+|---|---|---|---|
+| `admin` | Platform | Everywhere | Full access: users, roles, tenants, collections |
+| `user` | Platform | Everywhere | The default platform role; further capabilities come entirely from tenant membership |
+| `moderator` | Tenant | One tenant | Manage that tenant's members and their access levels |
+| `co-moderator` | Tenant | One tenant | Assist the moderator with tenant management |
+| _member (no tenant role)_ | Tenant | One tenant | Query collections that tenant has access to |
 
 ### 5.2 User Management (Admin)
 
@@ -143,7 +159,7 @@ Navigate to **Admin → Users**.
 
 - **Create a user:** Click **New user**, fill in the username, email, and initial password, and assign a role.
 - **Edit a user:** Click the user row to update their details, role, or expiration date.
-- **Disable / delete a user:** Use the action menu on the user row. Disabled users cannot log in; deleted users are removed permanently.
+- **Delete a user:** Use the action menu on the user row. This permanently removes the account — hestIA does not currently support disabling an account without deleting it.
 
 > When using LDAP or OIDC, user accounts are created automatically on first login. You can still edit roles and expiration dates from this panel.
 
@@ -171,6 +187,8 @@ Moderators manage members within their assigned tenant without needing full admi
 - Add and remove members.
 - Adjust member classification levels.
 - Assign or revoke the co-moderator role.
+- Invite specific users to join the tenant, or review and approve/reject self-service join requests.
+- Request access to another tenant's collection, and approve or reject incoming requests from other tenants for collections their own tenant owns.
 
 ---
 
@@ -182,7 +200,7 @@ All document processing, model inference, and data storage occur within your org
 
 ### 6.2 Audit Logging
 
-Every query, response, login, and administrative action is written to a structured audit log. Logs are stored locally and can be forwarded to your organisation's SIEM or log management system. Contact your administrator for log access.
+Security-relevant events — queries, responses, logins, and administrative changes — are written to a structured audit log as metadata (who did what, and when): the actual text of a query or response is never written to the audit log. Login/logout auditing is off by default and must be turned on by an administrator. Logs are stored locally and can be forwarded to your organisation's SIEM or log management system. Contact your administrator for log access.
 
 ### 6.3 Access Control
 
@@ -194,7 +212,7 @@ Access to documents is enforced at query time based on:
 
 A user who is not a member of a tenant, or whose classification level is insufficient, will not receive answers drawn from the restricted documents, even if they know the documents exist. This enforcement is automatic and transparent: hestIA simply answers as if those documents do not exist for that user.
 
-**Cross-organisation sharing:** Administrators can grant an external tenant (e.g., a partner organisation) access to a collection while setting a maximum classification level for that tenant. This allows controlled knowledge sharing — for example, publishing regulatory guidelines to partners — without exposing content above the permitted classification ceiling. The external organisation's users interact with the shared collection exactly like any other, subject to their own individual classification levels and the cap set by the owning organisation.
+**Cross-organisation sharing:** Tenant moderators (or administrators) can grant an external tenant (e.g., a partner organisation) access to a collection while setting a maximum classification level for that tenant. This allows controlled knowledge sharing — for example, publishing regulatory guidelines to partners — without exposing content above the permitted classification ceiling. The external organisation's users interact with the shared collection exactly like any other, subject to their own individual classification levels and the cap set by the owning organisation.
 
 ### 6.4 Authentication Modes
 
@@ -247,6 +265,9 @@ For account issues, contact your **system administrator**. For questions about w
 | **Embedding** | A numerical representation of text that captures its meaning, allowing similar passages to be found by a search. |
 | **Vector database** | A specialised database that stores embeddings and enables fast similarity search across large document sets. |
 | **Classification level** | A per-user, per-tenant access tier that restricts which documents within a collection a user may query. |
+| **Join request** | A user-initiated request to become a member of a specific tenant; reviewed and approved or rejected by a moderator of that tenant. |
+| **Invitation** | A moderator-initiated invite for a specific user to join their tenant; the invited user accepts or declines it. |
+| **Share request** | A moderator-initiated request for their tenant to be granted access to another tenant's collection; approved or rejected by a moderator of the owning tenant. |
 | **Citation** | A reference in the AI's response pointing to the specific source passage the information was drawn from. |
 | **LDAP** | Lightweight Directory Access Protocol — a standard for accessing corporate directory services (e.g., Active Directory). |
 | **OIDC** | OpenID Connect — a standard protocol for single sign-on authentication. |
