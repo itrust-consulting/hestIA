@@ -6,11 +6,8 @@
   import LogoutIcon from '$lib/components/icons/logoutIcon.svelte';
   import OrgIcon from '$lib/components/icons/orgIcon.svelte';
 
+  import { version as currentVersion } from '$app/environment';
 
-  import { env } from '$env/dynamic/public';
-
-  const currentVersion = env.PUBLIC_APP_VERSION;
-  
   export let currentSection: string = "profile";
 
   const sections = [

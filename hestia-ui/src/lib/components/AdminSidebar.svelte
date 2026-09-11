@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { env } from '$env/dynamic/public';
+  import { version as currentVersion } from '$app/environment';
   import { page } from '$app/stores';
   import ItrustIcon from './icons/itrustIcon.svelte';
-
-  const currentVersion = env.PUBLIC_APP_VERSION;
 
   const adminNavGroups = [
     {

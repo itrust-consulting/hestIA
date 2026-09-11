@@ -4,9 +4,7 @@
   import BookIcon    from '$lib/components/icons/bookIcon.svelte';
   import AdminIcon   from '$lib/components/icons/adminIcon.svelte';
   import HelpIcon    from '$lib/components/icons/helpIcon.svelte';
-  import { env }     from '$env/dynamic/public';
-
-  const currentVersion = env.PUBLIC_APP_VERSION;
+  import { version as currentVersion } from '$app/environment';
 
   export let sections: Array<{ id: string; title: string }> = [];
   export let currentSection: string = 'getting-started';
