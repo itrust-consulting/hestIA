@@ -4,7 +4,7 @@
 
 hestIA is a sub-project of the CyFORT project, which in turn stands for "Cloud Cybersecurity Fortress of Open Resources and Tools for Resilience", carried out in the context of the IPCEI-CIS project.
 
-<img width="1200" height="600" alt="CyFORT-logo" src="https://github.com/user-attachments/assets/72179f45-256a-4f93-8c13-ce2411ab0c40" />
+<img width="400" height="200" alt="CyFORT-logo" src="https://github.com/user-attachments/assets/72179f45-256a-4f93-8c13-ce2411ab0c40" />
 
 hestIA is an on-premises RAG assistant for querying internal policy, compliance, and
 knowledge-base documents. It grounds every response in source passages that users can inspect
