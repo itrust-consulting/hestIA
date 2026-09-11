@@ -357,36 +357,3 @@ A1_Prototypes/
 ├── Dockerfile                  # Backend container
 └── docker-compose.yml          # Multi-service orchestration
 ```
-
-## Changelog v0.3
-
-**Added**
-
-- Admin-configurable runtime settings: LLM/embedding/vector-DB connections, auth and logging
-  settings with log export, and a visual editor for the RAG workflow pipeline — all
-  configurable from the Admin UI without a restart.
-- Tenant collaboration workflows: users can request to join a tenant, moderators can invite
-  users directly, and moderators can request and grant cross-tenant access to specific
-  collections, with admin broadcast notifications.
-- Automatic chunking-strategy detection (block/section, prose vs. table) with manual override,
-  plus per-document metadata inspection and editing after upload.
-- Collection ownership can now be reassigned between organisations by an admin.
-- Per-conversation knowledge-base/corpus selection, with keyboard shortcuts to switch between
-  corpora.
-- The bootstrap admin account is now configured via `DEFAULT_ADMIN_USERNAME`/`PASSWORD`/`EMAIL`
-  environment variables on first boot, instead of a hardcoded default.
-
-**Fixed**
-
-- Classification level mismatch between backend and frontend enums, which could show or hide
-  the wrong documents.
-- Chat used a hardcoded model name that caused errors once the underlying model changed; the
-  active model is now read from settings.
-- First boot could fail to initialize because the `app/data` directory wasn't created if
-  missing.
-- Retrieved RAG context was being resent on every turn of a conversation, needlessly bloating
-  the context window; it's now sent only with the originating query.
-- Audit logging could report a partially-successful admin action as a failure; account
-  expiration used mismatched time units that could lock accounts out immediately; streaming
-  chat/generate could crash if a save-conversation flag was omitted from the request;
-  non-streaming responses were mislabeled as JSON while actually returning raw text.
